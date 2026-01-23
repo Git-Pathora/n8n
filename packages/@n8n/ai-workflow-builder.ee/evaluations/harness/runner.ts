@@ -534,6 +534,8 @@ async function runLocalExample(args: {
 			workflow,
 			generatedCode,
 			tokenUsage,
+			dos: testCase.context?.dos,
+			donts: testCase.context?.donts,
 		};
 
 		artifactSaver?.saveExample(result);
@@ -558,6 +560,8 @@ async function runLocalExample(args: {
 			],
 			durationMs,
 			error: errorMessage,
+			dos: testCase.context?.dos,
+			donts: testCase.context?.donts,
 		};
 
 		artifactSaver?.saveExample(result);
@@ -1077,6 +1081,12 @@ async function runLangsmith(config: LangsmithRunConfig): Promise<RunSummary> {
 		const prompt = extractPrompt(inputs);
 		const { evals: datasetContext, ...rest } = inputs;
 
+		// Extract context from inputs before try block so it's available for error cases
+		const extracted = extractContextFromLangsmithInputs({
+			...asRecord(datasetContext),
+			...asRecord(rest),
+		});
+
 		lifecycle?.onExampleStart?.(index, totalExamples, prompt);
 		const startTime = Date.now();
 		const genStart = Date.now();
@@ -1119,10 +1129,6 @@ async function runLangsmith(config: LangsmithRunConfig): Promise<RunSummary> {
 
 			lifecycle?.onWorkflowGenerated?.(workflow, genDurationMs);
 
-			const extracted = extractContextFromLangsmithInputs({
-				...asRecord(datasetContext),
-				...asRecord(rest),
-			});
 			const context = buildContext({
 				prompt,
 				globalContext: effectiveGlobalContext,
@@ -1175,6 +1181,8 @@ async function runLangsmith(config: LangsmithRunConfig): Promise<RunSummary> {
 				workflow,
 				generatedCode,
 				tokenUsage,
+				dos: extracted.dos,
+				donts: extracted.donts,
 			};
 
 			artifactSaver?.saveExample(result);
@@ -1223,6 +1231,8 @@ async function runLangsmith(config: LangsmithRunConfig): Promise<RunSummary> {
 				generationDurationMs: genDurationMs,
 				workflow,
 				error: errorMessage,
+				dos: extracted.dos,
+				donts: extracted.donts,
 			};
 
 			artifactSaver?.saveExample(result);

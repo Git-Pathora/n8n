@@ -57,6 +57,7 @@ class ModulesHooksRegistry {
 							workflow: this.workflowData,
 							runData,
 							newStaticData,
+							executionId: this.executionId,
 						};
 						// eslint-disable-next-line @typescript-eslint/no-unsafe-return
 						return await instance[methodName].call(instance, context);
@@ -97,6 +98,7 @@ class ModulesHooksRegistry {
 							workflow: this.workflowData,
 							workflowInstance,
 							executionData,
+							executionId: this.executionId,
 						};
 						// eslint-disable-next-line @typescript-eslint/no-unsafe-return
 						return await instance[methodName].call(instance, context);

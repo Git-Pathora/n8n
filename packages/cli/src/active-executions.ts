@@ -116,6 +116,11 @@ export class ActiveExecutions {
 					// Another process is already resuming this execution
 					throw new ExecutionAlreadyResumingError(maybeExecutionId);
 				}
+
+				this.eventService.emit('execution-resumed', {
+					executionId: maybeExecutionId,
+					workflowId: executionData.workflowData.id,
+				});
 			}
 		} catch (error) {
 			capacityReservation.release();

@@ -35,6 +35,7 @@ export type WorkflowExecuteBeforeContext = {
 	workflow: IWorkflowBase;
 	workflowInstance: Workflow;
 	executionData?: IRunExecutionData;
+	executionId: string;
 };
 
 export type WorkflowExecuteAfterContext = {
@@ -42,6 +43,7 @@ export type WorkflowExecuteAfterContext = {
 	workflow: IWorkflowBase;
 	runData: IRun;
 	newStaticData: IDataObject;
+	executionId: string;
 };
 
 /** Context arg passed to a lifecycle event handler method. */

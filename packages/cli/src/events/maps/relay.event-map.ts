@@ -438,6 +438,11 @@ export type RelayEventMap = {
 		reason: CancellationReason;
 	};
 
+	'execution-resumed': {
+		executionId: string;
+		workflowId?: string;
+	};
+
 	'execution-deleted': {
 		user: UserLike;
 		executionIds: string[];

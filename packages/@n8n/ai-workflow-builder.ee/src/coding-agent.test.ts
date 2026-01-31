@@ -1,4 +1,5 @@
 import type { WorkflowJSON } from '@n8n/workflow-sdk';
+import * as workflowSdk from '@n8n/workflow-sdk';
 
 import { CodingAgent, type CodingAgentConfig } from './coding-agent';
 
@@ -304,6 +305,95 @@ describe('CodingAgent', () => {
 				expect(workflowMessage.sourceCode).toContain('trigger');
 				expect(workflowMessage.sourceCode).toContain('workflow');
 			}
+		});
+
+		it('should call generatePinData with beforeWorkflow when currentWorkflow is provided', async () => {
+			// Spy on parseWorkflowCodeToBuilder to capture the builder and spy on generatePinData
+			let capturedGeneratePinDataArgs: unknown[] = [];
+			const originalParseWorkflowCodeToBuilder = workflowSdk.parseWorkflowCodeToBuilder;
+			const parseWorkflowCodeToBuilderSpy = jest
+				.spyOn(workflowSdk, 'parseWorkflowCodeToBuilder')
+				.mockImplementation((code: string) => {
+					const builder = originalParseWorkflowCodeToBuilder(code);
+					// Spy on generatePinData
+					const originalGeneratePinData = builder.generatePinData.bind(builder);
+					builder.generatePinData = jest.fn((options) => {
+						capturedGeneratePinDataArgs.push(options);
+						return originalGeneratePinData(options);
+					});
+					return builder;
+				});
+
+			// Existing workflow already has the Start trigger
+			const currentWorkflow: WorkflowJSON = {
+				id: 'test',
+				name: 'Test',
+				nodes: [
+					{
+						id: '1',
+						name: 'Start',
+						type: 'n8n-nodes-base.manualTrigger',
+						typeVersion: 1.1,
+						position: [240, 300],
+						parameters: {},
+					},
+				],
+				connections: {},
+			};
+
+			const config: CodingAgentConfig = {
+				llm: createMockLLM(validWorkflowCode) as unknown as CodingAgentConfig['llm'],
+			};
+
+			const agent = new CodingAgent(config);
+			const generator = agent.run(samplePlan, currentWorkflow);
+
+			const chunks = [];
+			for await (const chunk of generator) {
+				chunks.push(chunk);
+			}
+
+			// Verify generatePinData was called with beforeWorkflow
+			expect(capturedGeneratePinDataArgs.length).toBe(1);
+			expect(capturedGeneratePinDataArgs[0]).toEqual({ beforeWorkflow: currentWorkflow });
+
+			parseWorkflowCodeToBuilderSpy.mockRestore();
+		});
+
+		it('should call generatePinData without beforeWorkflow when no currentWorkflow is provided', async () => {
+			// Spy on parseWorkflowCodeToBuilder to capture the builder and spy on generatePinData
+			let capturedGeneratePinDataArgs: unknown[] = [];
+			const originalParseWorkflowCodeToBuilder = workflowSdk.parseWorkflowCodeToBuilder;
+			const parseWorkflowCodeToBuilderSpy = jest
+				.spyOn(workflowSdk, 'parseWorkflowCodeToBuilder')
+				.mockImplementation((code: string) => {
+					const builder = originalParseWorkflowCodeToBuilder(code);
+					// Spy on generatePinData
+					const originalGeneratePinData = builder.generatePinData.bind(builder);
+					builder.generatePinData = jest.fn((options) => {
+						capturedGeneratePinDataArgs.push(options);
+						return originalGeneratePinData(options);
+					});
+					return builder;
+				});
+
+			const config: CodingAgentConfig = {
+				llm: createMockLLM(validWorkflowCode) as unknown as CodingAgentConfig['llm'],
+			};
+
+			const agent = new CodingAgent(config);
+			const generator = agent.run(samplePlan); // No currentWorkflow
+
+			const chunks = [];
+			for await (const chunk of generator) {
+				chunks.push(chunk);
+			}
+
+			// Verify generatePinData was called with undefined beforeWorkflow
+			expect(capturedGeneratePinDataArgs.length).toBe(1);
+			expect(capturedGeneratePinDataArgs[0]).toEqual({ beforeWorkflow: undefined });
+
+			parseWorkflowCodeToBuilderSpy.mockRestore();
 		});
 	});
 });

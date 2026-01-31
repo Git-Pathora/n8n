@@ -254,7 +254,7 @@ export class CodingAgent {
 					const parseStartTime = Date.now();
 
 					try {
-						const result = await this.parseAndValidate(workflowCode);
+						const result = await this.parseAndValidate(workflowCode, currentWorkflow);
 						const parseDuration = Date.now() - parseStartTime;
 						workflow = result.workflow;
 						sourceCode = workflowCode;
@@ -502,7 +502,10 @@ export class CodingAgent {
 	/**
 	 * Parse TypeScript code to WorkflowJSON and validate
 	 */
-	private async parseAndValidate(code: string): Promise<ParseAndValidateResult> {
+	private async parseAndValidate(
+		code: string,
+		currentWorkflow?: WorkflowJSON,
+	): Promise<ParseAndValidateResult> {
 		this.debugLog('PARSE_VALIDATE', 'Parsing workflow code...');
 
 		// Parse the TypeScript code to WorkflowBuilder
@@ -528,6 +531,9 @@ export class CodingAgent {
 				nodeName: w.nodeName,
 			});
 		}
+
+		// Generate pin data for new nodes only (nodes not in currentWorkflow)
+		builder.generatePinData({ beforeWorkflow: currentWorkflow });
 
 		// Convert to JSON
 		const workflow: WorkflowJSON = builder.toJSON();

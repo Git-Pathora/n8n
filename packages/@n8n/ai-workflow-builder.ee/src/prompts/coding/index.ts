@@ -228,7 +228,7 @@ return workflow('ai-calculator', 'AI Calculator')
   .add(startTrigger.to(aiAgent));
 \`\`\`
 
-### AI Agent with $fromAI (AI-Driven Parameters)
+### AI Agent with fromAi() (AI-Driven Parameters)
 \`\`\`typescript
 const openAiModel = languageModel({{
   type: '@n8n/n8n-nodes-langchain.lmChatOpenAi',
@@ -244,16 +244,16 @@ const openAiModel = languageModel({{
 const gmailTool = tool({{
   type: 'n8n-nodes-base.gmailTool',
   version: 1,
-  config: ($) => ({{
+  config: {{
     name: 'Gmail Tool',
     parameters: {{
-      sendTo: $.fromAI('recipient', 'Email address'),
-      subject: $.fromAI('subject', 'Email subject'),
-      message: $.fromAI('body', 'Email content')
+      sendTo: fromAi('recipient', 'Email address'),
+      subject: fromAi('subject', 'Email subject'),
+      message: fromAi('body', 'Email content')
     }},
     credentials: {{ gmailOAuth2: newCredential('Gmail') }},
     position: [700, 500]
-  }})
+  }}
 }});
 
 const aiAgent = node({{

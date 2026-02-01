@@ -119,6 +119,7 @@ export {
 	retriever,
 	documentLoader,
 	textSplitter,
+	fromAi, // Top-level function for $fromAI expressions
 } from './subnode-builders';
 
 // Merge nodes - use merge() factory and .input(n) syntax for connections

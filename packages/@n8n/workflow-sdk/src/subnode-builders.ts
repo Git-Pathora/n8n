@@ -517,3 +517,51 @@ export type RerankerFn = typeof reranker;
  */
 export const embeddings = embedding;
 export type EmbeddingsFn = EmbeddingFn;
+
+// =============================================================================
+// fromAi Function (Top-Level SDK Function)
+// =============================================================================
+
+/**
+ * Create a $fromAI expression for AI-driven parameter values.
+ *
+ * This is a top-level SDK function that generates $fromAI expressions
+ * for tool parameters. At runtime, the AI agent will provide values
+ * for these parameters based on the description.
+ *
+ * NEW PATTERN: Use fromAi() directly instead of config callbacks.
+ *
+ * @example Old pattern (deprecated):
+ * ```typescript
+ * tool({
+ *   type: 'n8n-nodes-base.gmailTool',
+ *   version: 1,
+ *   config: ($) => ({ parameters: { sendTo: $.fromAI('to', 'Email recipient') } })
+ * })
+ * ```
+ *
+ * @example New pattern:
+ * ```typescript
+ * tool({
+ *   type: 'n8n-nodes-base.gmailTool',
+ *   version: 1,
+ *   config: { parameters: { sendTo: fromAi('to', 'Email recipient') } }
+ * })
+ * ```
+ *
+ * @param key - Unique identifier for the parameter
+ * @param description - Optional description to help the AI understand what value to provide
+ * @param type - Expected value type: 'string' (default), 'number', 'boolean', 'json'
+ * @param defaultValue - Optional fallback value if AI doesn't provide one
+ * @returns A $fromAI expression string
+ */
+export function fromAi(
+	key: string,
+	description?: string,
+	type?: FromAIArgumentType,
+	defaultValue?: string | number | boolean | object,
+): string {
+	return createFromAIExpression(key, description, type, defaultValue);
+}
+
+export type FromAiFn = typeof fromAi;

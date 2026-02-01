@@ -37,9 +37,11 @@
 		"dist/**/*"
 	],
 	"devDependencies": {
-		"@n8n/typescript-config": "workspace:*"
+		"@n8n/typescript-config": "workspace:*",
+		"@types/estree": "^1.0.8"
 	},
 	"dependencies": {
+		"acorn": "8.14.0",
 		"minifaker": "1.34.1",
 		"n8n-workflow": "workspace:*",
 		"uuid": "catalog:",

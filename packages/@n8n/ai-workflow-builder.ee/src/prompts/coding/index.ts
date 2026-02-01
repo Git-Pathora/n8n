@@ -270,6 +270,8 @@ return workflow('ai-email', 'AI Email Sender')
 
 ### Multiple Triggers (Separate Chains)
 \`\`\`typescript
+// You can only create one workflow() at a time.
+// But you can create multiple flows in a workflow.
 // Each trigger has its own processing chain
 const webhookTrigger = trigger({{
   type: 'n8n-nodes-base.webhook',
@@ -355,16 +357,22 @@ Your response MUST follow this pattern:
 
 ### Step 1: Analyze the Plan
 
-Start your <planning> section by extracting information from the plan:
+Start your <planning> section by listing ALL nodes from the plan with their EXACT discriminators:
 
 <planning>
 Analyzing the plan...
-Nodes needed:
-- Trigger: n8n-nodes-base.manualTrigger
-- Node 1: n8n-nodes-base.httpRequest (GET method)
-- Node 2: n8n-nodes-base.set
+Nodes to fetch (with exact discriminators from plan):
+1. n8n-nodes-base.manualTrigger
+2. n8n-nodes-base.gmail (resource: message, operation: send)
+3. n8n-nodes-base.code (mode: runOnceForAllItems)
+4. @n8n/n8n-nodes-langchain.vectorStoreInMemory (mode: insert)
+5. @n8n/n8n-nodes-langchain.vectorStoreInMemory (mode: retrieve-as-tool)
 
-Flow: Trigger → HTTP Request → Set
+Flow: Trigger → Gmail → Code → Vector Store (insert)
+
+You can add all the suggested workflows in the plan under the same workflow, starting at multiple triggers.
+Flow1: Webhook -> ProcessWebhook
+Flow2: Schedule -> ProcessWebhook
 
 Let me get the node details...
 </planning>
@@ -373,17 +381,24 @@ Let me get the node details...
 
 **MANDATORY:** Before generating code, call get_node_details for ALL nodes in the plan.
 
-\`\`\`
-get_node_details({{ nodeIds: ["n8n-nodes-base.manualTrigger", "n8n-nodes-base.httpRequest", ...] }})
-\`\`\`
+**CRITICAL: Use the EXACT discriminator values from the plan.** The plan specifies exact modes/resources/operations - copy them precisely into your tool call.
 
-For nodes with discriminators (mentioned in the plan), include them:
+Example - if the plan says:
+- "Simple Vector Store - Insert (nodeType: @n8n/n8n-nodes-langchain.vectorStoreInMemory, mode: insert)"
+- "Simple Vector Store - Retrieve (nodeType: @n8n/n8n-nodes-langchain.vectorStoreInMemory, mode: retrieve-as-tool)"
+
+Then your tool call MUST use those exact modes:
 \`\`\`
 get_node_details({{ nodeIds: [
+  "n8n-nodes-base.manualTrigger",
   {{ nodeId: "n8n-nodes-base.gmail", resource: "message", operation: "send" }},
-  {{ nodeId: "n8n-nodes-base.code", mode: "runOnceForAllItems" }}
+  {{ nodeId: "n8n-nodes-base.code", mode: "runOnceForAllItems" }},
+  {{ nodeId: "@n8n/n8n-nodes-langchain.vectorStoreInMemory", mode: "insert" }},
+  {{ nodeId: "@n8n/n8n-nodes-langchain.vectorStoreInMemory", mode: "retrieve-as-tool" }}
 ] }})
 \`\`\`
+
+**DO NOT substitute different values.** If the plan says mode: "insert", use "insert" - not "load" or anything else.
 
 ### Step 3: Review and Generate
 

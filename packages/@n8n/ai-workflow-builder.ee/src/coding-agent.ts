@@ -297,6 +297,9 @@ export class CodingAgent {
 								warningMessages,
 							});
 
+							// Log warnings with console.warn for visibility
+							this.evalLogger?.logWarnings('CODING-AGENT:VALIDATION', newWarnings);
+
 							// Mark warnings as sent
 							for (const w of newWarnings) {
 								previousWarningCodes.add(`${w.code}:${w.message}`);
@@ -327,6 +330,7 @@ export class CodingAgent {
 						consecutiveParseErrors++;
 						const errorMessage =
 							parseError instanceof Error ? parseError.message : String(parseError);
+						const errorStack = parseError instanceof Error ? parseError.stack : undefined;
 
 						generationErrors.push({
 							message: errorMessage,
@@ -339,6 +343,9 @@ export class CodingAgent {
 							consecutiveParseErrors,
 							errorMessage,
 						});
+
+						// Log error with console.error for visibility
+						this.evalLogger?.logError('CODING-AGENT:PARSE', errorMessage, workflowCode, errorStack);
 
 						messages.push(
 							new HumanMessage(
@@ -387,10 +394,16 @@ export class CodingAgent {
 			});
 		} catch (error) {
 			const totalDuration = Date.now() - startTime;
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			const errorStack = error instanceof Error ? error.stack : undefined;
+
 			this.debugLog('RUN', '========== CODING AGENT FAILED ==========', {
 				totalDurationMs: totalDuration,
-				errorMessage: error instanceof Error ? error.message : String(error),
+				errorMessage,
 			});
+
+			// Log error with console.error for visibility
+			this.evalLogger?.logError('CODING-AGENT:FATAL', errorMessage, undefined, errorStack);
 
 			// Stream error message
 			yield {
@@ -398,7 +411,7 @@ export class CodingAgent {
 					{
 						role: 'assistant',
 						type: 'message',
-						text: `I encountered an error while generating the workflow: ${error instanceof Error ? error.message : 'Unknown error'}. Please try rephrasing your request.`,
+						text: `I encountered an error while generating the workflow: ${errorMessage}. Please try rephrasing your request.`,
 					} as AgentMessageChunk,
 				],
 			};

@@ -260,9 +260,16 @@ export class PlanningAgent {
 
 			return finalResponse;
 		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			const errorStack = error instanceof Error ? error.stack : undefined;
+
 			this.debugLog('RUN', '========== PLANNING AGENT FAILED ==========', {
-				errorMessage: error instanceof Error ? error.message : String(error),
+				errorMessage,
 			});
+
+			// Log error with console.error for visibility
+			this.evalLogger?.logError('PLANNING-AGENT:FATAL', errorMessage, undefined, errorStack);
+
 			throw error;
 		}
 	}

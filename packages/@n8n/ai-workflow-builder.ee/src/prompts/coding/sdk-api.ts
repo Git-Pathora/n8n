@@ -647,51 +647,39 @@ export type NextBatchFn = (
 export type FromAIArgumentType = 'string' | 'number' | 'boolean' | 'json';
 
 /**
- * Context provided to tool() config callbacks.
- * Use \$.fromAI() to create AI-driven parameter values.
+ * fromAi(key, description?, type?, defaultValue?) - Creates a \$fromAI placeholder
+ *
+ * Use in tool parameters to let the AI agent determine values at runtime.
+ * This is a top-level SDK function, not a callback.
+ *
+ * @param key - Unique identifier for the parameter (1-64 chars, alphanumeric/underscore/hyphen)
+ * @param description - Description to help the AI understand what value to provide
+ * @param type - Expected value type: 'string' | 'number' | 'boolean' | 'json' (default: 'string')
+ * @param defaultValue - Fallback value if AI doesn't provide one
+ * @returns Expression string like "={{ \$fromAI('key', 'desc', 'type') }}"
+ *
+ * @example Basic usage
+ * fromAi('recipient_email')
+ * // Returns: "={{ /*n8n-auto-generated-fromAI-override*/ \$fromAI('recipient_email') }}"
+ *
+ * @example With description (helps AI understand the parameter)
+ * fromAi('subject', 'The email subject line')
+ *
+ * @example With type
+ * fromAi('count', 'Number of items to fetch', 'number')
+ *
+ * @example With default value
+ * fromAi('limit', 'Max results', 'number', 10)
  */
-export interface ToolConfigContext {
-	/**
-	 * Create a \$fromAI placeholder for AI-driven parameter values.
-	 * The AI agent will determine the actual value at runtime.
-	 *
-	 * @param key - Unique identifier for the parameter (1-64 chars, alphanumeric/underscore/hyphen)
-	 * @param description - Description to help the AI understand what value to provide
-	 * @param type - Expected value type: 'string' | 'number' | 'boolean' | 'json' (default: 'string')
-	 * @param defaultValue - Fallback value if AI doesn't provide one
-	 * @returns Expression string like "={{ \$fromAI('key', 'desc', 'type') }}"
-	 *
-	 * @example Basic usage
-	 * \$.fromAI('recipient_email')
-	 * // Returns: "={{ /*n8n-auto-generated-fromAI-override*\\/ \$fromAI('recipient_email') }}"
-	 *
-	 * @example With description (helps AI understand the parameter)
-	 * \$.fromAI('subject', 'The email subject line')
-	 *
-	 * @example With type
-	 * \$.fromAI('count', 'Number of items to fetch', 'number')
-	 *
-	 * @example With default value
-	 * \$.fromAI('limit', 'Max results', 'number', 10)
-	 */
-	fromAI(
-		key: string,
-		description?: string,
-		type?: FromAIArgumentType,
-		defaultValue?: string | number | boolean | object,
-	): string;
-}
+export type FromAiFn = (
+	key: string,
+	description?: string,
+	type?: FromAIArgumentType,
+	defaultValue?: string | number | boolean | object,
+) => string;
 
 /**
- * Tool configuration - can be a static NodeConfig or a callback receiving ToolConfigContext.
- * Use the callback form when you need \$.fromAI() for AI-driven parameter values.
- */
-export type ToolConfigInput<TParams = unknown> =
-	| NodeConfig<TParams>
-	| ((\$: ToolConfigContext) => NodeConfig<TParams>);
-
-/**
- * Input for tool() factory with config callback support for \$fromAI.
+ * Input for tool() factory.
  */
 export interface ToolInput<
 	TType extends string = string,
@@ -702,12 +690,8 @@ export interface ToolInput<
 	type: TType;
 	/** Tool node version */
 	version: TVersion;
-	/**
-	 * Tool configuration - can be:
-	 * 1. Static NodeConfig object (when \$fromAI not needed)
-	 * 2. Callback function receiving \$ context with \$.fromAI() (when AI should fill values)
-	 */
-	config: ToolConfigInput<TParams>;
+	/** Tool configuration - use fromAi() for AI-driven parameter values */
+	config: NodeConfig<TParams>;
 }
 
 // =============================================================================
@@ -747,7 +731,7 @@ export type MemoryFn = (input: NodeInput) => MemoryInstance;
  * tool(input) - Creates a tool subnode for AI agents
  *
  * Tools are subnodes that give AI agents capabilities (send email, search, etc.).
- * Use \$.fromAI() in the config callback to let the AI determine parameter values.
+ * Use fromAi() for parameters that the AI should determine at runtime.
  *
  * @example Static config (no AI-driven values)
  * // 1. Define subnodes first
@@ -757,21 +741,21 @@ export type MemoryFn = (input: NodeInput) => MemoryInstance;
  *   config: { name: 'Calculator', parameters: {}, position: [700, 500] }
  * });
  *
- * @example Config callback with \$.fromAI() for AI-driven values
+ * @example With fromAi() for AI-driven values
  * // 1. Define subnodes first
  * const gmailTool = tool({
  *   type: 'n8n-nodes-base.gmailTool',
  *   version: 1,
- *   config: (\$) => ({
+ *   config: {
  *     name: 'Gmail Tool',
  *     parameters: {
- *       sendTo: \$.fromAI('recipient', 'Email address to send to'),
- *       subject: \$.fromAI('subject', 'Email subject line'),
- *       message: \$.fromAI('body', 'Email body content', 'string')
+ *       sendTo: fromAi('recipient', 'Email address to send to'),
+ *       subject: fromAi('subject', 'Email subject line'),
+ *       message: fromAi('body', 'Email body content', 'string')
  *     },
  *     credentials: { gmailOAuth2: newCredential('Gmail') },
  *     position: [700, 500]
- *   })
+ *   }
  * });
  *
  * // 2. Define main nodes with subnodes

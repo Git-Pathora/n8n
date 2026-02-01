@@ -255,47 +255,29 @@ export class Orchestrator {
 				contentLength: planningResponse.content.length,
 			});
 
-			// Step 2: Route based on response type
-			if (planningResponse.type === 'answer') {
-				// Direct answer - stream it and we're done
-				this.debugLog('CHAT', 'Routing: Direct answer');
-				yield {
-					messages: [
-						{
-							role: 'assistant',
-							type: 'message',
-							text: planningResponse.content,
-						} as AgentMessageChunk,
-					],
-				};
-			} else if (planningResponse.type === 'plan') {
-				// Plan - run coding agent
-				this.debugLog('CHAT', 'Routing: Plan → Coding Agent');
+			// Step 2: Run Coding Agent with the plan
+			this.debugLog('CHAT', 'Routing: Plan → Coding Agent');
 
-				// Check for abort before coding
-				if (abortSignal?.aborted) {
-					this.debugLog('CHAT', 'Abort signal received before coding');
-					throw new Error('Aborted');
-				}
-
-				// Step 3: Run Coding Agent
-				this.debugLog('CHAT', 'Starting Coding Agent...');
-
-				const codingGenerator = this.codingAgent.run(
-					planningResponse.content,
-					currentWorkflow,
-					abortSignal,
-				);
-
-				// Forward coding agent stream
-				for await (const chunk of codingGenerator) {
-					yield chunk;
-				}
-
-				this.debugLog('CHAT', 'Coding Agent completed');
-			} else {
-				throw new Error(`Unknown planning response type: ${String(planningResponse.type)}`);
+			// Check for abort before coding
+			if (abortSignal?.aborted) {
+				this.debugLog('CHAT', 'Abort signal received before coding');
+				throw new Error('Aborted');
 			}
+
+			this.debugLog('CHAT', 'Starting Coding Agent...');
+
+			const codingGenerator = this.codingAgent.run(
+				planningResponse.content,
+				currentWorkflow,
+				abortSignal,
+			);
+
+			// Forward coding agent stream
+			for await (const chunk of codingGenerator) {
+				yield chunk;
+			}
+
+			this.debugLog('CHAT', 'Coding Agent completed');
 
 			const totalDuration = Date.now() - startTime;
 			this.debugLog('CHAT', '========== ORCHESTRATOR COMPLETE ==========', {

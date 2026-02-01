@@ -4,7 +4,8 @@ import { Orchestrator } from './orchestrator';
 // Create a mock LLM that returns valid planning response
 const createMockLLM = () => {
 	const mockResponse = {
-		content: JSON.stringify({ type: 'answer', content: 'This is a test answer.' }),
+		content:
+			'<final_plan>## Overview\nTest plan.\n\n## Nodes\n- Test\n\n## Flow\nA → B\n\n## Key Points\nNone</final_plan>',
 		tool_calls: [],
 		response_metadata: { usage: { input_tokens: 100, output_tokens: 50 } },
 	};
@@ -125,32 +126,7 @@ describe('Orchestrator', () => {
 	});
 
 	describe('chat routing', () => {
-		it('should route "answer" type response directly without calling coding agent', async () => {
-			const mockPlanningLLM = createMockLLM();
-			const mockCodingLLM = createMockLLM();
-
-			const config: OrchestratorConfig = {
-				planningLLM: mockPlanningLLM as unknown as OrchestratorConfig['planningLLM'],
-				codingLLM: mockCodingLLM as unknown as OrchestratorConfig['codingLLM'],
-				nodeTypes: mockNodeTypes as unknown as OrchestratorConfig['nodeTypes'],
-			};
-
-			const orchestrator = new Orchestrator(config);
-			const generator = orchestrator.chat('What is n8n?');
-
-			const chunks = [];
-			for await (const chunk of generator) {
-				chunks.push(chunk);
-			}
-
-			// Should have chunks for planning agent output
-			expect(chunks.length).toBeGreaterThan(0);
-
-			// Coding LLM should not be called for "answer" type
-			expect(mockCodingLLM.bindTools().invoke).not.toHaveBeenCalled();
-		});
-
-		it('should route "plan" type response to coding agent', async () => {
+		it('should route plan to coding agent', async () => {
 			// Planning agent returns a plan
 			const planResponse = {
 				content: JSON.stringify({
@@ -267,7 +243,7 @@ describe('Orchestrator', () => {
 	});
 
 	describe('streaming output', () => {
-		it('should stream planning agent output wrapped in tags', async () => {
+		it('should stream planning agent output with final_plan tags', async () => {
 			const config: OrchestratorConfig = {
 				planningLLM: createMockLLM() as unknown as OrchestratorConfig['planningLLM'],
 				codingLLM: createMockLLM() as unknown as OrchestratorConfig['codingLLM'],
@@ -275,27 +251,24 @@ describe('Orchestrator', () => {
 			};
 
 			const orchestrator = new Orchestrator(config);
-			const generator = orchestrator.chat('What is n8n?');
+			const generator = orchestrator.chat('Build a workflow');
 
 			const chunks = [];
 			for await (const chunk of generator) {
 				chunks.push(chunk);
 			}
 
-			// First message should be opening tag
-			const firstMessage = chunks[0]?.messages?.[0];
-			expect(firstMessage?.type).toBe('message');
-			if (firstMessage?.type === 'message') {
-				expect(firstMessage.text).toContain('<final_workflow_plan>');
-			}
+			// Should have message chunks with the plan content
+			const hasMessage = chunks.some((c) => c.messages?.some((m) => m.type === 'message'));
+			expect(hasMessage).toBe(true);
 
-			// Should have closing tag somewhere
-			const hasClosingTag = chunks.some((c) =>
+			// The planning agent output should contain the final_plan
+			const hasPlanContent = chunks.some((c) =>
 				c.messages?.some(
-					(m) => m.type === 'message' && 'text' in m && m.text.includes('</final_workflow_plan>'),
+					(m) => m.type === 'message' && 'text' in m && m.text.includes('<final_plan>'),
 				),
 			);
-			expect(hasClosingTag).toBe(true);
+			expect(hasPlanContent).toBe(true);
 		});
 	});
 });

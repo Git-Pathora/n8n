@@ -91,34 +91,6 @@ describe('PlanningAgent', () => {
 	});
 
 	describe('run', () => {
-		it('should return "answer" type for direct questions with <final_answer> tag', async () => {
-			const nodeTypeParser = new NodeTypeParser(mockNodeTypes);
-
-			const answerResponse = '<final_answer>n8n is a workflow automation tool.</final_answer>';
-
-			const config: PlanningAgentConfig = {
-				llm: createMockLLM(answerResponse) as unknown as PlanningAgentConfig['llm'],
-				nodeTypeParser,
-			};
-
-			const agent = new PlanningAgent(config);
-			const generator = agent.run('What is n8n?');
-
-			// Consume chunks and get final response
-			let finalResponse;
-			while (true) {
-				const result = await generator.next();
-				if (result.done) {
-					finalResponse = result.value;
-					break;
-				}
-			}
-
-			expect(finalResponse).toBeDefined();
-			expect(finalResponse?.type).toBe('answer');
-			expect(finalResponse?.content).toBe('n8n is a workflow automation tool.');
-		});
-
 		it('should return "plan" type for workflow requests with <final_plan> tag', async () => {
 			const nodeTypeParser = new NodeTypeParser(mockNodeTypes);
 
@@ -151,7 +123,7 @@ describe('PlanningAgent', () => {
 			const nodeTypeParser = new NodeTypeParser(mockNodeTypes);
 
 			const fullResponse =
-				'<planning>\nAnalyzing...\n</planning>\n<final_answer>Streamed answer.</final_answer>';
+				'<planning>\nAnalyzing...\n</planning>\n<final_plan>## Overview\nStreamed plan.</final_plan>';
 
 			const config: PlanningAgentConfig = {
 				llm: createMockLLM(fullResponse) as unknown as PlanningAgentConfig['llm'],
@@ -186,11 +158,11 @@ describe('PlanningAgent', () => {
 			};
 
 			expect(getMessageText(textChunks[0])).toContain('<planning>');
-			expect(getMessageText(textChunks[0])).toContain('<final_answer>');
+			expect(getMessageText(textChunks[0])).toContain('<final_plan>');
 
 			// Final response should be parsed correctly
-			expect(finalResponse?.type).toBe('answer');
-			expect(finalResponse?.content).toBe('Streamed answer.');
+			expect(finalResponse?.type).toBe('plan');
+			expect(finalResponse?.content).toBe('## Overview\nStreamed plan.');
 		});
 
 		it('should handle <planning> tags interleaved with <final_plan>', async () => {
@@ -243,8 +215,8 @@ None
 
 			// Legacy JSON format
 			const legacyJsonResponse = JSON.stringify({
-				type: 'answer',
-				content: 'Legacy JSON response.',
+				type: 'plan',
+				content: '## Overview\nLegacy JSON plan.',
 			});
 
 			const config: PlanningAgentConfig = {
@@ -253,7 +225,7 @@ None
 			};
 
 			const agent = new PlanningAgent(config);
-			const generator = agent.run('What is n8n?');
+			const generator = agent.run('Build a workflow');
 
 			let finalResponse;
 			while (true) {
@@ -265,8 +237,8 @@ None
 			}
 
 			expect(finalResponse).toBeDefined();
-			expect(finalResponse?.type).toBe('answer');
-			expect(finalResponse?.content).toBe('Legacy JSON response.');
+			expect(finalResponse?.type).toBe('plan');
+			expect(finalResponse?.content).toBe('## Overview\nLegacy JSON plan.');
 		});
 
 		it('should yield stream output chunks for tool calls', async () => {
@@ -286,7 +258,7 @@ None
 			};
 
 			const finalResponse = {
-				content: '<final_answer>Found email nodes.</final_answer>',
+				content: '<final_plan>## Overview\nPlan with email nodes.</final_plan>',
 				tool_calls: [],
 				response_metadata: { usage: { input_tokens: 100, output_tokens: 50 } },
 			};
@@ -392,7 +364,8 @@ None
 			const nodeTypeParser = new NodeTypeParser(mockNodeTypes);
 
 			// Response with JSON in markdown code block (legacy format)
-			const wrappedResponse = '```json\n{"type": "answer", "content": "Test answer"}\n```';
+			const wrappedResponse =
+				'```json\n{"type": "plan", "content": "## Overview\\nTest plan"}\n```';
 
 			const config: PlanningAgentConfig = {
 				llm: createMockLLM(wrappedResponse) as unknown as PlanningAgentConfig['llm'],
@@ -400,7 +373,7 @@ None
 			};
 
 			const agent = new PlanningAgent(config);
-			const generator = agent.run('What is this?');
+			const generator = agent.run('Build a workflow');
 
 			let finalResponse;
 			while (true) {
@@ -411,8 +384,8 @@ None
 				}
 			}
 
-			expect(finalResponse?.type).toBe('answer');
-			expect(finalResponse?.content).toBe('Test answer');
+			expect(finalResponse?.type).toBe('plan');
+			expect(finalResponse?.content).toBe('## Overview\nTest plan');
 		});
 	});
 });

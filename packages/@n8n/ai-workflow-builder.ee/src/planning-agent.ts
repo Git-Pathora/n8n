@@ -32,7 +32,7 @@ const MAX_PLANNING_ITERATIONS = 10;
  * Response from the planning agent
  */
 export interface PlanningAgentResponse {
-	type: 'plan' | 'answer';
+	type: 'plan';
 	content: string;
 }
 
@@ -183,6 +183,7 @@ export class PlanningAgent {
 
 				this.debugLog('RUN', 'LLM response received', {
 					textLength: accumulatedText.length,
+					text: accumulatedText,
 					toolCallCount: toolCalls.length,
 					toolCalls: toolCalls.map((tc) => ({
 						id: tc.id,
@@ -230,6 +231,7 @@ export class PlanningAgent {
 							this.debugLog('RUN', 'Final response parsed successfully', {
 								type: finalResponse.type,
 								contentLength: finalResponse.content.length,
+								content: finalResponse.content,
 							});
 							break;
 						} else {
@@ -238,7 +240,7 @@ export class PlanningAgent {
 							messages.push({
 								type: 'human',
 								content:
-									'Your response must include either a <final_plan> tag (for workflow plans) or a <final_answer> tag (for direct answers). Please format your response correctly.',
+									'Your response must include a <final_plan> tag with your workflow plan. Please format your response correctly.',
 							} as BaseMessage);
 						}
 					}
@@ -291,21 +293,12 @@ export class PlanningAgent {
 	 * Parse response from the LLM by extracting tagged content
 	 */
 	private parseTaggedResponse(content: string): PlanningAgentResponse | null {
-		// Try to extract <final_plan> tag
+		// Extract <final_plan> tag
 		const planMatch = content.match(/<final_plan>([\s\S]*?)<\/final_plan>/);
 		if (planMatch) {
 			return {
 				type: 'plan',
 				content: planMatch[1].trim(),
-			};
-		}
-
-		// Try to extract <final_answer> tag
-		const answerMatch = content.match(/<final_answer>([\s\S]*?)<\/final_answer>/);
-		if (answerMatch) {
-			return {
-				type: 'answer',
-				content: answerMatch[1].trim(),
 			};
 		}
 
@@ -330,7 +323,7 @@ export class PlanningAgent {
 				parsed !== null &&
 				'type' in parsed &&
 				'content' in parsed &&
-				(parsed.type === 'plan' || parsed.type === 'answer') &&
+				parsed.type === 'plan' &&
 				typeof parsed.content === 'string'
 			) {
 				return parsed as PlanningAgentResponse;

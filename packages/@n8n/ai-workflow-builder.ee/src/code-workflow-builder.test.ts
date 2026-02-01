@@ -5,7 +5,8 @@ import type { ChatPayload } from './workflow-builder-agent';
 // Create a mock LLM that returns valid planning response
 const createMockLLM = () => {
 	const mockResponse = {
-		content: JSON.stringify({ type: 'answer', content: 'This is a test answer.' }),
+		content:
+			'<final_plan>## Overview\nTest plan.\n\n## Nodes\n- Test\n\n## Flow\nA → B\n\n## Key Points\nNone</final_plan>',
 		tool_calls: [],
 		response_metadata: { usage: { input_tokens: 100, output_tokens: 50 } },
 	};

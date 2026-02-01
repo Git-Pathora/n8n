@@ -197,8 +197,9 @@ export class CodingAgent {
 				// Extract text content from response
 				const textContent = this.extractTextContent(response);
 				if (textContent) {
-					this.debugLog('RUN', 'Streaming text response', {
+					this.debugLog('RUN', 'LLM text response', {
 						textContentLength: textContent.length,
+						textContent,
 					});
 					yield {
 						messages: [
@@ -259,7 +260,10 @@ export class CodingAgent {
 					}
 
 					// Try to parse and validate
-					this.debugLog('RUN', 'Parsing and validating workflow code...');
+					this.debugLog('RUN', 'Parsing and validating workflow code...', {
+						codeLength: workflowCode.length,
+						code: workflowCode,
+					});
 					const parseStartTime = Date.now();
 
 					try {

@@ -2331,8 +2331,6 @@ export interface IBuilderHint {
 	message?: string;
 	/** Related nodes that work together with this node - can be string[] (legacy) or IRelatedNode[] (with hints) */
 	relatedNodes?: string[] | IRelatedNode[];
-	/** Extra type context/examples to append to generated type files */
-	extraTypeContext?: string;
 }
 
 export interface INodeTypeDescription extends INodeTypeBaseDescription {

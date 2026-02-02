@@ -1,20 +1,13 @@
 # TODO (MVP)
 
 ## For Monday
-	- [ ] subnodes. Planning agent needs to be aware of subnodes and how to configure them
-		- [ ]planning agent might need to get node types to pass them to coding agent.
-	- [ ] builderHints now that are specific to code format need to be adjusted for planning agent
-	- [ ] finish generating pin data
-	- [ ] optimize new prompts again
-	- [ ] rewrite .schema.ts files as .js to be able to load at runtime
+	- [ ] adjust builder hints to be questions/not code specific
 
 ## workflow-sdk
-- [ ] Better clarify/test how output data maps to expressions in types and referenced
-- [ ] why is model and other subnodes accepting arrays?
+- [ ] Better clarify/test how output data maps to expressions in types and referenced?
+- [ ] why is agent node accepting arrays as models? fallback model? how to clarify this better?
 
 ## agent
-- [ ] test out disabling agent static prompt warning
-	- [ ] improve understanding of expressions. often hitting MISSING_EXPRESSION_PREFIX.
 - [ ] Add relevant best practice pieces, esp to better handling (let evals guide this)
 	- [ ] a lot of pairwise seem to be about preferring certain nodes, how can we add that as part of the node definition
 	- [ ] add section for pref of other nodes over code node
@@ -26,7 +19,6 @@
 - [ ] investigate failed syntax in prompt in this example packages/@n8n/ai-workflow-builder.ee/eval-results/sonnet-one-shot-all/example-005-05fd23ad. also packages/@n8n/ai-workflow-builder.ee/eval-results/sonnet-one-shot-all/example-007-ca13700c
 - [ ] handling of large workflows
 	- [ ] context limits with many types of nodes?
-- [ ] improve understanding of items
 
 ## iteration
 - [ ] test iteration, inserting nodes in between
@@ -35,33 +27,26 @@
 - [ ] compacting
 
 ## ready to release
-- [ ] review security implications of Function. Use task runner for mvp?
-	- [maybe-later] parsing AST
-- [ ] security concerns of loading js from
-- [ ] pull in master
-- [ ] remove FE changes
-- [ ] collapse <planning> in FE
-- [ ] integrate with planning agent
+- [ ] security concerns of loading js from ~/.n8n
+- [ ] integrate with planning agent?
 - [ ] How to do we store the template workflows? zip folder
 - [ ] Review PR (lots of AI generated code that I did not look at)
 - [ ] Remove logging from agent. lots of logging for debugging.
 - [ ] Add some tracking if code parsing or generation step fails in prod.
-- [ ] put Behind a/b test.
 - [ ] test how unknown nodes handled?
-- [ ] fix up sticky sizing and positioning to cover nodes
 - [ ] caching the requests. make sure system prompt + caching the type requests
 - [ ] Update telemetry and prompt viewer app to support the code and workflow generated
-- [ ] Remove extraTypeContext if not used
 - [ ] Parameters?: should not be optional in types if some key in there is not optional
-- [ ] remove sdk-api in worklfow-sdk
 - [ ] Add commands for validate parse code
-- [ ] remove generated src/types files
+- [ ] fix up sticky sizing and positioning to cover nodes
 
 ## evaluate
 - [ ] test out prompt with/without sdk reference [maybe-later]
 - [ ] Evaluate with thinking enabled for each model. uses <planning> now [maybe-later]
 
 ## Nice to haves / tech debt
+- [ ] fromAI expressions replace in json -> code
+- [ ] rename get nodes tool to get_node_types
 - [ ] export and use rlc()
 - [ ] @tool=true in invalid_parameter warnings
 - [ ] make display options more clear in node types @displayOption.show { node: ["operation"]}
@@ -98,8 +83,14 @@
 		- [ ] .json is used when referencing data in expressions or code node
 		- [ ] invalid .item or .all keys in code nodes based on mode
 		- [ ] optional warning for code node?
+- [ ] test out disabling agent static prompt warning
+	- [ ] improve understanding of expressions. often hitting MISSING_EXPRESSION_PREFIX.
 
 ## Future improvement
+- [ ] improve generating static pin data
+	- [ ] have agent generate pin data for http request / webhook nodes
+	- [ ] should only generate pin data for nodes that also don't have pin data, never replace
+- [ ] planning agent
 - [ ] Add system message validation for Toolagent and no tools validation
 - [ ] New validation: For tool, should use $fromAI in multi orchestrator workflow
 - [ ] New validation: Respond to webhook only if web hook node is attached and configured correctly

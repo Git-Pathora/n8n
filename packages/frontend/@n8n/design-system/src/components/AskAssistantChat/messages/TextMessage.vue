@@ -8,6 +8,7 @@ import { useI18n } from '../../../composables/useI18n';
 import type { ChatUI, RatingFeedback } from '../../../types/assistant';
 import BlinkingCursor from '../../BlinkingCursor/BlinkingCursor.vue';
 import N8nButton from '../../N8nButton';
+import N8nIcon from '../../N8nIcon';
 
 interface Props {
 	message: ChatUI.TextMessage & { quickReplies?: ChatUI.QuickReply[] };
@@ -126,7 +127,11 @@ async function onCopyButtonClick(content: string, e: MouseEvent) {
 				<template v-for="(segment, idx) in parsedContent" :key="idx">
 					<span v-if="segment.type === 'text'" v-n8n-html="renderMarkdown(segment.content)" />
 					<details v-else class="n8n-thinking-section">
-						<summary>{{ t('assistantChat.thinking.thinking') }}...</summary>
+						<summary>
+							{{ t('assistantChat.thinking.thinking') }}...
+							<N8nIcon icon="chevron-right" class="n8n-thinking-chevron-closed" />
+							<N8nIcon icon="chevron-down" class="n8n-thinking-chevron-open" />
+						</summary>
 						<span v-n8n-html="renderMarkdown(segment.content)" />
 					</details>
 				</template>
@@ -334,24 +339,38 @@ async function onCopyButtonClick(content: string, e: MouseEvent) {
 				display: none;
 			}
 
-			&::after {
-				content: '';
-				width: 0;
-				height: 0;
-				border-style: solid;
-				border-width: 5px 0 5px 6px;
-				border-color: transparent transparent transparent var(--assistant--color--text--subtle);
-				flex-shrink: 0;
-				transition: transform 0.2s ease;
-			}
-
 			&:hover {
 				opacity: 0.8;
 			}
 		}
 
-		&[open] summary::after {
-			transform: rotate(90deg);
+		// Chevron icon styles
+		:global(.n8n-thinking-chevron-closed),
+		:global(.n8n-thinking-chevron-open) {
+			color: var(--assistant--color--text--subtle);
+			flex-shrink: 0;
+			width: var(--font-size--lg);
+			height: var(--font-size--lg);
+			padding-top: 1px;
+
+			svg {
+				width: var(--font-size--lg);
+				height: var(--font-size--lg);
+			}
+		}
+
+		// Show chevron-right when closed, hide chevron-down
+		:global(.n8n-thinking-chevron-open) {
+			display: none;
+		}
+
+		// When open, hide chevron-right, show chevron-down
+		&[open] :global(.n8n-thinking-chevron-closed) {
+			display: none;
+		}
+
+		&[open] :global(.n8n-thinking-chevron-open) {
+			display: inline-flex;
 		}
 
 		// Content area when expanded

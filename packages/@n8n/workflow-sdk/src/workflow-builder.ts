@@ -1887,48 +1887,53 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 	}
 
 	generatePinData(options?: GeneratePinDataOptions): WorkflowBuilder {
-		const { nodes: filterNodes, hasNoCredentials, beforeWorkflow } = options ?? {};
+		const { beforeWorkflow } = options ?? {};
 
 		// Build set of existing node names from beforeWorkflow for quick lookup
 		const existingNodeNames = beforeWorkflow
 			? new Set(beforeWorkflow.nodes.map((n) => n.name))
 			: undefined;
 
-		// Get all nodes to process
-		let nodesToProcess = Array.from(this._nodes.values());
-
-		// Apply filters
-		if (filterNodes) {
-			const filterSet = new Set(filterNodes);
-			nodesToProcess = nodesToProcess.filter((graphNode) => filterSet.has(graphNode.instance.name));
-		}
-
-		if (hasNoCredentials) {
-			nodesToProcess = nodesToProcess.filter((graphNode) => {
-				const creds = graphNode.instance.config?.credentials;
-				return !creds || Object.keys(creds).length === 0;
-			});
-		}
-
-		if (existingNodeNames) {
-			nodesToProcess = nodesToProcess.filter(
-				(graphNode) => !existingNodeNames.has(graphNode.instance.name),
-			);
-		}
-
-		// Generate pin data for each node using output declarations
-		for (const graphNode of nodesToProcess) {
+		for (const graphNode of this._nodes.values()) {
 			const node = graphNode.instance;
+			const nodeName = node.name;
 
-			// Use output declaration directly as pinData (copied from top-level to config)
+			// Skip if node exists in beforeWorkflow (only process NEW nodes)
+			if (existingNodeNames?.has(nodeName)) {
+				continue;
+			}
+
+			// Skip if node already has pin data in current workflow
+			if (this._pinData?.[nodeName]) {
+				continue;
+			}
+
+			// Only generate for nodes that need newCredential() OR are HTTP Request/Webhook
+			if (!this.hasNewCredential(node) && !this.isHttpRequestOrWebhook(node.type)) {
+				continue;
+			}
+
+			// Generate pin data from output declaration
 			const output = node.config?.output;
 			if (output && output.length > 0) {
 				this._pinData = this._pinData ?? {};
-				this._pinData[node.name] = output;
+				this._pinData[nodeName] = output;
 			}
 		}
 
 		return this;
+	}
+
+	private hasNewCredential(node: NodeInstance<string, string, unknown>): boolean {
+		const creds = node.config?.credentials;
+		if (!creds) return false;
+		return Object.values(creds).some(
+			(cred) => cred && typeof cred === 'object' && '__newCredential' in cred,
+		);
+	}
+
+	private isHttpRequestOrWebhook(type: string): boolean {
+		return type === 'n8n-nodes-base.httpRequest' || type === 'n8n-nodes-base.webhook';
 	}
 
 	/**

@@ -891,10 +891,6 @@ export interface SplitInBatchesBuilder<TOutput = unknown> {
  * Options for generating pin data from node output declarations
  */
 export interface GeneratePinDataOptions {
-	/** Filter by specific node names */
-	nodes?: string[];
-	/** Only generate for nodes without credentials */
-	hasNoCredentials?: boolean;
 	/** Only generate for nodes not in this workflow (new nodes) */
 	beforeWorkflow?: WorkflowJSON;
 }

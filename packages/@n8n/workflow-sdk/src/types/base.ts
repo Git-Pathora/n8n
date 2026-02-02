@@ -361,6 +361,12 @@ export interface NodeConfig<TParams = IDataObject> {
 	alwaysOutputData?: boolean;
 	onError?: OnError;
 	pinData?: IDataObject[];
+	/**
+	 * Declared output shape for data flow validation.
+	 * Used by the code builder agent to declare what output a node produces.
+	 * Takes priority over pinData for expression path validation.
+	 */
+	output?: IDataObject[];
 	subnodes?: SubnodeConfig;
 }
 

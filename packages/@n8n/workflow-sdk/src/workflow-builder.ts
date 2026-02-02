@@ -1642,11 +1642,22 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 	 * in the predecessor node's output (from pinData)
 	 */
 	private checkExpressionPaths(warnings: import('./validation/index').ValidationWarning[]): void {
-		// Build output shapes from pinData
+		// Build output shapes from node config's output property first, then fall back to pinData
 		const outputShapes = new Map<string, Record<string, unknown>>();
+
+		// First: collect output declarations from node configs (LLM-generated)
+		for (const [mapKey, graphNode] of this._nodes) {
+			const output = graphNode.instance.config?.output;
+			if (output && output.length > 0) {
+				outputShapes.set(mapKey, output[0] as Record<string, unknown>);
+			}
+		}
+
+		// Second: fall back to pinData for nodes without output declarations
 		if (this._pinData) {
 			for (const [nodeName, pinData] of Object.entries(this._pinData)) {
-				if (pinData.length > 0) {
+				// Only use pinData if we don't already have output from config
+				if (!outputShapes.has(nodeName) && pinData.length > 0) {
 					outputShapes.set(nodeName, pinData[0] as Record<string, unknown>);
 				}
 			}

@@ -1039,5 +1039,108 @@ describe('Validation', () => {
 			expect(partialWarnings[0].message).toContain('Branch A');
 			expect(partialWarnings[0].message).toContain('Branch B');
 		});
+
+		it('should use output property over pinData for expression validation', () => {
+			// When both output and pinData are set, output should take priority
+			const webhookTrigger = trigger({
+				type: 'n8n-nodes-base.webhook',
+				version: 2,
+				config: {
+					name: 'Webhook',
+					// pinData has 'oldField' but output has 'newField'
+					pinData: [{ oldField: 'from-pinData' }],
+					output: [{ newField: 'from-output' }],
+				},
+			});
+
+			const setNode = node({
+				type: 'n8n-nodes-base.set',
+				version: 3,
+				config: {
+					name: 'Set',
+					parameters: {
+						value: '={{ $json.newField }}', // Should validate against output, not pinData
+					},
+				},
+			});
+
+			const wf = workflow('test', 'Test').add(webhookTrigger).then(setNode);
+
+			const result = wf.validate();
+			const expressionWarnings = result.warnings.filter(
+				(w) => w.code === 'INVALID_EXPRESSION_PATH' || w.code === 'PARTIAL_EXPRESSION_PATH',
+			);
+
+			// No warning because 'newField' exists in output (which takes priority over pinData)
+			expect(expressionWarnings).toHaveLength(0);
+		});
+
+		it('should warn when referencing field that exists in pinData but not in output', () => {
+			// When output is set, pinData fields are ignored
+			const webhookTrigger = trigger({
+				type: 'n8n-nodes-base.webhook',
+				version: 2,
+				config: {
+					name: 'Webhook',
+					pinData: [{ oldField: 'from-pinData' }],
+					output: [{ newField: 'from-output' }],
+				},
+			});
+
+			const setNode = node({
+				type: 'n8n-nodes-base.set',
+				version: 3,
+				config: {
+					name: 'Set',
+					parameters: {
+						value: '={{ $json.oldField }}', // oldField only in pinData, not output
+					},
+				},
+			});
+
+			const wf = workflow('test', 'Test').add(webhookTrigger).then(setNode);
+
+			const result = wf.validate();
+			const expressionWarnings = result.warnings.filter(
+				(w) => w.code === 'INVALID_EXPRESSION_PATH',
+			);
+
+			// Should warn because 'oldField' doesn't exist in output (which takes priority)
+			expect(expressionWarnings).toHaveLength(1);
+			expect(expressionWarnings[0].message).toContain('oldField');
+		});
+
+		it('should fall back to pinData when output is not set', () => {
+			// Without output property, pinData should be used
+			const webhookTrigger = trigger({
+				type: 'n8n-nodes-base.webhook',
+				version: 2,
+				config: {
+					name: 'Webhook',
+					pinData: [{ amount: 100 }], // No output property
+				},
+			});
+
+			const setNode = node({
+				type: 'n8n-nodes-base.set',
+				version: 3,
+				config: {
+					name: 'Set',
+					parameters: {
+						value: '={{ $json.amount }}', // Should validate against pinData
+					},
+				},
+			});
+
+			const wf = workflow('test', 'Test').add(webhookTrigger).then(setNode);
+
+			const result = wf.validate();
+			const expressionWarnings = result.warnings.filter(
+				(w) => w.code === 'INVALID_EXPRESSION_PATH' || w.code === 'PARTIAL_EXPRESSION_PATH',
+			);
+
+			// No warning because 'amount' exists in pinData (fallback)
+			expect(expressionWarnings).toHaveLength(0);
+		});
 	});
 });

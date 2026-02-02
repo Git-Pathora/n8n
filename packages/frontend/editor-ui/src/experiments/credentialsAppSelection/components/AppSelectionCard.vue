@@ -186,6 +186,8 @@ const nodeTypeForIcon = computed((): SimplifiedNodeType | null => {
 		&:focus-visible {
 			border-color: var(--color--primary);
 			background-color: var(--color--background--light-2);
+			transform: translateY(-2px);
+			box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
 			outline: none;
 		}
 	}
@@ -198,6 +200,8 @@ const nodeTypeForIcon = computed((): SimplifiedNodeType | null => {
 		&:focus-visible {
 			border-color: var(--color--primary);
 			background-color: var(--color--background--light-2);
+			transform: translateY(-2px);
+			box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
 			outline: none;
 		}
 	}
@@ -210,6 +214,8 @@ const nodeTypeForIcon = computed((): SimplifiedNodeType | null => {
 		&:focus-visible {
 			border-color: var(--color--primary);
 			background-color: var(--color--background--light-2);
+			transform: translateY(-2px);
+			box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
 			outline: none;
 		}
 	}
@@ -220,6 +226,8 @@ const nodeTypeForIcon = computed((): SimplifiedNodeType | null => {
 		&:hover,
 		&:focus-visible {
 			background-color: var(--color--danger--tint-4);
+			transform: translateY(-2px);
+			box-shadow: 0 8px 25px rgba(0, 0, 0, 0.1);
 		}
 	}
 

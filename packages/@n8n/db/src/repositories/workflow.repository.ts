@@ -22,6 +22,9 @@ import {
 	WorkflowTagMapping,
 	WorkflowDependency,
 	User,
+	SharedWorkflow,
+	Project,
+	ProjectRelation,
 } from '../entities';
 import type {
 	ListQueryDb,
@@ -746,15 +749,15 @@ export class WorkflowRepository extends Repository<WorkflowEntity> {
 		const subquery = this.manager
 			.createQueryBuilder()
 			.select('sw.workflowId')
-			.from('shared_workflow', 'sw');
+			.from(SharedWorkflow, 'sw');
 
 		// Handle different sharing scenarios
 		// Check explicit filters first (isPersonalProject, onlySharedWithMe) before falling back to user's global permissions
 		if (isPersonalProject) {
 			// Personal project - get owned workflows in the specified personal project
 			subquery
-				.innerJoin('project', 'p', 'sw.projectId = p.id')
-				.innerJoin('project_relation', 'pr', 'pr.projectId = p.id')
+				.innerJoin(Project, 'p', 'sw.projectId = p.id')
+				.innerJoin(ProjectRelation, 'pr', 'pr.projectId = p.id')
 				.where('sw.role = :ownerRole', { ownerRole: 'workflow:owner' })
 				.andWhere('pr.userId = :subqueryUserId', { subqueryUserId: user.id })
 				.andWhere('pr.role = :projectOwnerRole', { projectOwnerRole: PROJECT_OWNER_ROLE_SLUG });
@@ -766,8 +769,8 @@ export class WorkflowRepository extends Repository<WorkflowEntity> {
 		} else if (onlySharedWithMe) {
 			// Shared with me - workflows shared (as editor) to user's personal project
 			subquery
-				.innerJoin('project', 'p', 'sw.projectId = p.id')
-				.innerJoin('project_relation', 'pr', 'pr.projectId = p.id')
+				.innerJoin(Project, 'p', 'sw.projectId = p.id')
+				.innerJoin(ProjectRelation, 'pr', 'pr.projectId = p.id')
 				.where('sw.role = :editorRole', { editorRole: 'workflow:editor' })
 				.andWhere('pr.userId = :subqueryUserId', { subqueryUserId: user.id })
 				.andWhere('pr.role = :projectOwnerRole', { projectOwnerRole: PROJECT_OWNER_ROLE_SLUG });
@@ -783,8 +786,8 @@ export class WorkflowRepository extends Repository<WorkflowEntity> {
 			}
 
 			subquery
-				.innerJoin('project', 'p', 'sw.projectId = p.id')
-				.innerJoin('project_relation', 'pr', 'pr.projectId = p.id')
+				.innerJoin(Project, 'p', 'sw.projectId = p.id')
+				.innerJoin(ProjectRelation, 'pr', 'pr.projectId = p.id')
 				.where('sw.role IN (:...workflowRoles)', { workflowRoles })
 				.andWhere('pr.userId = :subqueryUserId', { subqueryUserId: user.id })
 				.andWhere('pr.role IN (:...projectRoles)', { projectRoles });

@@ -41,7 +41,7 @@ import {
 } from './csv-prompt-loader';
 import { sendWebhookNotification } from './webhook';
 import { summarizeIntrospectionResults } from '../summarizers/introspection-summarizer';
-import { setupTestEnvironment, createAgent } from '../support/environment';
+import { setupTestEnvironment } from '../support/environment';
 
 /**
  * Load test cases from various sources.
@@ -120,12 +120,8 @@ export async function runV2Evaluation(): Promise<void> {
 
 	// Create workflow generator (returns workflow + introspection events)
 	const generateWorkflow = createWorkflowGenerator({
-		createAgent: () =>
-			createAgent({
-				parsedNodeTypes: env.parsedNodeTypes,
-				llms: env.llms,
-				featureFlags: args.featureFlags,
-			}),
+		parsedNodeTypes: env.parsedNodeTypes,
+		llms: env.llms,
 		featureFlags: args.featureFlags,
 	});
 

@@ -3,15 +3,12 @@ import { getLangchainCallbacks } from 'langsmith/langchain';
 import { v4 as uuid } from 'uuid';
 
 import type { IntrospectionEvent } from '@/tools/introspect.tool';
-import type {
-	BuilderFeatureFlags,
-	ChatPayload,
-	WorkflowBuilderAgent,
-} from '@/workflow-builder-agent';
+import type { BuilderFeatureFlags, ChatPayload } from '@/workflow-builder-agent';
 
 import type { LlmCallLimiter, WorkflowGenerationResult } from './harness-types';
 import { generateRunId, isWorkflowStateValues } from '../langsmith/types';
 import { EVAL_TYPES, EVAL_USERS, DEFAULTS } from '../support/constants';
+import { createAgent, type CreateAgentOptions } from '../support/environment';
 
 /**
  * Get LangChain callbacks that bridge the current traceable context.
@@ -89,14 +86,9 @@ export function getChatPayload(options: GetChatPayloadOptions): ChatPayload {
 }
 
 /**
- * Options for createWorkflowGenerator
+ * Options for createWorkflowGenerator - same as agent creation options
  */
-export interface WorkflowGeneratorOptions {
-	/** Function to create a WorkflowBuilderAgent instance */
-	createAgent: () => WorkflowBuilderAgent;
-	/** Optional feature flags to pass to the agent */
-	featureFlags?: BuilderFeatureFlags;
-}
+export type WorkflowGeneratorOptions = Omit<CreateAgentOptions, 'experimentName'>;
 
 /**
  * Workflow generator function type.
@@ -111,16 +103,16 @@ export type WorkflowGenerator = (
  * Creates a workflow generator that captures introspection events from state.
  * Events are extracted from the agent state after each run, avoiding global state.
  *
- * @param options - Configuration options including agent creator function
+ * @param options - Agent configuration options (parsedNodeTypes, llms, featureFlags)
  * @returns Generator function that returns workflow and introspection events
  */
 export function createWorkflowGenerator(options: WorkflowGeneratorOptions): WorkflowGenerator {
-	const { createAgent, featureFlags } = options;
+	const { featureFlags } = options;
 
 	return async (prompt: string, callbacks?: Callbacks): Promise<WorkflowGenerationResult> => {
 		const runId = generateRunId();
 
-		const agent = createAgent();
+		const agent = createAgent(options);
 
 		await consumeGenerator(
 			agent.chat(

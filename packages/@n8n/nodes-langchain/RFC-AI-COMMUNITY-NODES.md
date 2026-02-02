@@ -130,9 +130,9 @@ const model = createChatModel(this, {
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
 │                               COMMUNITY NODE                                        │
 │  ┌─────────────────────────────────────────────────────────────────────────────┐    │
-│  │  import { createMemory, ChatHistory } from '@n8n/ai-node-sdk';           │    │
+│  │  import { createMemory, ChatHistory } from '@n8n/ai-node-sdk';              │    │
 │  │                                                                             │    │
-│  │  class MyMemory extends ChatHistory { /* provider-specific logic */ }    │    │
+│  │  class MyMemory extends ChatHistory { /* provider-specific logic */ }       │    │
 │  │                                                                             │    │
 │  │  supplyData() {                                                             │    │
 │  │    return { response: createMemory(this, { chatHistory: new MyMemory() }) };│    │
@@ -152,10 +152,10 @@ const model = createChatModel(this, {
 │  │ export { createMemory } from './factories/memory';                           │   │
 │  │                                                                              │   │
 │  │ // Base Classes for Extension                                                │   │
-│  │ export { ChatHistory } from './bases/chatHistory';                        │   │
+│  │ export { ChatHistory } from './bases/chatHistory';                           │   │
 │  │                                                                              │   │
 │  │ // Types                                                                     │   │
-│  │ export type { Message, ChatModelOptions, ... } from './types';         │   │
+│  │ export type { Message, ChatModelOptions, ... } from './types';               │   │
 │  └──────────────────────────────────────────────────────────────────────────────┘   │
 │                                        │                                            │
 │                                        │ Internal Implementation                    │
@@ -164,7 +164,7 @@ const model = createChatModel(this, {
 │  │ ADAPTERS (Internal - Hidden from Community)                                  │   │
 │  │                                                                              │   │
 │  │ // Bridges n8n types ↔ LangChain types                                       │   │
-│  │ class ChatHistoryAdapter extends BaseChatMessageHistory { }               │   │
+│  │ class ChatHistoryAdapter extends BaseChatMessageHistory { }                  │   │
 │  └──────────────────────────────────────────────────────────────────────────────┘   │
 └───────────────────────────────────────┬─────────────────────────────────────────────┘
                                         │

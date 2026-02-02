@@ -6,6 +6,8 @@ import type {
 	IUpdateInformation,
 	IWorkflowDb,
 } from '@/Interface';
+import type { ITag } from '@n8n/rest-api-client/api/tags';
+import type { WorkflowData, WorkflowDataUpdate } from '@n8n/rest-api-client/api/workflows';
 import type {
 	IExecutionResponse,
 	IExecutionsStopData,
@@ -14,7 +16,10 @@ import { useUIStore } from '@/app/stores/ui.store';
 import { useWorkflowsStore } from '@/app/stores/workflows.store';
 import { useWorkflowDocumentsStore } from '@/app/stores/workflowDocuments.store';
 import { useWorkflowsListStore } from '@/app/stores/workflowsList.store';
+import { useWorkflowsEEStore } from '@/app/stores/workflows.ee.store';
 import { useBuilderStore } from '@/features/ai/assistant/builder.store';
+import { useTagsStore } from '@/features/shared/tags/tags.store';
+import { convertWorkflowTagsToIds } from '@/app/utils/workflowUtils';
 import { getPairedItemsMapping } from '@/app/utils/pairedItemUtils';
 import {
 	type INodeIssueData,
@@ -54,10 +59,12 @@ export function useWorkflowState(workflowId: string) {
 	const documentsStore = useWorkflowDocumentsStore(workflowId);
 	const { workflow, workflowObject } = documentsStore;
 	const workflowsListStore = useWorkflowsListStore();
+	const workflowsEEStore = useWorkflowsEEStore();
 	const workflowStateStore = useWorkflowStateStore();
 	const uiStore = useUIStore();
 	const rootStore = useRootStore();
 	const nodeTypesStore = useNodeTypesStore();
+	const tagsStore = useTagsStore();
 
 	////
 	// Workflow editing state
@@ -478,6 +485,88 @@ export function useWorkflowState(workflowId: string) {
 		}
 	}
 
+	////
+	// Workflow initialization and update
+	////
+
+	async function initState(workflowData: IWorkflowDb) {
+		workflowsListStore.addWorkflow(workflowData);
+		setActive(workflowData.activeVersionId);
+		ws.setIsArchived(workflowData.isArchived);
+		ws.setDescription(workflowData.description);
+		setWorkflowId(workflowData.id);
+		setWorkflowName({
+			newName: workflowData.name,
+			setStateDirty: uiStore.stateIsDirty,
+		});
+		setWorkflowSettings(workflowData.settings ?? {});
+		setWorkflowPinData(workflowData.pinData ?? {});
+		ws.setWorkflowVersionId(workflowData.versionId, workflowData.checksum);
+		setWorkflowMetadata(workflowData.meta);
+		setWorkflowScopes(workflowData.scopes);
+
+		if ('activeVersion' in workflowData) {
+			ws.setWorkflowActiveVersion(workflowData.activeVersion ?? null);
+		}
+
+		if (workflowData.usedCredentials) {
+			ws.setUsedCredentials(workflowData.usedCredentials);
+		}
+
+		if (workflowData.sharedWithProjects) {
+			workflowsEEStore.setWorkflowSharedWith({
+				workflowId: workflowData.id,
+				sharedWithProjects: workflowData.sharedWithProjects,
+			});
+		}
+
+		const tags = (workflowData.tags ?? []) as ITag[];
+		setWorkflowTagIds(convertWorkflowTagsToIds(tags));
+		tagsStore.upsertTags(tags);
+	}
+
+	async function updateWorkflow(
+		{ workflowId: updateWorkflowId, active }: { workflowId: string; active?: boolean },
+		partialData = false,
+		getWorkflowDataToSave?: () => Promise<WorkflowData>,
+	) {
+		let data: WorkflowDataUpdate = {};
+
+		const isCurrentWorkflow = updateWorkflowId === ws.workflowId;
+		if (isCurrentWorkflow) {
+			if (partialData) {
+				data = { versionId: ws.workflowVersionId };
+			} else if (getWorkflowDataToSave) {
+				data = await getWorkflowDataToSave();
+			} else {
+				throw new Error('getWorkflowDataToSave callback required for full data update');
+			}
+		} else {
+			const { versionId } = await workflowsListStore.fetchWorkflow(updateWorkflowId);
+			data.versionId = versionId;
+		}
+
+		if (active !== undefined) {
+			data.active = active;
+		}
+
+		const updatedWorkflow = await ws.updateWorkflow(updateWorkflowId, data);
+		if (!updatedWorkflow.checksum) {
+			throw new Error('Failed to update workflow');
+		}
+
+		if (isCurrentWorkflow) {
+			setActive(updatedWorkflow.activeVersionId);
+			uiStore.markStateClean();
+		}
+
+		if (updatedWorkflow.activeVersion) {
+			ws.setWorkflowActive(updateWorkflowId, updatedWorkflow.activeVersion, isCurrentWorkflow);
+		} else {
+			ws.setWorkflowInactive(updateWorkflowId);
+		}
+	}
+
 	return {
 		// Workflow editing state
 		resetState,
@@ -499,6 +588,8 @@ export function useWorkflowState(workflowId: string) {
 		setWorkflowMetadata,
 		addToWorkflowMetadata,
 		setWorkflowPinData,
+		initState,
+		updateWorkflow,
 
 		// Execution
 		markExecutionAsStopped,
@@ -525,8 +616,7 @@ export function injectWorkflowState() {
 	return inject(
 		WorkflowStateKey,
 		() => {
-			// Fallback for code paths that call injectWorkflowState outside of NodeView tree
-			// (e.g., useWorkflowHelpers called from useWorkflowsStore during store initialization)
+			// TODO: Use injectStrict(WorkflowIdKey) once all call sites provide WorkflowIdKey
 			const workflowId = inject(WorkflowIdKey);
 			return useWorkflowState(workflowId?.value ?? '');
 		},

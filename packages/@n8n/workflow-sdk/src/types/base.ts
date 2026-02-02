@@ -1,41 +1,104 @@
 /**
  * Workflow SDK Types
  *
- * This file re-exports public API types from sdk-api.ts and defines
- * internal implementation types not exposed to the LLM.
+ * Core types for building n8n workflows programmatically.
  */
 
 // =============================================================================
-// Re-export primitive types from sdk-api.ts (types that are truly identical)
+// Data Types
 // =============================================================================
 
-export type {
-	// Data types
-	IDataObject,
-	// Item flow types
-	BinaryData,
-	Item,
-	Items,
-	// Credentials
-	CredentialReference,
-	NewCredentialValue,
-	// Placeholder
-	PlaceholderValue,
-	// Error handling
-	OnError,
-	// Merge mode (simple union)
-	MergeMode,
-} from './sdk-api';
+/**
+ * Generic data object for node parameters and data.
+ * Supports nested objects and arrays.
+ */
+export interface IDataObject {
+	[key: string]:
+		| string
+		| number
+		| boolean
+		| null
+		| undefined
+		| object
+		| IDataObject
+		| Array<string | number | boolean | null | object | IDataObject>;
+}
 
-// Import for internal use
-import type {
-	IDataObject,
-	CredentialReference,
-	NewCredentialValue,
-	PlaceholderValue,
-	OnError,
-	MergeMode,
-} from './sdk-api';
+/**
+ * Binary data attached to an item.
+ */
+export interface BinaryData {
+	[key: string]: {
+		fileName?: string;
+		mimeType?: string;
+		fileExtension?: string;
+		fileSize?: string;
+		data?: string;
+	};
+}
+
+/**
+ * A single n8n item with JSON data and optional binary attachments.
+ */
+export interface Item<T = IDataObject> {
+	json: T;
+	binary?: BinaryData;
+}
+
+/**
+ * An array of n8n items.
+ */
+export type Items<T = IDataObject> = Array<Item<T>>;
+
+// =============================================================================
+// Credentials
+// =============================================================================
+
+/**
+ * Reference to existing credentials
+ */
+export interface CredentialReference {
+	name: string;
+	id: string;
+}
+
+/**
+ * Marker for new credentials that need to be created.
+ */
+export interface NewCredentialValue {
+	readonly __newCredential: true;
+	readonly name: string;
+}
+
+// =============================================================================
+// Placeholder Values
+// =============================================================================
+
+/**
+ * Placeholder for values the user needs to fill in.
+ */
+export interface PlaceholderValue {
+	readonly __placeholder: true;
+	readonly hint: string;
+}
+
+// =============================================================================
+// Error Handling
+// =============================================================================
+
+/**
+ * Error handling behavior for nodes
+ */
+export type OnError = 'stopWorkflow' | 'continueRegularOutput' | 'continueErrorOutput';
+
+// =============================================================================
+// Merge Mode
+// =============================================================================
+
+/**
+ * Merge mode options
+ */
+export type MergeMode = 'append' | 'combine' | 'multiplex' | 'chooseBranch';
 
 // =============================================================================
 // Workflow Settings (with extensibility)

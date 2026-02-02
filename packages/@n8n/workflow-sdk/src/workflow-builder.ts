@@ -1589,7 +1589,7 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 		const nodeName = parts.length > 1 ? parts[parts.length - 1] : nodeType;
 
 		// Map node name patterns to required AI connection types and subnode field names
-		// Field names match SubnodeConfig in sdk-api.ts
+		// Field names match SubnodeConfig in types/base.ts
 		// Excluded from validation (can be standalone):
 		// - vectorStore* - Can operate in retrieval mode as standalone node
 		// - retriever* - Connects to agents, complex usage patterns

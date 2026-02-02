@@ -76,7 +76,7 @@ export function createArtifactSaver(options: ArtifactSaverOptions): ArtifactSave
 				);
 			}
 
-			// Save generated code if available (e.g., TypeScript SDK code from one-shot agent)
+			// Save generated code if available (e.g., TypeScript SDK code from coding agent)
 			if (result.generatedCode) {
 				fs.writeFileSync(path.join(exampleDir, 'code.ts'), result.generatedCode, 'utf-8');
 			}

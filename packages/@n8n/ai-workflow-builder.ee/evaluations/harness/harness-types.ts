@@ -230,7 +230,7 @@ export interface ExampleResult {
 	/** Subgraph timing and workflow metrics */
 	subgraphMetrics?: SubgraphMetrics;
 	workflow?: SimpleWorkflow;
-	/** Generated source code (e.g., TypeScript SDK code from one-shot agent) */
+	/** Generated source code (e.g., TypeScript SDK code from coding agent) */
 	generatedCode?: string;
 	/** Token usage statistics from the generation */
 	tokenUsage?: TokenUsage;
@@ -263,7 +263,7 @@ export interface GenerationError {
 
 /**
  * Result from workflow generation that may include source code.
- * Used by generators that produce code (e.g., one-shot agent).
+ * Used by generators that produce code (e.g., coding agent).
  */
 export interface GenerationResult {
 	workflow: SimpleWorkflow;

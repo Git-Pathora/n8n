@@ -599,6 +599,7 @@ Your code must:
 - **Define all nodes as constants FIRST** (subnodes before main nodes)
 - **Then return the workflow composition** with .add() and .to() chains
 - **NO import statements** (functions are pre-loaded)
+- **Write clean code without comments** - comments are stripped before execution and users only see the resulting workflow. Use 'sticky()' to add guidance for users
 - Follow all workflow rules with valid syntax
 - Use proper node positioning (left-to-right, vertical for branches)
 - Use descriptive node names

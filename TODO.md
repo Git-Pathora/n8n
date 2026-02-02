@@ -2,40 +2,30 @@
 
 ## workflow-sdk
 - [ ] Better clarify/test how output data maps to expressions in types and referenced?
-- [ ] why is agent node accepting arrays as models? fallback model? how to clarify this better?
 
 ## agent
-- [ ] Add relevant best practice pieces, esp to better handling (let evals guide this)
-	- [ ] a lot of pairwise seem to be about preferring certain nodes, how can we add that as part of the node definition
-	- [ ] best practices:
-		- [ ] reasonable defaults? using placeholder for parameters like Country code in packages/@n8n/ai-workflow-builder.ee/eval-results-01-26/opus-one-shot-test-dataset-01-26/example-002-00a012f0
-		- [ ] Best practices documentation recommends using Wait nodes and batching options to avoid hitting API rate limits.
-			- "The workflow uses returnAll: true for Gmail without batching." packages/@n8n/ai-workflow-builder.ee/eval-results-01-26/opus-one-shot-test-dataset-01-26/example-001-f1b1d9b7
-- [ ] Make sure conversation history is included in request
 - [ ] investigate failed syntax in prompt in this example packages/@n8n/ai-workflow-builder.ee/eval-results/sonnet-one-shot-all/example-005-05fd23ad. also packages/@n8n/ai-workflow-builder.ee/eval-results/sonnet-one-shot-all/example-007-ca13700c
-- [ ] handling of large workflows
-	- [ ] context limits with many types of nodes?
-	- [ ] adjust builder hints to be questions/not code specific
-
-## iteration
-- [ ] test iteration, inserting nodes in between
-- [ ] strip away previous contexts from previous messages.
-- [ ] add in execution schema/expression data, whatever we are passing now
-- [ ] compacting
 
 ## ready to release
-- [ ] security concerns of loading js from ~/.n8n
-- [ ] integrate with planning agent?
+- [ ] security concerns of loading js from ~/.n8n/generated-types/
 - [ ] Review PR (lots of AI generated code that I did not look at)
 - [ ] Remove logging from agent. lots of logging for debugging.
 - [ ] Add some tracking if code parsing or generation step fails in prod.
-- [ ] test how unknown nodes handled?
 - [ ] caching the requests. make sure system prompt + caching the type requests
 - [ ] Update telemetry and prompt viewer app to support the code and workflow generated
 - [ ] Parameters?: should not be optional in types if some key in there is not optional
 - [ ] fix up sticky sizing and positioning to cover nodes
 
+## testing
+- [ ] unknown nodes
+- [ ] community nodes
+- [ ] handling of large workflows
+- [ ] context limits with many types of nodes
+- [ ] long conversations
+- [ ] stickies
+
 ## Nice to haves / tech debt
+- [ ] why is agent node accepting arrays as models? fallback model? how to clarify this better?
 - [ ] test out prompt with/without sdk reference
 - [ ] fromAI expressions replace in json -> code
 - [ ] rename get nodes tool to get_node_types
@@ -43,20 +33,11 @@
 - [ ] make display options more clear in node types @displayOption.show { node: ["operation"]}
 - [ ] move node-specific builder validations to node level rather than at sdk level
 - [ ] format the workflows into multi lines. might make it easier for workflow to handle parsing errors better
-- [ ] Evaluate with thinking enabled for each model. uses <planning> now [maybe-later]
 - [ ] remove / @ts-nocheck - Generated file may have unused from generated files
 - [ ] Test more of the template library
 - [ ] Make it more clear that SDK api file is for LLM consumption. To avoid other engineers adding unnecessary types to it, confusing the agent.
-- [ ] rename one shot agent across code base
 - [ ] update workflow() to support object init { id, settings }
 - [ ] move generated test files for committed workflows to same folder.
-- [ ] allow adding node defaults when generating workflows
-- [ ] Add builderHint
-		- [ ] for example promptType: 'auto'/'define'
-		- [ ] use expressions for agent
-		- [ ] simplify output changes?
-		- [ ] memory key in chat node
-		- [ ] schedule node cron or multiple intervals
 - [] Fallback model in agent? how to represent that effectively. builderHint to true.
 - [] Make the nodes search more fuzzy
 {
@@ -79,6 +60,7 @@
 	- [ ] improve understanding of expressions. often hitting MISSING_EXPRESSION_PREFIX.
 
 ## Future improvement
+- [ ] integrate with planning agent?
 - [ ] improve generating static pin data
 	- [ ] have agent generate pin data for http request / webhook nodes
 	- [ ] should only generate pin data for nodes that also don't have pin data, never replace
@@ -99,6 +81,7 @@
 - [ ] Add text editing tools support, to improve iteration
 - [ ] fine tuning model with sdk code
 - [ ] abstract away rlc() -> { _rlc: true, mode, value} resource locator component
+- [ ] Evaluate with thinking enabled for each model. uses <planning> now
 
 
 Feature Support Summary
@@ -121,11 +104,11 @@ Feature Support Summary
  ├──────────────────────────────┼─────────────────┼──────────────────┤
  │ Resource/Operation Discovery │ ✅              │ ✅                │
  ├──────────────────────────────┼─────────────────┼──────────────────┤
- │ Best Practices Tool          │ ✅              │ WIP               │
+ │ Best Practices Tool          │ ✅              │ ✅               │
  ├──────────────────────────────┼─────────────────┼──────────────────┤
- │ Error Recovery Mode*          │ ✅              │ ⚠️              │
+ │ Error Recovery Mode*         │ ✅              │ ✅              │
  ├──────────────────────────────┼─────────────────┼──────────────────┤
- │ Message Compaction           │ ✅              │ TODO               │
+ │ Messag History, Compaction   │ ✅              │ TODO               │
  ├──────────────────────────────┼─────────────────┼──────────────────┤
  │ Node Search                  │ ✅              │ ✅               │
  ├──────────────────────────────┼─────────────────┼──────────────────┤

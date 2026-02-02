@@ -49,7 +49,7 @@ export const suggestedNodesData: Record<string, CategoryData> = {
 				name: 'n8n-nodes-base.scheduleTrigger',
 				note: 'Periodic monitoring and batch notifications',
 			},
-			{ name: 'n8n-nodes-base.emailSend', note: 'Use App Passwords for Gmail SMTP' },
+			{ name: 'n8n-nodes-base.gmail', note: 'Easy OAuth setup for sending emails' },
 			{ name: 'n8n-nodes-base.slack', note: 'Use channel IDs (starting with C), not names' },
 			{ name: 'n8n-nodes-base.telegram', note: 'Use chat ID for direct messages' },
 			{ name: 'n8n-nodes-base.twilio', note: 'Use international format (+1234567890)' },

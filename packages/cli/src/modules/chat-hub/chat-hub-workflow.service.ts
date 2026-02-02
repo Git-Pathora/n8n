@@ -3,8 +3,6 @@ import {
 	ChatSessionId,
 	PROVIDER_CREDENTIAL_TYPE_MAP,
 	type ChatHubBaseLLMModel,
-	type ChatHubInputModality,
-	type ChatModelMetadataDto,
 	type ChatHubAgentKnowledgeItem,
 } from '@n8n/api-types';
 import { Logger } from '@n8n/backend-common';
@@ -18,7 +16,6 @@ import {
 } from '@n8n/db';
 import { Service } from '@n8n/di';
 import { EntityManager } from '@n8n/typeorm';
-import { DateTime } from 'luxon';
 import { Cipher } from 'n8n-core';
 import {
 	CHAT_NODE_TYPE,
@@ -49,12 +46,9 @@ import { WorkflowFinderService } from '@/workflows/workflow-finder.service';
 
 import { ChatHubCredentialsService } from './chat-hub-credentials.service';
 import { CHATHUB_EXTRACTOR_NAME, ChatHubAuthenticationMetadata } from './chat-hub-extractor';
-import { ChatHubMessage } from './chat-hub-message.entity';
-import { ChatHubAttachmentService } from './chat-hub.attachment.service';
 import {
 	CHAT_TRIGGER_NODE_MIN_VERSION,
 	EMBEDDINGS_NODE_TYPE_MAP,
-	getModelMetadata,
 	NODE_NAMES,
 	PROVIDER_NODE_TYPE_MAP,
 	SUPPORTED_RESPONSE_MODES,
@@ -64,15 +58,11 @@ import { ChatHubSettingsService } from './chat-hub.settings.service';
 import {
 	chatTriggerParamsShape,
 	MessageRecord,
-	PreparedChatWorkflow,
-	type ContentBlock,
 	type ChatTriggerResponseMode,
 	type VectorStoreSearchOptions,
 	type ChatInput,
-	type ProviderAndCredentialId,
 } from './chat-hub.types';
 import { getMaxContextWindowTokens } from './context-limits';
-import { inE2ETests } from '../../constants';
 import type { ChatHubAgent } from './chat-hub-agent.entity';
 
 @Service()
@@ -81,7 +71,6 @@ export class ChatHubWorkflowService {
 		private readonly logger: Logger,
 		private readonly workflowRepository: WorkflowRepository,
 		private readonly sharedWorkflowRepository: SharedWorkflowRepository,
-		private readonly chatHubAttachmentService: ChatHubAttachmentService,
 		private readonly chatHubSettingsService: ChatHubSettingsService,
 		private readonly chatHubCredentialsService: ChatHubCredentialsService,
 		private readonly workflowFinderService: WorkflowFinderService,
@@ -222,35 +211,6 @@ export class ChatHubWorkflowService {
 				executionData,
 			};
 		});
-	}
-
-	/**
-	 * Parses input modalities from chat trigger options
-	 * Converts MIME types string to ChatHubInputModality array
-	 */
-	parseInputModalities(options?: {
-		allowFileUploads?: boolean;
-		allowedFilesMimeTypes?: string;
-	}): ChatHubInputModality[] {
-		const allowFileUploads = options?.allowFileUploads ?? false;
-		const allowedFilesMimeTypes = options?.allowedFilesMimeTypes;
-
-		if (!allowFileUploads) {
-			return ['text'];
-		}
-
-		if (!allowedFilesMimeTypes || allowedFilesMimeTypes === '*/*') {
-			return ['text', 'image', 'audio', 'video', 'file'];
-		}
-
-		const mimeTypes = allowedFilesMimeTypes.split(',').map((type) => type.trim());
-		const modalities = new Set<ChatHubInputModality>(['text']);
-
-		for (const mimeType of mimeTypes) {
-			modalities.add(this.getMimeTypeModality(mimeType));
-		}
-
-		return Array.from(modalities);
 	}
 
 	private getUniqueNodeName(originalName: string, existingNames: Set<string>): string {
@@ -538,43 +498,6 @@ export class ChatHubWorkflowService {
 		};
 	}
 
-	// TODO: move to chat-hub service
-	getSystemMessageMetadata(timeZone: string) {
-		const now = inE2ETests ? DateTime.fromISO('2025-01-15T12:00:00.000Z') : DateTime.now();
-		const isoTime = now.setZone(timeZone).toISO({ includeOffset: true });
-
-		return `
-## Date and time
-
-The user's current local date and time is: ${isoTime} (timezone: ${timeZone}).
-When you need to reference "now", use this date and time.
-
-
-## Capabilities
-
-You may *analyze* and *explain* provided multimedia contents, but you can ONLY *produce text responses*.
-You cannot create, generate, edit, or display images, videos, or other non-text content.
-If the user asks you to generate or edit an image (or other media), explain that you are not able to do that and, if helpful, describe in words what the image could look like or how they could create it using external tools.
-
-
-## Context files
-
-If context files are provided by the user,
-- Take them into account for generating relevant answers.
-- Do NOT proactively mention, analyze, summarize or explain them until requested.
-
-BAD: "I've received three files: [list and summary]"
-BAD: "I'll use ${NODE_NAMES.VECTOR_STORE_QUESTION_TOOL} to answer your questions."
-GOOD: "Hello! How can I help you?"
-`;
-	}
-
-	getBaseSystemMessage(timeZone: string) {
-		return `You are a helpful assistant.
-
-${this.getSystemMessageMetadata(timeZone)}`;
-	}
-
 	private buildToolsAgentNode(
 		model: ChatHubConversationModel,
 		systemMessage: string,
@@ -776,204 +699,6 @@ ${this.getSystemMessageMetadata(timeZone)}`;
 		};
 	}
 
-	// TODO: move to chat-hub service
-	async buildMessageValuesWithAttachments(
-		history: ChatHubMessage[],
-		model: ChatHubBaseLLMModel,
-		contextFiles: ChatHubAgentKnowledgeItem[],
-	): Promise<MessageRecord[]> {
-		const metadata = getModelMetadata(model.provider, model.model);
-
-		// Gemini has 20MB limit, the value should also be what n8n instance can safely handle
-		const maxTotalPayloadSize = 20 * 1024 * 1024 * 0.9;
-
-		const typeMap: Record<string, MessageRecord['type']> = {
-			human: 'user',
-			ai: 'ai',
-			system: 'system',
-		};
-
-		const messageValues: MessageRecord[] = [];
-
-		let currentTotalSize = 0;
-
-		const messages = history.slice().reverse(); // Traversing messages from last to prioritize newer attachments
-
-		for (const message of messages) {
-			// Empty messages can't be restored by the memory manager
-			if (message.content.length === 0) {
-				continue;
-			}
-
-			const attachments = message.attachments ?? [];
-			const type = typeMap[message.type] || 'system';
-
-			// TODO: Tool messages etc?
-
-			const textSize = message.content.length;
-			currentTotalSize += textSize;
-
-			if (attachments.length === 0) {
-				messageValues.push({
-					type,
-					message: message.content,
-					hideFromUI: false,
-				});
-				continue;
-			}
-
-			const blocks: ContentBlock[] = [{ type: 'text', text: message.content }];
-
-			// Add attachments if within size limit
-			for (const attachment of attachments) {
-				const attachmentBlocks = await this.buildContentBlockForAttachment(
-					{ type: 'file', binaryData: attachment },
-					currentTotalSize,
-					maxTotalPayloadSize,
-					metadata,
-					'File',
-				);
-
-				for (const block of attachmentBlocks) {
-					blocks.push(block);
-					currentTotalSize += block.type === 'text' ? block.text.length : block.image_url.length;
-				}
-			}
-
-			messageValues.push({
-				type,
-				message: blocks,
-				hideFromUI: false,
-			});
-		}
-
-		const contextFileBlocks: ContentBlock[] = [];
-
-		for (let i = 0; i < contextFiles.length; i++) {
-			const file = contextFiles[i];
-			const blocks = await this.buildContentBlockForAttachment(
-				file,
-				currentTotalSize,
-				maxTotalPayloadSize,
-				metadata,
-				`Context file (${i + 1} of ${contextFiles.length})`,
-			);
-
-			for (const block of blocks) {
-				contextFileBlocks.push(block);
-				currentTotalSize += block.type === 'text' ? block.text.length : block.image_url.length;
-			}
-		}
-
-		if (contextFileBlocks.length > 0) {
-			messageValues.push({
-				type: 'user',
-				message: contextFileBlocks,
-				hideFromUI: true,
-			});
-		}
-
-		// Reverse to restore original order
-		messageValues.reverse();
-
-		return messageValues;
-	}
-
-	private async buildContentBlockForAttachment(
-		file: ChatHubAgentKnowledgeItem,
-		currentTotalSize: number,
-		maxTotalPayloadSize: number,
-		modelMetadata: ChatModelMetadataDto,
-		prefix: string,
-	): Promise<ContentBlock[]> {
-		class TotalFileSizeExceededError extends Error {}
-		class UnsupportedMimeTypeError extends Error {}
-
-		try {
-			if (currentTotalSize >= maxTotalPayloadSize) {
-				throw new TotalFileSizeExceededError();
-			}
-
-			if (file.type === 'embedding') {
-				return [
-					{
-						type: 'text',
-						text: `${prefix}: ${file.fileName ?? 'attachment'}\nContent: \nUse ${NODE_NAMES.VECTOR_STORE_QUESTION_TOOL} to query this document`,
-					},
-				];
-			}
-
-			const attachment = file.binaryData;
-
-			if (this.isTextFile(attachment.mimeType)) {
-				const buffer = await this.chatHubAttachmentService.getAsBuffer(attachment);
-				const content = buffer.toString('utf-8');
-
-				if (currentTotalSize + content.length > maxTotalPayloadSize) {
-					throw new TotalFileSizeExceededError();
-				}
-
-				return [
-					{
-						type: 'text',
-						text: `${prefix}: ${attachment.fileName ?? 'attachment'}\nContent: \n${content}`,
-					},
-				];
-			}
-
-			const modality = this.getMimeTypeModality(attachment.mimeType);
-
-			if (!modelMetadata.inputModalities.includes(modality)) {
-				throw new UnsupportedMimeTypeError();
-			}
-
-			const url = await this.chatHubAttachmentService.getDataUrl(attachment);
-
-			if (currentTotalSize + url.length > maxTotalPayloadSize) {
-				throw new TotalFileSizeExceededError();
-			}
-
-			return [
-				{ type: 'text', text: `${prefix}: ${attachment.fileName ?? 'attachment'}` },
-				{ type: 'image_url', image_url: url },
-			];
-		} catch (e) {
-			const fileName =
-				file.type === 'embedding' ? file.fileName : (file.binaryData.fileName ?? 'attachment');
-
-			if (e instanceof TotalFileSizeExceededError) {
-				return [
-					{
-						type: 'text',
-						text: `${prefix}: ${fileName}\n(Content omitted due to size limit)`,
-					},
-				];
-			}
-
-			if (e instanceof UnsupportedMimeTypeError) {
-				return [
-					{
-						type: 'text',
-						text: `${prefix}: ${fileName}\n(Unsupported file type)`,
-					},
-				];
-			}
-
-			throw e;
-		}
-	}
-
-	private isTextFile(mimeType: string): boolean {
-		return (
-			mimeType.startsWith('text/') ||
-			mimeType === 'application/json' ||
-			mimeType === 'application/xml' ||
-			mimeType === 'application/csv' ||
-			mimeType === 'application/x-yaml' ||
-			mimeType === 'application/yaml'
-		);
-	}
-
 	private buildClearMemoryNode(): INode {
 		return {
 			parameters: {
@@ -1040,22 +765,6 @@ Respond the title only:`,
 		};
 	}
 
-	/**
-	 * Determines the input modality for a given MIME type
-	 */
-	private getMimeTypeModality(mimeType: string): ChatHubInputModality {
-		if (mimeType.startsWith('image/')) {
-			return 'image';
-		}
-		if (mimeType.startsWith('audio/')) {
-			return 'audio';
-		}
-		if (mimeType.startsWith('video/')) {
-			return 'video';
-		}
-		return 'file';
-	}
-
 	prepareExecutionData(
 		triggerNode: INode,
 		sessionId: string,
@@ -1104,67 +813,7 @@ Respond the title only:`,
 		];
 	}
 
-	async prepareReplyWorkflow(
-		user: User,
-		sessionId: ChatSessionId,
-		credentials: INodeCredentials,
-		model: ChatHubConversationModel,
-		agent: ChatHubAgent | null,
-		history: ChatHubMessage[],
-		input: ChatInput,
-		tools: INode[],
-		timeZone: string,
-		trx: EntityManager,
-		executionMetadata: ChatHubAuthenticationMetadata,
-		embeddingModel: ProviderAndCredentialId | null,
-		memoryKey: string | null,
-	): Promise<PreparedChatWorkflow> {
-		if (model.provider === 'n8n') {
-			return await this.prepareWorkflowAgentWorkflow(
-				user,
-				sessionId,
-				model.workflowId,
-				input,
-				trx,
-				executionMetadata,
-			);
-		}
-
-		if (model.provider === 'custom-agent') {
-			if (!agent || !memoryKey) {
-				throw new BadRequestError('Agent not found');
-			}
-
-			return await this.prepareChatAgentWorkflow(
-				agent,
-				user,
-				sessionId,
-				history,
-				input,
-				trx,
-				executionMetadata,
-				timeZone,
-				embeddingModel,
-				memoryKey,
-			);
-		}
-
-		return await this.prepareBaseChatWorkflow(
-			user,
-			sessionId,
-			credentials,
-			model,
-			await this.buildMessageValuesWithAttachments(history, model, []),
-			input,
-			this.getBaseSystemMessage(timeZone),
-			tools,
-			null,
-			trx,
-			executionMetadata,
-		);
-	}
-
-	private async prepareBaseChatWorkflow(
+	async prepareBaseChatWorkflow(
 		user: User,
 		sessionId: ChatSessionId,
 		credentials: INodeCredentials,
@@ -1197,17 +846,16 @@ Respond the title only:`,
 		);
 	}
 
-	private async prepareChatAgentWorkflow(
+	async prepareChatAgentWorkflow(
 		agent: ChatHubAgent,
 		user: User,
 		sessionId: ChatSessionId,
-		history: ChatHubMessage[],
+		history: MessageRecord[],
 		input: ChatInput,
 		trx: EntityManager,
+		systemMessage: string,
 		executionMetadata: ChatHubAuthenticationMetadata,
-		timeZone: string,
-		embeddingModel: ProviderAndCredentialId | null,
-		memoryKey: string,
+		vectorStoreSearchOptions: VectorStoreSearchOptions | null,
 	) {
 		if (!agent.provider || !agent.model) {
 			throw new BadRequestError('Provider or model not set for agent');
@@ -1217,8 +865,6 @@ Respond the title only:`,
 		if (!credentialId) {
 			throw new BadRequestError('Credentials not set for agent');
 		}
-
-		const systemMessage = agent.systemPrompt + '\n\n' + this.getSystemMessageMetadata(timeZone);
 
 		const model: ChatHubBaseLLMModel = {
 			provider: agent.provider,
@@ -1234,37 +880,22 @@ Respond the title only:`,
 
 		const { tools } = agent;
 
-		const knowledgeItems = agent.files.filter((f) => f.type === 'embedding');
-
-		for (const item of knowledgeItems) {
-			if (item.provider !== embeddingModel?.provider) {
-				throw new BadRequestError(
-					`Credential for processing agent's file knowledge is missing. Configure credential for ${item.provider} or remove '${item.fileName}' from agent.`,
-				);
-			}
-		}
-
 		return await this.prepareBaseChatWorkflow(
 			user,
 			sessionId,
 			credentials,
 			model,
-			await this.buildMessageValuesWithAttachments(history, model, agent.files),
+			history,
 			input,
 			systemMessage,
 			tools,
-			knowledgeItems.length > 0 && embeddingModel
-				? {
-						embeddingModel,
-						memoryKey,
-					}
-				: null,
+			vectorStoreSearchOptions,
 			trx,
 			executionMetadata,
 		);
 	}
 
-	private async prepareWorkflowAgentWorkflow(
+	async prepareWorkflowAgentWorkflow(
 		user: User,
 		sessionId: ChatSessionId,
 		workflowId: string,

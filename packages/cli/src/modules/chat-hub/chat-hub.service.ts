@@ -9,6 +9,9 @@ import {
 	ChatHubConversationModel,
 	type ChatHubUpdateConversationRequest,
 	type ChatHubSessionDto,
+	type ChatHubBaseLLMModel,
+	type ChatHubAgentKnowledgeItem,
+	type ChatModelMetadataDto,
 } from '@n8n/api-types';
 import { Logger } from '@n8n/backend-common';
 import { GlobalConfig } from '@n8n/config';
@@ -44,10 +47,15 @@ import {
 	EditMessagePayload,
 	PreparedChatWorkflow,
 	type ChatInput,
+	type MessageRecord,
+	type ContentBlock,
 } from './chat-hub.types';
 import { ChatHubMessageRepository } from './chat-message.repository';
 import { ChatHubSessionRepository } from './chat-session.repository';
 import { ChatStreamService } from './chat-stream.service';
+import { getModelMetadata } from './chat-hub.constants';
+import { inE2ETests } from '@/constants';
+import { DateTime } from 'luxon';
 
 @Service()
 export class ChatHubService {
@@ -732,38 +740,73 @@ export class ChatHubService {
 		trx: EntityManager,
 		executionMetadata: ChatHubAuthenticationMetadata,
 	) {
-		const [agent, memoryKey] =
-			model.provider === 'custom-agent'
-				? [
-						await this.chatHubAgentService.getAgentById(user.id, model.agentId),
-						this.chatHubAgentService.getAgentMemoryKey(user.id, model.agentId),
-					]
-				: [null, null];
-		const embeddingProvider = agent?.files.flatMap((f) =>
-			f.type === 'embedding' ? [f.provider] : [],
-		)[0];
-		const embeddingModel = agent?.credentialId
-			? await this.chatHubAgentService.determineEmbeddingProvider(
-					user,
-					{ provider: agent.provider, credentialId: agent.credentialId },
-					embeddingProvider,
-				)
-			: null;
+		if (model.provider === 'n8n') {
+			return await this.chatHubWorkflowService.prepareWorkflowAgentWorkflow(
+				user,
+				sessionId,
+				model.workflowId,
+				input,
+				trx,
+				executionMetadata,
+			);
+		}
 
-		return await this.chatHubWorkflowService.prepareReplyWorkflow(
+		if (model.provider === 'custom-agent') {
+			const [agent, memoryKey] =
+				model.provider === 'custom-agent'
+					? [
+							await this.chatHubAgentService.getAgentById(user.id, model.agentId),
+							this.chatHubAgentService.getAgentMemoryKey(user.id, model.agentId),
+						]
+					: [null, null];
+
+			if (!agent) {
+				throw new BadRequestError('Agent not found');
+			}
+
+			const knowledgeItems = agent.files.filter((f) => f.type === 'embedding');
+			const embeddingModel =
+				agent?.credentialId && knowledgeItems.length > 0
+					? await this.chatHubAgentService.determineEmbeddingProvider(
+							user,
+							{ provider: agent.provider, credentialId: agent.credentialId },
+							knowledgeItems[0].provider,
+						)
+					: null;
+
+			for (const item of knowledgeItems) {
+				if (item.provider !== embeddingModel?.provider) {
+					throw new BadRequestError(
+						`Credential for processing agent's file knowledge is missing. Configure credential for ${item.provider} or remove '${item.fileName}' from agent.`,
+					);
+				}
+			}
+
+			return await this.chatHubWorkflowService.prepareChatAgentWorkflow(
+				agent,
+				user,
+				sessionId,
+				await this.buildMessageValuesWithAttachments(history, agent, agent.files),
+				input,
+				trx,
+				agent.systemPrompt + '\n\n' + this.getSystemMessage(timeZone),
+				executionMetadata,
+				embeddingModel ? { memoryKey, embeddingModel } : null,
+			);
+		}
+
+		return await this.chatHubWorkflowService.prepareBaseChatWorkflow(
 			user,
 			sessionId,
 			credentials,
 			model,
-			agent,
-			history,
+			await this.buildMessageValuesWithAttachments(history, model, []),
 			input,
+			'You are a helpful assistant.\n\n' + this.getSystemMessage(timeZone),
 			tools,
-			timeZone,
+			null,
 			trx,
 			executionMetadata,
-			embeddingModel,
-			memoryKey,
 		);
 	}
 
@@ -888,5 +931,232 @@ export class ChatHubService {
 			updatedAt: session.updatedAt.toISOString(),
 			tools: session.tools,
 		};
+	}
+
+	async buildMessageValuesWithAttachments(
+		history: ChatHubMessage[],
+		model: ChatHubBaseLLMModel,
+		contextFiles: ChatHubAgentKnowledgeItem[],
+	): Promise<MessageRecord[]> {
+		const metadata = getModelMetadata(model.provider, model.model);
+
+		// Gemini has 20MB limit, the value should also be what n8n instance can safely handle
+		const maxTotalPayloadSize = 20 * 1024 * 1024 * 0.9;
+
+		const typeMap: Record<string, MessageRecord['type']> = {
+			human: 'user',
+			ai: 'ai',
+			system: 'system',
+		};
+
+		const messageValues: MessageRecord[] = [];
+
+		let currentTotalSize = 0;
+
+		const messages = history.slice().reverse(); // Traversing messages from last to prioritize newer attachments
+
+		for (const message of messages) {
+			// Empty messages can't be restored by the memory manager
+			if (message.content.length === 0) {
+				continue;
+			}
+
+			const attachments = message.attachments ?? [];
+			const type = typeMap[message.type] || 'system';
+
+			// TODO: Tool messages etc?
+
+			const textSize = message.content.length;
+			currentTotalSize += textSize;
+
+			if (attachments.length === 0) {
+				messageValues.push({
+					type,
+					message: message.content,
+					hideFromUI: false,
+				});
+				continue;
+			}
+
+			const blocks: ContentBlock[] = [{ type: 'text', text: message.content }];
+
+			// Add attachments if within size limit
+			for (const attachment of attachments) {
+				const attachmentBlocks = await this.buildContentBlockForAttachment(
+					{ type: 'file', binaryData: attachment },
+					currentTotalSize,
+					maxTotalPayloadSize,
+					metadata,
+					'File',
+				);
+
+				for (const block of attachmentBlocks) {
+					blocks.push(block);
+					currentTotalSize += block.type === 'text' ? block.text.length : block.image_url.length;
+				}
+			}
+
+			messageValues.push({
+				type,
+				message: blocks,
+				hideFromUI: false,
+			});
+		}
+
+		const contextFileBlocks: ContentBlock[] = [];
+
+		for (let i = 0; i < contextFiles.length; i++) {
+			const file = contextFiles[i];
+			const blocks = await this.buildContentBlockForAttachment(
+				file,
+				currentTotalSize,
+				maxTotalPayloadSize,
+				metadata,
+				`Context file (${i + 1} of ${contextFiles.length})`,
+			);
+
+			for (const block of blocks) {
+				contextFileBlocks.push(block);
+				currentTotalSize += block.type === 'text' ? block.text.length : block.image_url.length;
+			}
+		}
+
+		if (contextFileBlocks.length > 0) {
+			messageValues.push({
+				type: 'user',
+				message: contextFileBlocks,
+				hideFromUI: true,
+			});
+		}
+
+		// Reverse to restore original order
+		messageValues.reverse();
+
+		return messageValues;
+	}
+
+	private async buildContentBlockForAttachment(
+		file: ChatHubAgentKnowledgeItem,
+		currentTotalSize: number,
+		maxTotalPayloadSize: number,
+		modelMetadata: ChatModelMetadataDto,
+		prefix: string,
+	): Promise<ContentBlock[]> {
+		class TotalFileSizeExceededError extends Error {}
+		class UnsupportedMimeTypeError extends Error {}
+
+		try {
+			if (currentTotalSize >= maxTotalPayloadSize) {
+				throw new TotalFileSizeExceededError();
+			}
+
+			if (file.type === 'embedding') {
+				return [
+					{
+						type: 'text',
+						text: `${prefix}: ${file.fileName ?? 'attachment'}\nContent: \n(Use vector store question tool to query this document)`,
+					},
+				];
+			}
+
+			const attachment = file.binaryData;
+
+			if (this.isTextFile(attachment.mimeType)) {
+				const buffer = await this.chatHubAttachmentService.getAsBuffer(attachment);
+				const content = buffer.toString('utf-8');
+
+				if (currentTotalSize + content.length > maxTotalPayloadSize) {
+					throw new TotalFileSizeExceededError();
+				}
+
+				return [
+					{
+						type: 'text',
+						text: `${prefix}: ${attachment.fileName ?? 'attachment'}\nContent: \n${content}`,
+					},
+				];
+			}
+
+			const modality = this.chatHubModelsService.getMimeTypeModality(attachment.mimeType);
+
+			if (!modelMetadata.inputModalities.includes(modality)) {
+				throw new UnsupportedMimeTypeError();
+			}
+
+			const url = await this.chatHubAttachmentService.getDataUrl(attachment);
+
+			if (currentTotalSize + url.length > maxTotalPayloadSize) {
+				throw new TotalFileSizeExceededError();
+			}
+
+			return [
+				{ type: 'text', text: `${prefix}: ${attachment.fileName ?? 'attachment'}` },
+				{ type: 'image_url', image_url: url },
+			];
+		} catch (e) {
+			const fileName =
+				file.type === 'embedding' ? file.fileName : (file.binaryData.fileName ?? 'attachment');
+
+			if (e instanceof TotalFileSizeExceededError) {
+				return [
+					{
+						type: 'text',
+						text: `${prefix}: ${fileName}\n(Content omitted due to size limit)`,
+					},
+				];
+			}
+
+			if (e instanceof UnsupportedMimeTypeError) {
+				return [
+					{
+						type: 'text',
+						text: `${prefix}: ${fileName}\n(Unsupported file type)`,
+					},
+				];
+			}
+
+			throw e;
+		}
+	}
+
+	private isTextFile(mimeType: string): boolean {
+		return (
+			mimeType.startsWith('text/') ||
+			mimeType === 'application/json' ||
+			mimeType === 'application/xml' ||
+			mimeType === 'application/csv' ||
+			mimeType === 'application/x-yaml' ||
+			mimeType === 'application/yaml'
+		);
+	}
+
+	private getSystemMessage(timeZone: string) {
+		const now = inE2ETests ? DateTime.fromISO('2025-01-15T12:00:00.000Z') : DateTime.now();
+		const isoTime = now.setZone(timeZone).toISO({ includeOffset: true });
+
+		return `
+## Date and time
+
+The user's current local date and time is: ${isoTime} (timezone: ${timeZone}).
+When you need to reference "now", use this date and time.
+
+
+## Capabilities
+
+You may *analyze* and *explain* provided multimedia contents, but you can ONLY *produce text responses*.
+You cannot create, generate, edit, or display images, videos, or other non-text content.
+If the user asks you to generate or edit an image (or other media), explain that you are not able to do that and, if helpful, describe in words what the image could look like or how they could create it using external tools.
+
+
+## Context files
+
+If context files are provided by the user,
+- Take them into account for generating relevant answers.
+- Do NOT proactively mention, analyze, summarize or explain them until requested.
+
+BAD: "I've received three files: [list and summary]"
+BAD: "I'll use vector store question tool to answer your questions."
+GOOD: "Hello! How can I help you?"
+`;
 	}
 }

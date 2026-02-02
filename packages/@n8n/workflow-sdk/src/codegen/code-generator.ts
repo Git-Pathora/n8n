@@ -145,6 +145,25 @@ const RESERVED_KEYWORDS = new Set([
 	'vectorStore',
 	'retriever',
 	'document',
+	// Dangerous globals (blocked by AST interpreter)
+	'eval',
+	'Function',
+	'require',
+	'process',
+	'global',
+	'globalThis',
+	'window',
+	'setTimeout',
+	'setInterval',
+	'setImmediate',
+	'clearTimeout',
+	'clearInterval',
+	'clearImmediate',
+	'module',
+	'exports',
+	'Buffer',
+	'Reflect',
+	'Proxy',
 ]);
 
 /**

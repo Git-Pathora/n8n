@@ -32,7 +32,7 @@ describe('Schema Validation Integration', () => {
 			expect(result.errors).toEqual([]);
 		});
 
-		it('returns warning when required title field is missing', () => {
+		it('accepts config when optional title field is missing', () => {
 			const result = validateNodeConfig('n8n-nodes-base.microsoftTeams', 2, {
 				parameters: {
 					resource: 'task',
@@ -40,13 +40,12 @@ describe('Schema Validation Integration', () => {
 					groupId: { __rl: true, mode: 'id', value: 'group-123' },
 					planId: { __rl: true, mode: 'id', value: 'plan-456' },
 					bucketId: { __rl: true, mode: 'id', value: 'bucket-789' },
-					// title is missing
+					// title is optional in the schema
 				},
 			});
-			// For discriminated unions, Zod reports union mismatch errors
-			// The validation fails because the task/create schema requires title
-			expect(result.valid).toBe(false);
-			expect(result.errors.length).toBeGreaterThan(0);
+			// title is optional in the generated schema, so this should pass
+			expect(result.valid).toBe(true);
+			expect(result.errors).toEqual([]);
 		});
 
 		it('accepts expression in groupId field', () => {

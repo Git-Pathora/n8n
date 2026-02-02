@@ -128,12 +128,13 @@ describe('code-generator', () => {
 
 				expect(code).toContain('.then(');
 				// All nodes should be variables
+				// Note: 'process' is a reserved word, so it becomes 'process_node'
 				expect(code).toContain('const trigger_node = trigger({');
-				expect(code).toContain('const process = node({');
+				expect(code).toContain('const process_node = node({');
 				expect(code).toContain('const final = node({');
 				// Workflow should chain variable references
 				expect(code).toMatch(/\.add\(trigger_node\)/);
-				expect(code).toMatch(/\.then\(process\)/);
+				expect(code).toMatch(/\.then\(process_node\)/);
 				expect(code).toMatch(/\.then\(final\)/);
 			});
 		});

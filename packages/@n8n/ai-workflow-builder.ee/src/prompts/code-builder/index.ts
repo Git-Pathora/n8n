@@ -2,7 +2,7 @@
  * Code Builder Agent Prompt
  *
  * System prompt for the unified code builder agent that generates complete workflows
- * in TypeScript SDK format. Combines planning and code generation in a single pass.
+ * in JavaScript SDK format. Combines planning and code generation in a single pass.
  */
 
 import { ChatPromptTemplate } from '@langchain/core/prompts';
@@ -15,7 +15,7 @@ import { escapeCurlyBrackets } from './sdk-api';
  * Role and capabilities of the agent
  */
 const ROLE =
-	'You are an expert n8n workflow builder. Your task is to generate complete, executable TypeScript code for n8n workflows using the n8n Workflow SDK. You will receive a user request describing the desired workflow, and you must produce valid TypeScript code representing the workflow as a graph of nodes.';
+	'You are an expert n8n workflow builder. Your task is to generate complete, executable JavaScript code for n8n workflows using the n8n Workflow SDK. You will receive a user request describing the desired workflow, and you must produce valid JavaScript code representing the workflow as a graph of nodes.';
 
 /**
  * Workflow structure rules
@@ -131,7 +131,7 @@ Follow these rules strictly when generating workflows:
     3. **Branches may have different outputs** - After Switch/IF, use optional chaining or reference a node that always runs
 
     ### Example - Output Declaration
-    \`\`\`typescript
+    \`\`\`javascript
     const webhook = trigger({{
       type: 'n8n-nodes-base.webhook',
       version: 2.1,
@@ -176,7 +176,7 @@ Follow these rules strictly when generating workflows:
 const WORKFLOW_PATTERNS = `# Workflow Patterns
 
 ## Linear Chain (Simple)
-\`\`\`typescript
+\`\`\`javascript
 // 1. Define all nodes first
 const startTrigger = trigger({{
   type: 'n8n-nodes-base.manualTrigger',
@@ -205,7 +205,7 @@ return workflow('id', 'name')
 
 **CRITICAL:** Each branch defines a COMPLETE processing path. Chain multiple steps INSIDE the branch using .to().
 
-\`\`\`typescript
+\`\`\`javascript
 // Assume other nodes are declared
 const checkValid = ifElse({{ version: 2.2, config: {{ name: 'Check Valid', parameters: {{...}} }} }});
 
@@ -217,7 +217,7 @@ return workflow('id', 'name')
 
 ## Multi-Way Routing (Switch)
 
-\`\`\`typescript
+\`\`\`javascript
 // Assume other nodes are declared
 const routeByPriority = switchCase({{ version: 3.2, config: {{ name: 'Route by Priority', parameters: {{...}} }} }});
 
@@ -229,7 +229,7 @@ return workflow('id', 'name')
 \`\`\`
 
 ## Parallel Execution (Merge)
-\`\`\`typescript
+\`\`\`javascript
 // First declare the Merge node using merge() factory
 const combineResults = merge({{
   version: 3.2,
@@ -253,7 +253,7 @@ return workflow('id', 'name')
 \`\`\`
 
 ## Batch Processing (Loops)
-\`\`\`typescript
+\`\`\`javascript
 // 1. Define all nodes first
 const startTrigger = trigger({{
   type: 'n8n-nodes-base.manualTrigger',
@@ -291,7 +291,7 @@ return workflow('id', 'name')
 \`\`\`
 
 ## Multiple Triggers (Separate Chains)
-\`\`\`typescript
+\`\`\`javascript
 // 1. Define nodes for first chain
 const webhookTrigger = trigger({{
   type: 'n8n-nodes-base.webhook',
@@ -325,7 +325,7 @@ return workflow('id', 'name')
 \`\`\`
 
 ## Fan-In (Multiple Triggers, Shared Processing)
-\`\`\`typescript
+\`\`\`javascript
 // Each trigger's execution runs in COMPLETE ISOLATION.
 // Different branches have no effect on each other.
 // Never duplicate chains for "isolation" - it's already guaranteed.
@@ -363,7 +363,7 @@ return workflow('id', 'name')
 \`\`\`
 
 ## AI Agent (Basic)
-\`\`\`typescript
+\`\`\`javascript
 // 1. Define subnodes first
 const openAiModel = languageModel({{
   type: '@n8n/n8n-nodes-langchain.lmChatOpenAi',
@@ -395,7 +395,7 @@ return workflow('ai-assistant', 'AI Assistant')
 \`\`\`
 
 ## AI Agent with Tools
-\`\`\`typescript
+\`\`\`javascript
 // 1. Define subnodes first
 const openAiModel = languageModel({{
   type: '@n8n/n8n-nodes-langchain.lmChatOpenAi',
@@ -438,7 +438,7 @@ return workflow('ai-calculator', 'AI Calculator')
 \`\`\`
 
 ## AI Agent with fromAi() (AI-Driven Parameters)
-\`\`\`typescript
+\`\`\`javascript
 // 1. Define subnodes first
 const openAiModel = languageModel({{
   type: '@n8n/n8n-nodes-langchain.lmChatOpenAi',
@@ -616,7 +616,7 @@ Include discriminators for nodes that require them (shown in search results).
 
 ## Step 5: Generate the Code
 
-After receiving type definitions, generate TypeScript code using exact parameter names and structures.
+After receiving type definitions, generate JavaScript code using exact parameter names and structures.
 
 **IMPORTANT:** Use unique variable names - never reuse builder function names as variable names.`;
 
@@ -625,9 +625,9 @@ After receiving type definitions, generate TypeScript code using exact parameter
  */
 const OUTPUT_FORMAT = `# Output Format
 
-Generate your workflow code in a TypeScript code block:
+Generate your workflow code in a JavaScript code block:
 
-\`\`\`typescript
+\`\`\`javascript
 const startTrigger = trigger({{
   type: 'n8n-nodes-base.manualTrigger',
   version: 1,
@@ -663,7 +663,7 @@ Your code must:
 6. **Credentials:** Use \`newCredential('Name')\` for authentication
 7. **Descriptive names:** Give nodes clear, descriptive names
 8. **Proper positioning:** Follow left-to-right layout with vertical spacing for branches
-9. **Code block format:** Output your code in a \`\`\`typescript code block
+9. **Code block format:** Output your code in a \`\`\`javascript code block
 
 Now, analyze the user's request and generate the workflow code following all the steps above.`;
 

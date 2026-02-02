@@ -25,6 +25,9 @@ import {
 /** The only supported file path for workflow code */
 const WORKFLOW_FILE_PATH = '/workflow.ts';
 
+/** Debug log callback type */
+type DebugLogFn = (context: string, message: string, data?: Record<string, unknown>) => void;
+
 /**
  * Handler for text editor tool commands
  *
@@ -33,6 +36,12 @@ const WORKFLOW_FILE_PATH = '/workflow.ts';
  */
 export class TextEditorHandler {
 	private code: string | null = null;
+	private debugLog: DebugLogFn;
+
+	constructor(debugLog?: DebugLogFn) {
+		// Use provided debug log or no-op
+		this.debugLog = debugLog ?? (() => {});
+	}
 
 	/**
 	 * Execute a text editor command
@@ -42,25 +51,44 @@ export class TextEditorHandler {
 	 * @throws Various errors for invalid operations
 	 */
 	execute(command: TextEditorCommand): string {
+		this.debugLog('EXECUTE', `Executing command: ${command.command}`, {
+			path: command.path,
+			hasCode: this.code !== null,
+			codeLength: this.code?.length ?? 0,
+		});
+
 		// Validate path for all commands
 		this.validatePath(command.path);
 
+		let result: string;
 		switch (command.command) {
 			case 'view':
-				return this.handleView(command);
+				result = this.handleView(command);
+				break;
 			case 'create':
-				return this.handleCreate(command);
+				result = this.handleCreate(command);
+				break;
 			case 'str_replace':
-				return this.handleStrReplace(command);
+				result = this.handleStrReplace(command);
+				break;
 			case 'insert':
-				return this.handleInsert(command);
+				result = this.handleInsert(command);
+				break;
 			case 'finalize':
 				// Finalize is handled separately by the agent
 				// This should not be called directly on execute
-				return 'Finalize command should be handled by the agent.';
+				result = 'Finalize command should be handled by the agent.';
+				break;
 			default:
-				return `Unknown command: ${(command as { command: string }).command}`;
+				result = `Unknown command: ${(command as { command: string }).command}`;
 		}
+
+		this.debugLog('EXECUTE', `Command ${command.command} completed`, {
+			resultLength: result.length,
+			newCodeLength: this.code?.length ?? 0,
+		});
+
+		return result;
 	}
 
 	/**
@@ -76,11 +104,18 @@ export class TextEditorHandler {
 	 * Handle view command - display file content with line numbers
 	 */
 	private handleView(command: ViewCommand): string {
+		this.debugLog('VIEW', 'Handling view command', {
+			hasViewRange: !!command.view_range,
+			viewRange: command.view_range,
+		});
+
 		if (!this.code) {
+			this.debugLog('VIEW', 'File not found - no code exists');
 			throw new FileNotFoundError();
 		}
 
 		const lines = this.code.split('\n');
+		this.debugLog('VIEW', 'File loaded', { totalLines: lines.length });
 
 		// Handle view_range if specified
 		if (command.view_range) {
@@ -88,6 +123,7 @@ export class TextEditorHandler {
 
 			// Validate range (1-indexed)
 			if (start < 1 || end < start || start > lines.length) {
+				this.debugLog('VIEW', 'Invalid line range', { start, end, totalLines: lines.length });
 				throw new InvalidLineNumberError(start, lines.length);
 			}
 
@@ -96,9 +132,16 @@ export class TextEditorHandler {
 			const endIdx = Math.min(end, lines.length);
 			const selectedLines = lines.slice(startIdx, endIdx);
 
+			this.debugLog('VIEW', 'Returning range', {
+				startLine: start,
+				endLine: endIdx,
+				linesReturned: selectedLines.length,
+			});
+
 			return selectedLines.map((line, i) => `${startIdx + i + 1}: ${line}`).join('\n');
 		}
 
+		this.debugLog('VIEW', 'Returning full file', { linesReturned: lines.length });
 		// Return full file with line numbers
 		return lines.map((line, i) => `${i + 1}: ${line}`).join('\n');
 	}
@@ -107,11 +150,23 @@ export class TextEditorHandler {
 	 * Handle create command - create new file with content
 	 */
 	private handleCreate(command: CreateCommand): string {
+		this.debugLog('CREATE', 'Handling create command', {
+			contentLength: command.file_text.length,
+			contentLines: command.file_text.split('\n').length,
+		});
+
 		if (this.code !== null) {
+			this.debugLog('CREATE', 'File already exists - cannot create', {
+				existingCodeLength: this.code.length,
+			});
 			throw new FileExistsError();
 		}
 
 		this.code = command.file_text;
+		this.debugLog('CREATE', 'File created successfully', {
+			codeLength: this.code.length,
+			codeLines: this.code.split('\n').length,
+		});
 		return 'File created successfully.';
 	}
 
@@ -119,7 +174,15 @@ export class TextEditorHandler {
 	 * Handle str_replace command - replace exact string match
 	 */
 	private handleStrReplace(command: StrReplaceCommand): string {
+		this.debugLog('STR_REPLACE', 'Handling str_replace command', {
+			oldStrLength: command.old_str.length,
+			newStrLength: command.new_str.length,
+			oldStrPreview: command.old_str.substring(0, 100),
+			newStrPreview: command.new_str.substring(0, 100),
+		});
+
 		if (this.code === null) {
+			this.debugLog('STR_REPLACE', 'File not found - no code exists');
 			throw new FileNotFoundError();
 		}
 
@@ -127,17 +190,26 @@ export class TextEditorHandler {
 
 		// Count occurrences
 		const count = this.countOccurrences(this.code, old_str);
+		this.debugLog('STR_REPLACE', 'Occurrence count', { count });
 
 		if (count === 0) {
+			this.debugLog('STR_REPLACE', 'No match found for replacement');
 			throw new NoMatchFoundError(old_str);
 		}
 
 		if (count > 1) {
+			this.debugLog('STR_REPLACE', 'Multiple matches found - cannot replace', { count });
 			throw new MultipleMatchesError(count);
 		}
 
 		// Replace the single occurrence
+		const oldCodeLength = this.code.length;
 		this.code = this.code.replace(old_str, new_str);
+		this.debugLog('STR_REPLACE', 'Edit applied successfully', {
+			oldCodeLength,
+			newCodeLength: this.code.length,
+			sizeDelta: this.code.length - oldCodeLength,
+		});
 		return 'Edit applied successfully.';
 	}
 
@@ -145,7 +217,14 @@ export class TextEditorHandler {
 	 * Handle insert command - insert text at specific line
 	 */
 	private handleInsert(command: InsertCommand): string {
+		this.debugLog('INSERT', 'Handling insert command', {
+			insertLine: command.insert_line,
+			newStrLength: command.new_str.length,
+			newStrPreview: command.new_str.substring(0, 100),
+		});
+
 		if (this.code === null) {
+			this.debugLog('INSERT', 'File not found - no code exists');
 			throw new FileNotFoundError();
 		}
 
@@ -154,12 +233,24 @@ export class TextEditorHandler {
 
 		// Validate line number (0 = beginning, 1-n = after that line)
 		if (insert_line < 0 || insert_line > lines.length) {
+			this.debugLog('INSERT', 'Invalid line number', {
+				insertLine: insert_line,
+				totalLines: lines.length,
+			});
 			throw new InvalidLineNumberError(insert_line, lines.length);
 		}
 
 		// Insert at the specified position
+		const oldLineCount = lines.length;
 		lines.splice(insert_line, 0, new_str);
 		this.code = lines.join('\n');
+
+		this.debugLog('INSERT', 'Text inserted successfully', {
+			insertedAtLine: insert_line,
+			oldLineCount,
+			newLineCount: lines.length,
+			newCodeLength: this.code.length,
+		});
 
 		return 'Text inserted successfully.';
 	}
@@ -187,6 +278,10 @@ export class TextEditorHandler {
 	 * Get the current workflow code
 	 */
 	getWorkflowCode(): string | null {
+		this.debugLog('GET_CODE', 'Getting workflow code', {
+			hasCode: this.code !== null,
+			codeLength: this.code?.length ?? 0,
+		});
 		return this.code;
 	}
 
@@ -194,6 +289,10 @@ export class TextEditorHandler {
 	 * Set the workflow code (for pre-populating with existing workflow)
 	 */
 	setWorkflowCode(code: string): void {
+		this.debugLog('SET_CODE', 'Setting workflow code', {
+			codeLength: code.length,
+			codeLines: code.split('\n').length,
+		});
 		this.code = code;
 	}
 
@@ -208,6 +307,10 @@ export class TextEditorHandler {
 	 * Clear the workflow code
 	 */
 	clearWorkflowCode(): void {
+		this.debugLog('CLEAR_CODE', 'Clearing workflow code', {
+			hadCode: this.code !== null,
+			previousLength: this.code?.length ?? 0,
+		});
 		this.code = null;
 	}
 }

@@ -333,7 +333,10 @@ export class CodeBuilderAgent {
 			let textEditorFinalizeAttempts = 0;
 
 			if (textEditorEnabled) {
-				textEditorHandler = new TextEditorHandler();
+				// Pass debug log function to handler for detailed logging
+				textEditorHandler = new TextEditorHandler((context, message, data) => {
+					this.debugLog(`TEXT_EDITOR_HANDLER:${context}`, message, data);
+				});
 
 				// Pre-populate with current workflow from frontend (for iterations/refinements)
 				const hasExistingWorkflow =

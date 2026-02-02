@@ -676,11 +676,6 @@ You MUST use the \`str_replace_based_edit_tool\` for all workflow code. Do NOT o
 
 ## Commands
 
-- **create**: Create the initial workflow code for a NEW workflow.
-  \`\`\`json
-  {{"command": "create", "path": "/workflow.ts", "file_text": "..."}}
-  \`\`\`
-
 - **view**: View code with line numbers. Use view_range for specific lines.
   \`\`\`json
   {{"command": "view", "path": "/workflow.ts"}}
@@ -704,8 +699,8 @@ You MUST use the \`str_replace_based_edit_tool\` for all workflow code. Do NOT o
 
 ## Workflow
 
-1. For **NEW workflows**: Use \`create\` to write initial code, then \`finalize\`
-2. For **EXISTING workflows**: Code is pre-loaded. Use \`view\` to see current state, then \`str_replace\` to edit, then \`finalize\`
+1. Workflow code is always pre-loaded with the current state
+2. Use \`view\` to see current code, then \`str_replace\` to edit, then \`finalize\`
 3. After \`finalize\`, you'll see validation results:
    - **Success**: Workflow is complete
    - **Errors**: Use \`str_replace\` to fix the issues, then \`finalize\` again

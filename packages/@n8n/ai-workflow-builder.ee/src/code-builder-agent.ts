@@ -425,15 +425,12 @@ ${'='.repeat(50)}
 					this.debugLog(`TEXT_EDITOR_HANDLER:${context}`, message, data);
 				});
 
-				// Pre-populate with current workflow from frontend (for iterations/refinements)
-				const hasExistingWorkflow =
-					(currentWorkflow?.nodes?.length ?? 0) > 0 ||
-					Object.keys(currentWorkflow?.connections ?? {}).length > 0;
-
-				if (currentWorkflow && hasExistingWorkflow) {
+				// Always pre-populate with current workflow code (even for empty workflows)
+				// This ensures the LLM uses str_replace instead of create command
+				if (currentWorkflow) {
 					const existingCode = generateWorkflowCode(currentWorkflow);
 					textEditorHandler.setWorkflowCode(existingCode);
-					this.debugLog('CHAT', 'Pre-populated text editor with existing workflow code', {
+					this.debugLog('CHAT', 'Pre-populated text editor with workflow code', {
 						codeLength: existingCode.length,
 					});
 				}

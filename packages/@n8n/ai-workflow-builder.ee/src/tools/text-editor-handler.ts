@@ -18,7 +18,6 @@ import {
 	MultipleMatchesError,
 	InvalidLineNumberError,
 	InvalidPathError,
-	FileExistsError,
 	FileNotFoundError,
 } from '../types/text-editor';
 
@@ -147,27 +146,15 @@ export class TextEditorHandler {
 	}
 
 	/**
-	 * Handle create command - create new file with content
+	 * Handle create command - rejected, workflow code is always pre-loaded
 	 */
-	private handleCreate(command: CreateCommand): string {
-		this.debugLog('CREATE', 'Handling create command', {
-			contentLength: command.file_text.length,
-			contentLines: command.file_text.split('\n').length,
-		});
-
-		if (this.code !== null) {
-			this.debugLog('CREATE', 'File already exists - cannot create', {
-				existingCodeLength: this.code.length,
-			});
-			throw new FileExistsError();
-		}
-
-		this.code = command.file_text;
-		this.debugLog('CREATE', 'File created successfully', {
-			codeLength: this.code.length,
-			codeLines: this.code.split('\n').length,
-		});
-		return 'File created successfully.';
+	private handleCreate(_command: CreateCommand): string {
+		this.debugLog('CREATE', 'Create command rejected - workflow code is always pre-loaded');
+		throw new Error(
+			'The "create" command is not supported. ' +
+				'Workflow code is pre-loaded. Use "view" to see current code, ' +
+				'then "str_replace" to edit it.',
+		);
 	}
 
 	/**

@@ -75,6 +75,11 @@ export const SETUP_PANEL = createExperiment('069_setup_panel', {
 	variant: 'variant',
 });
 
+export const CODE_WORKFLOW_BUILDER_EXPERIMENT = createExperiment('071_coding_workflow_builder', {
+	control: 'control',
+	test: 'test',
+});
+
 export const EXPERIMENTS_TO_TRACK = [
 	EXTRA_TEMPLATE_LINKS_EXPERIMENT.name,
 	TEMPLATE_ONBOARDING_EXPERIMENT.name,
@@ -90,4 +95,5 @@ export const EXPERIMENTS_TO_TRACK = [
 	SIDEBAR_EXPANDED_EXPERIMENT.name,
 	EMPTY_STATE_EXPERIMENT.name,
 	SETUP_PANEL.name,
+	CODE_WORKFLOW_BUILDER_EXPERIMENT.name,
 ];

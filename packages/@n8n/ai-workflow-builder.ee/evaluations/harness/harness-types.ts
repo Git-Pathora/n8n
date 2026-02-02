@@ -2,7 +2,17 @@ import type { Client as LangsmithClient } from 'langsmith/client';
 import type pLimit from 'p-limit';
 
 import type { EvalLogger } from './logger.js';
+import type { IntrospectionEvent } from '../../src/tools/introspect.tool.js';
 import type { SimpleWorkflow } from '../../src/types/workflow.js';
+
+/**
+ * Result from workflow generation.
+ * Includes the generated workflow and optional introspection events.
+ */
+export interface WorkflowGenerationResult {
+	workflow: SimpleWorkflow;
+	introspectionEvents?: IntrospectionEvent[];
+}
 
 export type LlmCallLimiter = ReturnType<typeof pLimit>;
 
@@ -31,6 +41,8 @@ export interface EvaluationContext {
 	 * Note: timeouts are best-effort unless underlying calls support cancellation (AbortSignal).
 	 */
 	timeoutMs?: number;
+	/** Introspection events collected during workflow generation */
+	introspectionEvents?: IntrospectionEvent[];
 }
 
 /** Context attached to an individual test case (prompt is provided separately). */
@@ -99,8 +111,8 @@ export interface TestCase {
  * Configuration for an evaluation run.
  */
 export interface RunConfigBase {
-	/** Function to generate workflow from prompt */
-	generateWorkflow: (prompt: string) => Promise<SimpleWorkflow>;
+	/** Function to generate workflow from prompt. Returns workflow and optional introspection events. */
+	generateWorkflow: (prompt: string) => Promise<WorkflowGenerationResult>;
 	/** Evaluators to run on each generated workflow */
 	evaluators: Array<Evaluator<EvaluationContext>>;
 	/** Global context available to all evaluators */

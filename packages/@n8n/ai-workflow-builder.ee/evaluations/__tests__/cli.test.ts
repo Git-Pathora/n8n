@@ -64,6 +64,11 @@ jest.mock('../cli/webhook', () => ({
 jest.mock('../harness/evaluation-helpers', () => ({
 	consumeGenerator: (...args: unknown[]): unknown => mockConsumeGenerator(...args),
 	getChatPayload: (...args: unknown[]): unknown => mockGetChatPayload(...args),
+	createWorkflowGenerator: () =>
+		jest.fn().mockResolvedValue({
+			workflow: { name: 'Test', nodes: [], connections: {} },
+			introspectionEvents: [],
+		}),
 }));
 
 jest.mock('../index', () => ({
@@ -82,6 +87,8 @@ jest.mock('../index', () => ({
 	createProgrammaticEvaluator: (...args: unknown[]): unknown =>
 		mockCreateProgrammaticEvaluator(...args),
 	createPairwiseEvaluator: (...args: unknown[]): unknown => mockCreatePairwiseEvaluator(...args),
+	createSimilarityEvaluator: () => ({ name: 'similarity', evaluate: jest.fn() }),
+	createIntrospectionEvaluator: () => ({ name: 'introspection', evaluate: jest.fn() }),
 }));
 
 /** Helper to create a minimal valid workflow for tests */

@@ -2,9 +2,16 @@ import type { Callbacks } from '@langchain/core/callbacks/manager';
 import { getLangchainCallbacks } from 'langsmith/langchain';
 import { v4 as uuid } from 'uuid';
 
-import type { LlmCallLimiter } from './harness-types';
-import type { BuilderFeatureFlags, ChatPayload } from '../../src/workflow-builder-agent';
-import { DEFAULTS } from '../support/constants';
+import type { IntrospectionEvent } from '@/tools/introspect.tool';
+import type {
+	BuilderFeatureFlags,
+	ChatPayload,
+	WorkflowBuilderAgent,
+} from '@/workflow-builder-agent';
+
+import type { LlmCallLimiter, WorkflowGenerationResult } from './harness-types';
+import { generateRunId, isWorkflowStateValues } from '../langsmith/types';
+import { EVAL_TYPES, EVAL_USERS, DEFAULTS } from '../support/constants';
 
 /**
  * Get LangChain callbacks that bridge the current traceable context.
@@ -78,5 +85,69 @@ export function getChatPayload(options: GetChatPayloadOptions): ChatPayload {
 		workflowContext: {
 			currentWorkflow: { id: workflowId, nodes: [], connections: {} },
 		},
+	};
+}
+
+/**
+ * Options for createWorkflowGenerator
+ */
+export interface WorkflowGeneratorOptions {
+	/** Function to create a WorkflowBuilderAgent instance */
+	createAgent: () => WorkflowBuilderAgent;
+	/** Optional feature flags to pass to the agent */
+	featureFlags?: BuilderFeatureFlags;
+}
+
+/**
+ * Workflow generator function type.
+ * Returns both the workflow and any introspection events collected during generation.
+ */
+export type WorkflowGenerator = (
+	prompt: string,
+	callbacks?: Callbacks,
+) => Promise<WorkflowGenerationResult>;
+
+/**
+ * Creates a workflow generator that captures introspection events from state.
+ * Events are extracted from the agent state after each run, avoiding global state.
+ *
+ * @param options - Configuration options including agent creator function
+ * @returns Generator function that returns workflow and introspection events
+ */
+export function createWorkflowGenerator(options: WorkflowGeneratorOptions): WorkflowGenerator {
+	const { createAgent, featureFlags } = options;
+
+	return async (prompt: string, callbacks?: Callbacks): Promise<WorkflowGenerationResult> => {
+		const runId = generateRunId();
+
+		const agent = createAgent();
+
+		await consumeGenerator(
+			agent.chat(
+				getChatPayload({
+					evalType: EVAL_TYPES.LANGSMITH,
+					message: prompt,
+					workflowId: runId,
+					featureFlags,
+				}),
+				EVAL_USERS.LANGSMITH,
+				undefined, // abortSignal
+				callbacks,
+			),
+		);
+
+		const state = await agent.getState(runId, EVAL_USERS.LANGSMITH);
+
+		if (!state.values || !isWorkflowStateValues(state.values)) {
+			throw new Error('Invalid workflow state: workflow or messages missing');
+		}
+
+		// Extract introspection events from state
+		const introspectionEvents = (state.values.introspectionEvents as IntrospectionEvent[]) ?? [];
+
+		return {
+			workflow: state.values.workflowJSON,
+			introspectionEvents,
+		};
 	};
 }

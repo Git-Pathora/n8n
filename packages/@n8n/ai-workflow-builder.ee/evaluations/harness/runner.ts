@@ -22,6 +22,7 @@ import type {
 	EvaluationLifecycle,
 	LangsmithExampleFilters,
 	LlmCallLimiter,
+	WorkflowGenerationResult,
 } from './harness-types.js';
 import type { EvalLogger } from './logger';
 import { createArtifactSaver, type ArtifactSaver } from './output';
@@ -101,14 +102,16 @@ function buildContext(args: {
 	globalContext?: GlobalRunContext;
 	testCaseContext?: TestCaseContext;
 	referenceWorkflows?: SimpleWorkflow[];
+	introspectionEvents?: WorkflowGenerationResult['introspectionEvents'];
 }): EvaluationContext {
-	const { prompt, globalContext, testCaseContext, referenceWorkflows } = args;
+	const { prompt, globalContext, testCaseContext, referenceWorkflows, introspectionEvents } = args;
 
 	return {
 		prompt,
 		...(globalContext ?? {}),
 		...(testCaseContext ?? {}),
 		...(referenceWorkflows?.length ? { referenceWorkflows } : {}),
+		...(introspectionEvents?.length ? { introspectionEvents } : {}),
 	};
 }
 
@@ -352,7 +355,7 @@ async function runLocalExample(args: {
 	index: number;
 	total: number;
 	testCase: TestCase;
-	generateWorkflow: (prompt: string) => Promise<SimpleWorkflow>;
+	generateWorkflow: (prompt: string) => Promise<WorkflowGenerationResult>;
 	evaluators: Array<Evaluator<EvaluationContext>>;
 	globalContext?: GlobalRunContext;
 	passThreshold: number;
@@ -379,13 +382,14 @@ async function runLocalExample(args: {
 	try {
 		// Generate workflow
 		const genStartTime = Date.now();
-		const workflow = await runWithOptionalLimiter(async () => {
+		const generationResult = await runWithOptionalLimiter(async () => {
 			return await withTimeout({
 				promise: generateWorkflow(testCase.prompt),
 				timeoutMs,
 				label: 'workflow_generation',
 			});
 		}, globalContext?.llmCallLimiter);
+		const { workflow, introspectionEvents } = generationResult;
 		const genDurationMs = Date.now() - genStartTime;
 		lifecycle?.onWorkflowGenerated?.(workflow, genDurationMs);
 
@@ -397,6 +401,7 @@ async function runLocalExample(args: {
 			},
 			testCaseContext: testCase.context,
 			referenceWorkflows: testCase.referenceWorkflows,
+			introspectionEvents,
 		});
 
 		// Run evaluators in parallel
@@ -465,7 +470,7 @@ function createArtifactSaverIfRequested(args: {
 
 async function runLocalDataset(params: {
 	testCases: TestCase[];
-	generateWorkflow: (prompt: string) => Promise<SimpleWorkflow>;
+	generateWorkflow: (prompt: string) => Promise<WorkflowGenerationResult>;
 	evaluators: Array<Evaluator<EvaluationContext>>;
 	globalContext?: GlobalRunContext;
 	passThreshold: number;
@@ -905,10 +910,10 @@ async function runLangsmith(config: LangsmithRunConfig): Promise<RunSummary> {
 	const traceableGenerateWorkflow = traceable(
 		async (args: {
 			prompt: string;
-			genFn: (prompt: string, callbacks?: Callbacks) => Promise<SimpleWorkflow>;
+			genFn: (prompt: string, callbacks?: Callbacks) => Promise<WorkflowGenerationResult>;
 			limiter?: LlmCallLimiter;
 			genTimeoutMs?: number;
-		}): Promise<SimpleWorkflow> => {
+		}): Promise<WorkflowGenerationResult> => {
 			// Get callbacks inside traceable where context is correct
 			// Returns undefined if not in a traceable context (e.g., unit tests)
 			const callbacks = await getTracingCallbacks();
@@ -952,12 +957,13 @@ async function runLangsmith(config: LangsmithRunConfig): Promise<RunSummary> {
 		const genStart = Date.now();
 
 		try {
-			const workflow = await traceableGenerateWorkflow({
+			const generationResult = await traceableGenerateWorkflow({
 				prompt,
 				genFn: generateWorkflow,
 				limiter: effectiveGlobalContext.llmCallLimiter,
 				genTimeoutMs: timeoutMs,
 			});
+			const { workflow, introspectionEvents } = generationResult;
 			const genDurationMs = Date.now() - genStart;
 			lifecycle?.onWorkflowGenerated?.(workflow, genDurationMs);
 
@@ -969,6 +975,7 @@ async function runLangsmith(config: LangsmithRunConfig): Promise<RunSummary> {
 				prompt,
 				globalContext: effectiveGlobalContext,
 				testCaseContext: extracted,
+				introspectionEvents,
 			});
 
 			// Run all evaluators in parallel

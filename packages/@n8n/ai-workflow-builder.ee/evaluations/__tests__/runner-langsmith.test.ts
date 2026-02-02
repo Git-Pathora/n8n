@@ -18,7 +18,12 @@ import * as path from 'node:path';
 
 import type { SimpleWorkflow } from '@/types/workflow';
 
-import type { Evaluator, Feedback, RunConfig } from '../harness/harness-types';
+import type {
+	Evaluator,
+	Feedback,
+	RunConfig,
+	WorkflowGenerationResult,
+} from '../harness/harness-types';
 import { createLogger } from '../harness/logger';
 
 const silentLogger = createLogger(false);
@@ -36,6 +41,11 @@ jest.mock('langsmith/traceable', () => ({
 // Mock core/environment module (dynamically imported in runner.ts)
 function createMockWorkflow(name = 'Test Workflow'): SimpleWorkflow {
 	return { name, nodes: [], connections: {} };
+}
+
+/** Helper to create a workflow generation result for tests */
+function createMockGenerationResult(name = 'Test Workflow'): WorkflowGenerationResult {
+	return { workflow: createMockWorkflow(name), introspectionEvents: [] };
 }
 
 function createMockEvaluator(
@@ -113,7 +123,7 @@ describe('Runner - LangSmith Mode', () => {
 			const config: RunConfig = {
 				mode: 'langsmith',
 				dataset: 'my-dataset',
-				generateWorkflow: jest.fn().mockResolvedValue(createMockWorkflow()),
+				generateWorkflow: jest.fn().mockResolvedValue(createMockGenerationResult()),
 				evaluators: [createMockEvaluator('test')],
 				langsmithClient: lsClient,
 				langsmithOptions: {
@@ -145,7 +155,11 @@ describe('Runner - LangSmith Mode', () => {
 			const lsClient = createMockLangsmithClient();
 
 			const workflow = createMockWorkflow('Generated');
-			const generateWorkflow = jest.fn().mockResolvedValue(workflow);
+			const generationResult: WorkflowGenerationResult = {
+				workflow,
+				introspectionEvents: [],
+			};
+			const generateWorkflow = jest.fn().mockResolvedValue(generationResult);
 			const evaluator = createMockEvaluator('test', [
 				{ evaluator: 'test', metric: 'score', score: 0.9, kind: 'score' },
 			]);
@@ -197,7 +211,7 @@ describe('Runner - LangSmith Mode', () => {
 					mode: 'langsmith',
 					dataset: 'test-dataset',
 					outputDir: tempDir,
-					generateWorkflow: jest.fn().mockResolvedValue(createMockWorkflow('Generated')),
+					generateWorkflow: jest.fn().mockResolvedValue(createMockGenerationResult('Generated')),
 					evaluators: [createMockEvaluator('test')],
 					langsmithClient: lsClient,
 					langsmithOptions: {
@@ -245,7 +259,7 @@ describe('Runner - LangSmith Mode', () => {
 			const config: RunConfig = {
 				mode: 'langsmith',
 				dataset: 'test-dataset',
-				generateWorkflow: jest.fn().mockResolvedValue(createMockWorkflow()),
+				generateWorkflow: jest.fn().mockResolvedValue(createMockGenerationResult()),
 				evaluators: [evaluator1, evaluator2],
 				langsmithClient: lsClient,
 				langsmithOptions: {
@@ -301,7 +315,7 @@ describe('Runner - LangSmith Mode', () => {
 			const config: RunConfig = {
 				mode: 'langsmith',
 				dataset: 'test-dataset',
-				generateWorkflow: jest.fn().mockResolvedValue(createMockWorkflow()),
+				generateWorkflow: jest.fn().mockResolvedValue(createMockGenerationResult()),
 				evaluators: [goodEvaluator, badEvaluator],
 				langsmithClient: lsClient,
 				langsmithOptions: {
@@ -344,7 +358,7 @@ describe('Runner - LangSmith Mode', () => {
 			const config: RunConfig = {
 				mode: 'langsmith',
 				dataset: 'test-dataset',
-				generateWorkflow: jest.fn().mockResolvedValue(createMockWorkflow()),
+				generateWorkflow: jest.fn().mockResolvedValue(createMockGenerationResult()),
 				evaluators: [createMockEvaluator('test')],
 				langsmithClient: lsClient,
 				langsmithOptions: {
@@ -392,7 +406,7 @@ describe('Runner - LangSmith Mode', () => {
 			const config: RunConfig = {
 				mode: 'langsmith',
 				dataset: 'test-dataset',
-				generateWorkflow: jest.fn().mockResolvedValue(createMockWorkflow()),
+				generateWorkflow: jest.fn().mockResolvedValue(createMockGenerationResult()),
 				evaluators: [createMockEvaluator('test')],
 				langsmithClient: lsClient,
 				langsmithOptions: {
@@ -445,7 +459,7 @@ describe('Runner - LangSmith Mode', () => {
 			const config: RunConfig = {
 				mode: 'langsmith',
 				dataset: 'test-dataset',
-				generateWorkflow: jest.fn().mockResolvedValue(createMockWorkflow()),
+				generateWorkflow: jest.fn().mockResolvedValue(createMockGenerationResult()),
 				evaluators: [],
 				langsmithClient: lsClient,
 				langsmithOptions: {
@@ -495,7 +509,7 @@ describe('Runner - LangSmith Mode', () => {
 			const config: RunConfig = {
 				mode: 'langsmith',
 				dataset: 'test-dataset',
-				generateWorkflow: jest.fn().mockResolvedValue(createMockWorkflow()),
+				generateWorkflow: jest.fn().mockResolvedValue(createMockGenerationResult()),
 				evaluators: [evaluator],
 				langsmithClient: lsClient,
 				langsmithOptions: {
@@ -555,7 +569,7 @@ describe('Runner - LangSmith Mode', () => {
 			const config: RunConfig = {
 				mode: 'langsmith',
 				dataset: 'test-dataset',
-				generateWorkflow: jest.fn().mockResolvedValue(createMockWorkflow()),
+				generateWorkflow: jest.fn().mockResolvedValue(createMockGenerationResult()),
 				evaluators: [evaluator],
 				langsmithClient: lsClient,
 				langsmithOptions: {
@@ -618,7 +632,7 @@ describe('Runner - LangSmith Mode', () => {
 			const config: RunConfig = {
 				mode: 'langsmith',
 				dataset: 'test-dataset',
-				generateWorkflow: jest.fn().mockResolvedValue(createMockWorkflow()),
+				generateWorkflow: jest.fn().mockResolvedValue(createMockGenerationResult()),
 				evaluators: [createMockEvaluator('test')],
 				langsmithClient: lsClient,
 				langsmithOptions: {
@@ -660,7 +674,7 @@ describe('Runner - LangSmith Mode', () => {
 			const config: RunConfig = {
 				mode: 'langsmith',
 				dataset: 'test-dataset',
-				generateWorkflow: jest.fn().mockResolvedValue(createMockWorkflow()),
+				generateWorkflow: jest.fn().mockResolvedValue(createMockGenerationResult()),
 				evaluators: [createMockEvaluator('test')],
 				langsmithClient: lsClient,
 				langsmithOptions: {
@@ -702,7 +716,7 @@ describe('Runner - LangSmith Mode', () => {
 				const config: RunConfig = {
 					mode: 'langsmith',
 					dataset: 'test-dataset',
-					generateWorkflow: jest.fn().mockResolvedValue(createMockWorkflow()),
+					generateWorkflow: jest.fn().mockResolvedValue(createMockGenerationResult()),
 					evaluators: [evaluator1, evaluator2],
 					langsmithClient: lsClient,
 					langsmithOptions: {

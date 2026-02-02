@@ -5,17 +5,11 @@
  * Can be run directly or used as a reference for custom setups.
  */
 
-import type { Callbacks } from '@langchain/core/callbacks/manager';
-import type { INodeTypeDescription } from 'n8n-workflow';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import pLimit from 'p-limit';
 
-import type { IntrospectionEvent } from '@/tools/introspect.tool';
-import type { SimpleWorkflow } from '@/types/workflow';
-import type { BuilderFeatureFlags } from '@/workflow-builder-agent';
-
-import { consumeGenerator, getChatPayload } from '../harness/evaluation-helpers';
+import { createWorkflowGenerator } from '../harness/evaluation-helpers';
 import { createLogger } from '../harness/logger';
 import {
 	runEvaluation,
@@ -46,54 +40,8 @@ import {
 	getDefaultTestCaseIds,
 } from './csv-prompt-loader';
 import { sendWebhookNotification } from './webhook';
-import { generateRunId, isWorkflowStateValues } from '../langsmith/types';
 import { summarizeIntrospectionResults } from '../summarizers/introspection-summarizer';
-import { EVAL_TYPES, EVAL_USERS } from '../support/constants';
-import { setupTestEnvironment, createAgent, type ResolvedStageLLMs } from '../support/environment';
-
-/**
- * Create a workflow generator function.
- * LangSmith tracing is handled via traceable() in the runner.
- * Callbacks are passed explicitly from the runner to ensure correct trace context
- * under high concurrency (avoids AsyncLocalStorage race conditions).
- */
-function createWorkflowGenerator(
-	parsedNodeTypes: INodeTypeDescription[],
-	llms: ResolvedStageLLMs,
-	featureFlags?: BuilderFeatureFlags,
-): (prompt: string, callbacks?: Callbacks) => Promise<SimpleWorkflow> {
-	return async (prompt: string, callbacks?: Callbacks): Promise<SimpleWorkflow> => {
-		const runId = generateRunId();
-
-		const agent = createAgent({
-			parsedNodeTypes,
-			llms,
-			featureFlags,
-		});
-
-		await consumeGenerator(
-			agent.chat(
-				getChatPayload({
-					evalType: EVAL_TYPES.LANGSMITH,
-					message: prompt,
-					workflowId: runId,
-					featureFlags,
-				}),
-				EVAL_USERS.LANGSMITH,
-				undefined, // abortSignal
-				callbacks,
-			),
-		);
-
-		const state = await agent.getState(runId, EVAL_USERS.LANGSMITH);
-
-		if (!state.values || !isWorkflowStateValues(state.values)) {
-			throw new Error('Invalid workflow state: workflow or messages missing');
-		}
-
-		return state.values.workflowJSON;
-	};
-}
+import { setupTestEnvironment, createAgent } from '../support/environment';
 
 /**
  * Load test cases from various sources.
@@ -170,56 +118,21 @@ export async function runV2Evaluation(): Promise<void> {
 	// Create evaluators based on mode (using judge LLM for evaluation)
 	const evaluators: Array<Evaluator<EvaluationContext>> = [];
 
-	// Default workflow generator
-	let generateWorkflow: (prompt: string, callbacks?: Callbacks) => Promise<SimpleWorkflow>;
-
-	// Handle introspection suite separately - uses state-based event collection
-	if (args.suite === 'introspection') {
-		// Closure variable to capture events from the most recent generation
-		let lastIntrospectionEvents: IntrospectionEvent[] = [];
-
-		// Custom generator that captures events from state after each run
-		generateWorkflow = async (prompt: string, callbacks?: Callbacks): Promise<SimpleWorkflow> => {
-			const runId = generateRunId();
-
-			const agent = createAgent({
+	// Create workflow generator (returns workflow + introspection events)
+	const generateWorkflow = createWorkflowGenerator({
+		createAgent: () =>
+			createAgent({
 				parsedNodeTypes: env.parsedNodeTypes,
 				llms: env.llms,
 				featureFlags: args.featureFlags,
-			});
+			}),
+		featureFlags: args.featureFlags,
+	});
 
-			await consumeGenerator(
-				agent.chat(
-					getChatPayload({
-						evalType: EVAL_TYPES.LANGSMITH,
-						message: prompt,
-						workflowId: runId,
-						featureFlags: args.featureFlags,
-					}),
-					EVAL_USERS.LANGSMITH,
-					undefined, // abortSignal
-					callbacks,
-				),
-			);
-
-			const state = await agent.getState(runId, EVAL_USERS.LANGSMITH);
-
-			if (!state.values || !isWorkflowStateValues(state.values)) {
-				throw new Error('Invalid workflow state: workflow or messages missing');
-			}
-
-			// Capture introspection events from state for this run
-			lastIntrospectionEvents = (state.values.introspectionEvents as IntrospectionEvent[]) ?? [];
-
-			return state.values.workflowJSON;
-		};
-
-		// Create evaluator that reads from the closure variable (scoped to this run)
-		evaluators.push(createIntrospectionEvaluator(() => lastIntrospectionEvents));
+	// Handle introspection suite - events are passed via context
+	if (args.suite === 'introspection') {
+		evaluators.push(createIntrospectionEvaluator());
 	} else {
-		// Create standard workflow generator
-		generateWorkflow = createWorkflowGenerator(env.parsedNodeTypes, env.llms, args.featureFlags);
-
 		switch (args.suite) {
 			case 'llm-judge':
 				evaluators.push(createLLMJudgeEvaluator(env.llms.judge, env.parsedNodeTypes));

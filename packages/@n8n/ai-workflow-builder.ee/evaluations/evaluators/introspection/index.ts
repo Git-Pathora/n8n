@@ -7,20 +7,15 @@ import type { EvaluationContext, Evaluator, Feedback } from '../../harness/harne
 export type { IntrospectionEvent };
 
 /**
- * Evaluator that collects introspection events via a callback function.
- * Events are extracted from AIMessage tool_calls in the agent state.
- *
- * @param getEvents - Callback function that returns introspection events for the current run.
- *                    This should be a closure that captures events from the agent state.
+ * Evaluator that collects introspection events from the evaluation context.
+ * Events are passed via context.introspectionEvents after workflow generation.
  */
-export function createIntrospectionEvaluator(
-	getEvents: () => IntrospectionEvent[] = () => [],
-): Evaluator<EvaluationContext> {
+export function createIntrospectionEvaluator(): Evaluator<EvaluationContext> {
 	return {
 		name: 'introspection',
-		async evaluate(_workflow: SimpleWorkflow, _ctx: EvaluationContext): Promise<Feedback[]> {
-			// Get events from the callback (populated by the generator)
-			const events = getEvents();
+		async evaluate(_workflow: SimpleWorkflow, ctx: EvaluationContext): Promise<Feedback[]> {
+			// Get events from context (populated by the runner from generation result)
+			const events = ctx.introspectionEvents ?? [];
 
 			if (events.length === 0) {
 				return [

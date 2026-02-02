@@ -316,26 +316,51 @@ async function onCopyButtonClick(content: string, e: MouseEvent) {
 
 	:global(.n8n-thinking-section) {
 		margin: var(--spacing--2xs) 0;
-		border: 1px solid var(--color--foreground);
-		border-radius: var(--radius);
-		background-color: var(--color--background--light-2);
 
 		summary {
-			padding: var(--spacing--2xs) var(--spacing--xs);
+			display: flex;
+			align-items: center;
+			gap: var(--spacing--4xs);
+			padding: var(--spacing--2xs) 0;
 			cursor: pointer;
-			font-weight: var(--font-weight--bold);
-			font-size: var(--font-size--2xs);
-			color: var(--color--text--tint-1);
+			font-weight: var(--font-weight--medium);
+			font-size: var(--font-size--sm);
+			color: var(--assistant--color--text--subtle);
+			line-height: var(--line-height--xl);
 			user-select: none;
+			list-style: none;
+
+			&::-webkit-details-marker {
+				display: none;
+			}
+
+			&::before {
+				content: '';
+				width: 0;
+				height: 0;
+				border-style: solid;
+				border-width: 5px 0 5px 6px;
+				border-color: transparent transparent transparent var(--assistant--color--text--subtle);
+				flex-shrink: 0;
+				transition: transform 0.2s ease;
+			}
 
 			&:hover {
-				background-color: var(--color--foreground--tint-2);
+				opacity: 0.8;
 			}
+		}
+
+		&[open] summary::before {
+			transform: rotate(90deg);
 		}
 
 		// Content area when expanded
 		> *:not(summary) {
-			padding: 0 var(--spacing--xs) var(--spacing--xs);
+			padding-left: var(--spacing--xs);
+			padding-bottom: var(--spacing--2xs);
+			color: var(--assistant--color--text--subtle);
+			font-size: var(--font-size--sm);
+			line-height: var(--line-height--xl);
 		}
 	}
 }

@@ -1,8 +1,5 @@
 # TODO (MVP)
 
-## For Monday
-	- [ ] adjust builder hints to be questions/not code specific
-
 ## workflow-sdk
 - [ ] Better clarify/test how output data maps to expressions in types and referenced?
 - [ ] why is agent node accepting arrays as models? fallback model? how to clarify this better?
@@ -10,7 +7,6 @@
 ## agent
 - [ ] Add relevant best practice pieces, esp to better handling (let evals guide this)
 	- [ ] a lot of pairwise seem to be about preferring certain nodes, how can we add that as part of the node definition
-	- [ ] add section for pref of other nodes over code node
 	- [ ] best practices:
 		- [ ] reasonable defaults? using placeholder for parameters like Country code in packages/@n8n/ai-workflow-builder.ee/eval-results-01-26/opus-one-shot-test-dataset-01-26/example-002-00a012f0
 		- [ ] Best practices documentation recommends using Wait nodes and batching options to avoid hitting API rate limits.
@@ -19,6 +15,7 @@
 - [ ] investigate failed syntax in prompt in this example packages/@n8n/ai-workflow-builder.ee/eval-results/sonnet-one-shot-all/example-005-05fd23ad. also packages/@n8n/ai-workflow-builder.ee/eval-results/sonnet-one-shot-all/example-007-ca13700c
 - [ ] handling of large workflows
 	- [ ] context limits with many types of nodes?
+	- [ ] adjust builder hints to be questions/not code specific
 
 ## iteration
 - [ ] test iteration, inserting nodes in between
@@ -29,7 +26,6 @@
 ## ready to release
 - [ ] security concerns of loading js from ~/.n8n
 - [ ] integrate with planning agent?
-- [ ] How to do we store the template workflows? zip folder
 - [ ] Review PR (lots of AI generated code that I did not look at)
 - [ ] Remove logging from agent. lots of logging for debugging.
 - [ ] Add some tracking if code parsing or generation step fails in prod.
@@ -37,21 +33,17 @@
 - [ ] caching the requests. make sure system prompt + caching the type requests
 - [ ] Update telemetry and prompt viewer app to support the code and workflow generated
 - [ ] Parameters?: should not be optional in types if some key in there is not optional
-- [ ] Add commands for validate parse code
 - [ ] fix up sticky sizing and positioning to cover nodes
 
-## evaluate
-- [ ] test out prompt with/without sdk reference [maybe-later]
-- [ ] Evaluate with thinking enabled for each model. uses <planning> now [maybe-later]
-
 ## Nice to haves / tech debt
+- [ ] test out prompt with/without sdk reference
 - [ ] fromAI expressions replace in json -> code
 - [ ] rename get nodes tool to get_node_types
 - [ ] export and use rlc()
-- [ ] @tool=true in invalid_parameter warnings
 - [ ] make display options more clear in node types @displayOption.show { node: ["operation"]}
 - [ ] move node-specific builder validations to node level rather than at sdk level
 - [ ] format the workflows into multi lines. might make it easier for workflow to handle parsing errors better
+- [ ] Evaluate with thinking enabled for each model. uses <planning> now [maybe-later]
 - [ ] remove / @ts-nocheck - Generated file may have unused from generated files
 - [ ] Test more of the template library
 - [ ] Make it more clear that SDK api file is for LLM consumption. To avoid other engineers adding unnecessary types to it, confusing the agent.
@@ -107,3 +99,63 @@
 - [ ] Add text editing tools support, to improve iteration
 - [ ] fine tuning model with sdk code
 - [ ] abstract away rlc() -> { _rlc: true, mode, value} resource locator component
+
+
+Feature Support Summary
+ ┌──────────────────────────────┬─────────────────┬──────────────────┐
+ │           Feature            │ Old Multi-Agent │ New Code Builder │
+ ├──────────────────────────────┼─────────────────┼──────────────────┤
+ │ RLC Pre-fetching             │ ✅              │ ❌  (NOT MVP)     │
+ ├──────────────────────────────┼─────────────────┼──────────────────┤
+ │ RLC Tool                     │ ✅              │ ❌  (NOT MVP)     │
+ ├──────────────────────────────┼─────────────────┼──────────────────┤
+ │ Template Search              │ ✅              │ ❌   (NOT MVP, should go into planning)     │
+ ├──────────────────────────────┼─────────────────┼──────────────────┤
+ │ Template Caching             │ ✅              │ ❌   (NOT MVP, should go into planning)    │
+ ├──────────────────────────────┼─────────────────┼──────────────────┤
+ │ Execution Data               │ ✅              │ WIP               │
+ ├──────────────────────────────┼─────────────────┼──────────────────┤
+ │ Execution Schema             │ ✅              │ WIP               │
+ ├──────────────────────────────┼─────────────────┼──────────────────┤
+ │ Expression Values            │ ✅              │ WIP               │
+ ├──────────────────────────────┼─────────────────┼──────────────────┤
+ │ Resource/Operation Discovery │ ✅              │ ✅                │
+ ├──────────────────────────────┼─────────────────┼──────────────────┤
+ │ Best Practices Tool          │ ✅              │ WIP               │
+ ├──────────────────────────────┼─────────────────┼──────────────────┤
+ │ Error Recovery Mode*          │ ✅              │ ⚠️              │
+ ├──────────────────────────────┼─────────────────┼──────────────────┤
+ │ Message Compaction           │ ✅              │ TODO               │
+ ├──────────────────────────────┼─────────────────┼──────────────────┤
+ │ Node Search                  │ ✅              │ ✅               │
+ ├──────────────────────────────┼─────────────────┼──────────────────┤
+ │ Node Details                 │ ✅              │ ✅               │
+ ├──────────────────────────────┼─────────────────┼──────────────────┤
+ │ Current Workflow Context     │ ✅              │ ✅               │
+ ├──────────────────────────────┼─────────────────┼──────────────────┤
+ │ Validation                   │ ✅              │ ✅               │
+ ├──────────────────────────────┼─────────────────┼──────────────────┤
+ │ Token Usage Tracking         │ ❌              │ ✅               │
+ ├──────────────────────────────┼─────────────────┼──────────────────┤
+ │ Cost Estimation              │ ❌              │ ✅               │
+ ├──────────────────────────────┼─────────────────┼──────────────────┤
+ │ TypeScript SDK Output        │ ❌              │ ✅               │
+ └──────────────────────────────┴─────────────────┴──────────────────┘
+
+Error Recovery & Builder Recovery Mode ❌
+
+ What it is: Sophisticated error handling when subgraphs fail.
+
+ Old Architecture:
+ - Coordination log tracks failures with metadata
+ - Builder recursion errors captured with partialBuilderData
+ - Configurator has buildRecoveryModeContext() for recovering from partial builds
+ - Multi-phase retry logic
+
+ New Code Builder:
+ - Simple consecutive error tracking (3 parse errors = fail)
+ - Validation warnings get one correction attempt
+ - No partial workflow recovery
+ - generationErrors tracked but only for reporting
+
+ Impact: Less robust recovery from complex failures; agent may fail entirely instead of salvaging partial work.

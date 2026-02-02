@@ -320,13 +320,13 @@ async function onCopyButtonClick(content: string, e: MouseEvent) {
 	}
 
 	:global(.n8n-thinking-section) {
-		margin: var(--spacing--2xs) 0;
+		margin: var(--spacing--4xs) 0;
 
 		summary {
 			display: flex;
 			align-items: center;
 			gap: var(--spacing--4xs);
-			padding: var(--spacing--2xs) 0;
+			padding: var(--spacing--4xs) 0;
 			cursor: pointer;
 			font-weight: var(--font-weight--medium);
 			font-size: var(--font-size--sm);
@@ -375,8 +375,8 @@ async function onCopyButtonClick(content: string, e: MouseEvent) {
 
 		// Content area when expanded
 		> *:not(summary) {
-			padding-left: var(--spacing--xs);
-			padding-bottom: var(--spacing--2xs);
+			padding-left: var(--spacing--4xs);
+			padding-bottom: var(--spacing--4xs);
 			color: var(--assistant--color--text--subtle);
 			font-size: var(--font-size--sm);
 			line-height: var(--line-height--xl);

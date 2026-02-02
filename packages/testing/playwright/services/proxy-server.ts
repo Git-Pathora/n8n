@@ -73,17 +73,76 @@ export class ProxyServer {
 	/**
 	 * Load all expectations from the specified subfolder and mock them
 	 */
+	/**
+	 * Check if a string contains UUIDs
+	 */
+	private hasUUIDs(value: string): boolean {
+		const UUID_REGEX = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+		return UUID_REGEX.test(value);
+	}
+
+	/**
+	 * Strip UUID-containing fields from messages array to enable matching on stable fields only
+	 */
+	private stripUUIDFields(messages: unknown[]): unknown[] {
+		return messages.map((msg: any) => {
+			if (!msg || typeof msg !== 'object') return msg;
+
+			// Keep only role and filter content
+			const filtered: any = { role: msg.role };
+
+			// For content, check each item and keep only non-UUID content
+			if (Array.isArray(msg.content)) {
+				filtered.content = msg.content
+					.map((item: any) => {
+						// Keep text content that doesn't have UUIDs
+						if (item.type === 'text' && typeof item.text === 'string') {
+							return !this.hasUUIDs(item.text) ? item : null;
+						}
+						// Keep tool_use (these are from AI responses, stable)
+						if (item.type === 'tool_use') {
+							return item;
+						}
+						// For tool_result, check if content has UUIDs
+						if (item.type === 'tool_result') {
+							const contentStr =
+								typeof item.content === 'string' ? item.content : JSON.stringify(item.content);
+							// Only keep if content doesn't have UUIDs
+							if (!this.hasUUIDs(contentStr)) {
+								// Return tool_result but without tool_use_id (that's from AI response, should be stable)
+								return {
+									type: 'tool_result',
+									content: item.content,
+								};
+							}
+						}
+						return null;
+					})
+					.filter((item: any) => item !== null);
+			} else if (typeof msg.content === 'string') {
+				// Keep string content if it doesn't have UUIDs
+				if (!this.hasUUIDs(msg.content)) {
+					filtered.content = msg.content;
+				}
+			}
+
+			return filtered;
+		});
+	}
+
 	async loadExpectations(
 		folderName: string,
-		options: { strictBodyMatching?: boolean } = {},
+		options: { strictBodyMatching?: boolean; sequentialMatching?: boolean } = {},
 	): Promise<void> {
 		try {
 			const targetDir = join(this.expectationsDir, folderName);
 			const files = await fs.readdir(targetDir);
-			const jsonFiles = files.filter((file) => file.endsWith('.json'));
+			// Sort files by name (timestamp prefix ensures chronological order)
+			const jsonFiles = files.filter((file) => file.endsWith('.json')).sort();
 			const expectations: Expectation[] = [];
 
-			for (const file of jsonFiles) {
+			for (let i = 0; i < jsonFiles.length; i++) {
+				const file = jsonFiles[i];
 				try {
 					const filePath = join(targetDir, file);
 					const fileContent = await fs.readFile(filePath, 'utf8');
@@ -91,6 +150,28 @@ export class ProxyServer {
 
 					if (options.strictBodyMatching && expectation.httpRequest?.body) {
 						expectation.httpRequest.body.matchType = 'STRICT';
+					}
+
+					if (options.sequentialMatching) {
+						// Strip UUID-containing fields from request body for matching
+						if (expectation.httpRequest?.body?.json?.messages) {
+							expectation.httpRequest.body.json.messages = this.stripUUIDFields(
+								expectation.httpRequest.body.json.messages,
+							);
+						}
+
+						// Use ONLY_MATCHING_FIELDS - now that we've stripped UUID fields,
+						// matching will work on stable fields only (model, tools, system, filtered messages)
+						if (expectation.httpRequest?.body) {
+							expectation.httpRequest.body.matchType = 'ONLY_MATCHING_FIELDS';
+						}
+
+						// Set priority based on file order (earlier files = higher priority)
+						// Combined with times:1, this ensures sequential matching
+						expectation.priority = jsonFiles.length - i;
+
+						// Each expectation should only match once (in order)
+						expectation.times = { remainingTimes: 1, unlimited: false };
 					}
 
 					expectations.push(expectation);

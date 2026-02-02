@@ -114,6 +114,17 @@ export class WorkflowBuilderAgent {
 		this.runMetadata = config.runMetadata;
 		this.onGenerationSuccess = config.onGenerationSuccess;
 		this.resourceLocatorCallback = config.resourceLocatorCallback;
+
+		// Reset ID counters for E2E test isolation
+		console.log(
+			'🚀 ~ WorkflowBuilderAgent ~ constructor ~ process.env.E2E_TESTS:',
+			process.env.E2E_TESTS,
+		);
+		if (process.env.E2E_TESTS === 'true') {
+			// eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
+			const { resetIdCounters } = require('./tools/utils/node-creation.utils');
+			resetIdCounters();
+		}
 	}
 
 	/**

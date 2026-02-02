@@ -1,5 +1,6 @@
 import { workflow } from '../workflow-builder';
 import { node, trigger, newCredential } from '../node-builder';
+import { languageModel, tool, embedding, vectorStore } from '../subnode-builders';
 
 describe('generatePinData', () => {
 	describe('basic behavior', () => {
@@ -365,6 +366,156 @@ describe('generatePinData', () => {
 				.generatePinData();
 
 			expect(wf1.toJSON().pinData).toEqual(wf2.toJSON().pinData);
+		});
+	});
+
+	describe('nodes with subnodes that have newCredential()', () => {
+		it('generates pin data for agent with language model subnode that has newCredential()', () => {
+			const outputData = [{ response: 'AI response' }];
+
+			const model = languageModel({
+				type: '@n8n/n8n-nodes-langchain.lmChatOpenAi',
+				version: 1.2,
+				config: {
+					name: 'OpenAI Chat Model',
+					credentials: { openAiApi: newCredential('My OpenAI') },
+				},
+			});
+
+			const wf = workflow('id', 'Test')
+				.add(
+					node({
+						type: '@n8n/n8n-nodes-langchain.agent',
+						version: 1.7,
+						config: {
+							name: 'AI Agent',
+							subnodes: { model },
+						},
+						output: outputData,
+					}),
+				)
+				.generatePinData();
+
+			const json = wf.toJSON();
+			expect(json.pinData).toBeDefined();
+			expect(json.pinData!['AI Agent']).toEqual(outputData);
+		});
+
+		it('generates pin data for node with tool array containing newCredential()', () => {
+			const outputData = [{ result: 'search result' }];
+
+			const searchTool = tool({
+				type: '@n8n/n8n-nodes-langchain.toolHttpRequest',
+				version: 1,
+				config: {
+					name: 'Search Tool',
+					credentials: { httpHeaderAuth: newCredential('API Key') },
+				},
+			});
+
+			const model = languageModel({
+				type: '@n8n/n8n-nodes-langchain.lmChatOpenAi',
+				version: 1.2,
+				config: {
+					name: 'OpenAI Model',
+					// Using existing credential, not newCredential
+					credentials: { openAiApi: { id: '1', name: 'Existing OpenAI' } },
+				},
+			});
+
+			const wf = workflow('id', 'Test')
+				.add(
+					node({
+						type: '@n8n/n8n-nodes-langchain.agent',
+						version: 1.7,
+						config: {
+							name: 'AI Agent',
+							subnodes: { model, tools: [searchTool] },
+						},
+						output: outputData,
+					}),
+				)
+				.generatePinData();
+
+			const json = wf.toJSON();
+			expect(json.pinData).toBeDefined();
+			expect(json.pinData!['AI Agent']).toEqual(outputData);
+		});
+
+		it('does not generate pin data for node with subnode using existing credentials', () => {
+			const outputData = [{ response: 'AI response' }];
+
+			const model = languageModel({
+				type: '@n8n/n8n-nodes-langchain.lmChatOpenAi',
+				version: 1.2,
+				config: {
+					name: 'OpenAI Model',
+					// Using existing credential reference, not newCredential
+					credentials: { openAiApi: { id: '1', name: 'Existing OpenAI' } },
+				},
+			});
+
+			const wf = workflow('id', 'Test')
+				.add(
+					node({
+						type: '@n8n/n8n-nodes-langchain.agent',
+						version: 1.7,
+						config: {
+							name: 'AI Agent',
+							subnodes: { model },
+						},
+						output: outputData,
+					}),
+				)
+				.generatePinData();
+
+			const json = wf.toJSON();
+			// Should NOT generate pin data - no newCredential on parent or subnodes
+			expect(json.pinData?.['AI Agent']).toBeUndefined();
+		});
+
+		it('generates pin data for nested subnodes with newCredential()', () => {
+			const outputData = [{ documents: ['doc1', 'doc2'] }];
+
+			// Create an embedding model with newCredential
+			const embeddingModel = embedding({
+				type: '@n8n/n8n-nodes-langchain.embeddingsOpenAi',
+				version: 1,
+				config: {
+					name: 'OpenAI Embeddings',
+					credentials: { openAiApi: newCredential('Embedding Creds') },
+				},
+			});
+
+			// VectorStore that uses the embedding as a subnode
+			const store = vectorStore({
+				type: '@n8n/n8n-nodes-langchain.vectorStorePinecone',
+				version: 1,
+				config: {
+					name: 'Pinecone Store',
+					credentials: { pineconeApi: { id: '2', name: 'Existing Pinecone' } },
+					subnodes: { embedding: embeddingModel },
+				},
+			});
+
+			const wf = workflow('id', 'Test')
+				.add(
+					node({
+						type: '@n8n/n8n-nodes-langchain.retrievalQaChain',
+						version: 1,
+						config: {
+							name: 'QA Chain',
+							subnodes: { vectorStore: store },
+						},
+						output: outputData,
+					}),
+				)
+				.generatePinData();
+
+			const json = wf.toJSON();
+			// Should generate pin data because nested embedding has newCredential
+			expect(json.pinData).toBeDefined();
+			expect(json.pinData!['QA Chain']).toEqual(outputData);
 		});
 	});
 });

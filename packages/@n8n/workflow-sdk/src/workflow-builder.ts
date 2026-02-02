@@ -1925,11 +1925,34 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 	}
 
 	private hasNewCredential(node: NodeInstance<string, string, unknown>): boolean {
+		// Check main node credentials
 		const creds = node.config?.credentials;
-		if (!creds) return false;
-		return Object.values(creds).some(
-			(cred) => cred && typeof cred === 'object' && '__newCredential' in cred,
-		);
+		if (creds) {
+			const hasNew = Object.values(creds).some(
+				(cred) => cred && typeof cred === 'object' && '__newCredential' in cred,
+			);
+			if (hasNew) return true;
+		}
+
+		// Check subnode credentials recursively
+		const subnodes = node.config?.subnodes;
+		if (subnodes) {
+			for (const value of Object.values(subnodes)) {
+				if (!value) continue;
+				// Handle both single subnodes and arrays
+				const subnodeArray = Array.isArray(value) ? value : [value];
+				for (const subnode of subnodeArray) {
+					// Subnodes have a config property with credentials and potentially nested subnodes
+					if (subnode && typeof subnode === 'object' && 'config' in subnode) {
+						if (this.hasNewCredential(subnode as NodeInstance<string, string, unknown>)) {
+							return true;
+						}
+					}
+				}
+			}
+		}
+
+		return false;
 	}
 
 	private isHttpRequestOrWebhook(type: string): boolean {

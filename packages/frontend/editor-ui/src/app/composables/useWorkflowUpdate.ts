@@ -319,9 +319,6 @@ export function useWorkflowUpdate() {
 		options?: UpdateWorkflowOptions,
 	): Promise<UpdateWorkflowResult> {
 		try {
-			console.log('--- workflow ---');
-			console.log(workflowData);
-			console.log('------');
 			// Apply default credentials to incoming nodes BEFORE adding to store
 			setDefaultCredentialsOnNodes(workflowData.nodes ?? []);
 

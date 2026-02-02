@@ -3,19 +3,15 @@ import { ref, computed, onMounted, onUnmounted, reactive, watch } from 'vue';
 import { N8nButton, N8nHeading, N8nInput, N8nText, N8nIcon } from '@n8n/design-system';
 import { useI18n } from '@n8n/i18n';
 import { useDebounce } from '@/app/composables/useDebounce';
-import { useTelemetry } from '@/app/composables/useTelemetry';
-import {
-	useCredentialsStore,
-	listenForCredentialChanges,
-} from '@/features/credentials/credentials.store';
+import { useCredentialsStore } from '@/features/credentials/credentials.store';
 import { useUIStore } from '@/app/stores/ui.store';
 import { CREDENTIAL_EDIT_MODAL_KEY } from '@/features/credentials/credentials.constants';
 import { useCredentialsAppSelectionStore } from '../stores/credentialsAppSelection.store';
 import { useAppCredentials, type AppEntry } from '../composables/useAppCredentials';
 import { useUsersStore } from '@/features/settings/users/users.store';
+import type { ICredentialsDecrypted } from 'n8n-workflow';
 import AppSelectionGrid from './AppSelectionGrid.vue';
-
-type CardState = 'default' | 'loading' | 'connected' | 'error';
+import AppInstallModal from './AppInstallModal.vue';
 
 const emit = defineEmits<{
 	continue: [];
@@ -31,10 +27,13 @@ const usersStore = useUsersStore();
 
 const { appEntries, isLoading } = useAppCredentials();
 
+const APP_INSTALL_MODAL_KEY = 'appInstallModal';
+
 const searchQuery = ref('');
-const cardStates = reactive(new Map<string, CardState>());
-// Track which credential type is being created via modal (for non-OAuth flow)
+const invalidCredentials = reactive(new Set<string>());
+const validatedCredentials = reactive(new Set<string>());
 const pendingCredentialType = ref<string | null>(null);
+const appToInstall = ref<AppEntry | null>(null);
 
 const firstName = computed(() => usersStore.currentUser?.firstName ?? '');
 
@@ -55,87 +54,181 @@ const continueButtonLabel = computed(() => {
 	});
 });
 
-const trackSearch = (query: string, count: number) => {
+const trackSearch = (query: string) => {
 	if (query.trim()) {
-		appSelectionStore.trackSearchPerformed(query, count);
+		const filteredCount = appEntries.value.filter((entry) =>
+			entry.app.displayName.toLowerCase().includes(query.toLowerCase()),
+		).length;
+		appSelectionStore.trackSearchPerformed(query, filteredCount);
 	}
 };
 const debouncedTrackSearch = debounce(trackSearch, { debounceTime: 500 });
 
 const handleSearchInput = (value: string) => {
 	searchQuery.value = value;
-	const filteredCount = appEntries.value.filter((entry) =>
-		entry.app.displayName.toLowerCase().includes(value.toLowerCase()),
-	).length;
-	debouncedTrackSearch(value, filteredCount);
+	debouncedTrackSearch(value);
 };
 
 const handleCardClick = (appEntry: AppEntry) => {
-	const { credentialType } = appEntry;
-	const currentState = cardStates.get(credentialType.name);
+	const { credentialType, installed } = appEntry;
 
-	if (currentState === 'loading' || currentState === 'connected') {
+	if (credentialType) {
+		const existingCredential = credentialsStore.allCredentials.find(
+			(c) => c.type === credentialType.name,
+		);
+		if (existingCredential) {
+			uiStore.openExistingCredential(existingCredential.id);
+			return;
+		}
+	}
+
+	if (!installed) {
+		appToInstall.value = appEntry;
+		uiStore.openModal(APP_INSTALL_MODAL_KEY);
 		return;
 	}
 
-	// Open the credential modal - it handles OAuth and manual setup consistently
-	pendingCredentialType.value = credentialType.name;
-	cardStates.set(credentialType.name, 'loading');
-	uiStore.openNewCredential(credentialType.name, true);
+	if (!credentialType) {
+		return;
+	}
+
+	openCredentialModal(credentialType.name);
+};
+
+const openCredentialModal = (credentialTypeName: string) => {
+	credentialsCountBefore.value = credentialsStore.allCredentials.filter(
+		(c) => c.type === credentialTypeName,
+	).length;
+	pendingCredentialType.value = credentialTypeName;
+	uiStore.openNewCredential(credentialTypeName, true);
+};
+
+const handleInstallModalClose = () => {
+	uiStore.closeModal(APP_INSTALL_MODAL_KEY);
+	appToInstall.value = null;
+	(document.activeElement as HTMLElement)?.blur();
+};
+
+const handleNodeInstalled = (credentialTypeName: string) => {
+	uiStore.closeModal(APP_INSTALL_MODAL_KEY);
+	appToInstall.value = null;
+	openCredentialModal(credentialTypeName);
 };
 
 const handleContinue = () => {
-	appSelectionStore.trackCompleted();
+	const connectedApps = credentialsStore.allCredentials.map((credential) => ({
+		credential_type: credential.type,
+		is_valid: !invalidCredentials.has(credential.type),
+	}));
+	appSelectionStore.trackCompleted(connectedApps);
 	emit('continue');
 };
 
-// Listen for credential changes to handle manual flow completion
-let unsubscribeCredentialChanges: (() => void) | undefined;
+const credentialsCountBefore = ref(0);
 
-onMounted(() => {
-	appSelectionStore.trackPageViewed();
+// Clean up state when credentials are deleted
+watch(
+	() => credentialsStore.allCredentials,
+	(credentials) => {
+		const existingTypes = new Set(credentials.map((c) => c.type));
 
-	// Listen for credentials created via the modal
-	unsubscribeCredentialChanges = listenForCredentialChanges({
-		store: credentialsStore,
-		onCredentialCreated: (credential) => {
-			// Check if this matches our pending credential type
-			if (pendingCredentialType.value && credential.type === pendingCredentialType.value) {
-				cardStates.set(credential.type, 'connected');
-				appSelectionStore.markCredentialConnected(credential.id);
-
-				// Close the credential modal automatically
-				uiStore.closeModal(CREDENTIAL_EDIT_MODAL_KEY);
-
-				telemetry.track('User saved credentials', {
-					credential_type: credential.type,
-					credential_id: credential.id,
-					source: 'app_selection',
-					is_valid: true,
-					flow: 'manual_setup',
-				});
-
-				pendingCredentialType.value = null;
+		for (const typeName of invalidCredentials) {
+			if (!existingTypes.has(typeName)) {
+				invalidCredentials.delete(typeName);
 			}
-		},
-	});
+		}
+
+		for (const typeName of validatedCredentials) {
+			if (!existingTypes.has(typeName)) {
+				validatedCredentials.delete(typeName);
+			}
+		}
+	},
+	{ deep: true },
+);
+
+let wasModalOpenOnKeyDown = false;
+
+const handleKeyDownCapture = (event: KeyboardEvent) => {
+	if (event.key === 'Escape') {
+		wasModalOpenOnKeyDown = Object.values(uiStore.isModalActiveById).some((isActive) => isActive);
+	}
+};
+
+const handleKeyDown = (event: KeyboardEvent) => {
+	if (event.key !== 'Escape' || !searchQuery.value) return;
+	if (wasModalOpenOnKeyDown) return;
+	searchQuery.value = '';
+};
+
+const validateCredential = async (credentialId: string, credentialTypeName: string) => {
+	try {
+		const credentialData = await credentialsStore.getCredentialData({ id: credentialId });
+		if (credentialData && typeof credentialData.data === 'object') {
+			const testResult = await credentialsStore.testCredential(
+				credentialData as ICredentialsDecrypted,
+			);
+			if (testResult.status !== 'OK') {
+				invalidCredentials.add(credentialTypeName);
+			}
+		}
+	} catch {
+		invalidCredentials.add(credentialTypeName);
+	} finally {
+		validatedCredentials.add(credentialTypeName);
+	}
+};
+
+const validateExistingCredentials = async () => {
+	const credentials = credentialsStore.allCredentials;
+	const appCredentialTypes = new Set(
+		appEntries.value.map((entry) => entry.credentialType?.name).filter(Boolean),
+	);
+	const credentialsToValidate = credentials.filter((c) => appCredentialTypes.has(c.type));
+
+	await Promise.all(
+		credentialsToValidate.map((credential) => validateCredential(credential.id, credential.type)),
+	);
+};
+
+onMounted(async () => {
+	appSelectionStore.trackPageViewed();
+	document.addEventListener('keydown', handleKeyDownCapture, true);
+	document.addEventListener('keydown', handleKeyDown);
+	await credentialsStore.fetchAllCredentials();
 });
+
+const hasValidatedOnLoad = ref(false);
+
+watch(
+	() => isLoading.value,
+	async (loading) => {
+		if (!loading && !hasValidatedOnLoad.value) {
+			hasValidatedOnLoad.value = true;
+			await validateExistingCredentials();
+		}
+	},
+	{ immediate: true },
+);
 
 onUnmounted(() => {
-	unsubscribeCredentialChanges?.();
+	document.removeEventListener('keydown', handleKeyDownCapture, true);
+	document.removeEventListener('keydown', handleKeyDown);
 });
 
-// Watch for credential modal close to reset pending state if user didn't save
 const isCredentialModalOpen = computed(() => uiStore.isModalActiveById[CREDENTIAL_EDIT_MODAL_KEY]);
 
-watch(isCredentialModalOpen, (isOpen, wasOpen) => {
-	// Modal just closed
+watch(isCredentialModalOpen, async (isOpen, wasOpen) => {
 	if (!isOpen && wasOpen && pendingCredentialType.value) {
-		const state = cardStates.get(pendingCredentialType.value);
-		// If still loading, user closed without saving - reset to default
-		if (state === 'loading') {
-			cardStates.set(pendingCredentialType.value, 'default');
+		const credentialsOfType = credentialsStore.allCredentials.filter(
+			(c) => c.type === pendingCredentialType.value,
+		);
+
+		if (credentialsOfType.length > credentialsCountBefore.value) {
+			const newCredential = credentialsOfType[credentialsOfType.length - 1];
+			await validateCredential(newCredential.id, pendingCredentialType.value);
 		}
+
 		pendingCredentialType.value = null;
 	}
 });
@@ -143,6 +236,12 @@ watch(isCredentialModalOpen, (isOpen, wasOpen) => {
 
 <template>
 	<div :class="$style.container" data-test-id="app-selection-page">
+		<AppInstallModal
+			:app-entry="appToInstall"
+			:modal-name="APP_INSTALL_MODAL_KEY"
+			@close="handleInstallModalClose"
+			@installed="handleNodeInstalled"
+		/>
 		<div :class="$style.content">
 			<N8nHeading tag="h1" size="xlarge" :class="$style.heading">
 				{{ heading }}
@@ -163,12 +262,22 @@ watch(isCredentialModalOpen, (isOpen, wasOpen) => {
 					<template #prefix>
 						<N8nIcon icon="search" />
 					</template>
+					<template #suffix>
+						<N8nIcon
+							v-if="searchQuery"
+							icon="x"
+							:class="$style.clearIcon"
+							data-test-id="app-selection-search-clear"
+							@click="searchQuery = ''"
+						/>
+					</template>
 				</N8nInput>
 			</div>
 
 			<AppSelectionGrid
 				:app-entries="appEntries"
-				:card-states="cardStates"
+				:invalid-credentials="invalidCredentials"
+				:validated-credentials="validatedCredentials"
 				:search-query="searchQuery"
 				:loading="isLoading"
 				@card-click="handleCardClick"
@@ -228,6 +337,16 @@ watch(isCredentialModalOpen, (isOpen, wasOpen) => {
 	width: 400px;
 	min-width: 400px;
 	margin-bottom: var(--spacing--lg);
+}
+
+.clearIcon {
+	cursor: pointer;
+	color: var(--color--text--tint-1);
+	transition: color 0.2s ease;
+
+	&:hover {
+		color: var(--color--text);
+	}
 }
 
 .footer {

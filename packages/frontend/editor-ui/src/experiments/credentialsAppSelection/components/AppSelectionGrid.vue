@@ -1,17 +1,28 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { N8nText } from '@n8n/design-system';
 import { useI18n } from '@n8n/i18n';
+import { sublimeSearch } from '@n8n/utils/search/sublimeSearch';
+import { useCredentialsStore } from '@/features/credentials/credentials.store';
+import { useNodeTypesStore } from '@/app/stores/nodeTypes.store';
+import { removePreviewToken } from '@/features/shared/nodeCreator/nodeCreator.utils';
 import AppSelectionCard from './AppSelectionCard.vue';
 import type { AppEntry } from '../composables/useAppCredentials';
 
 type CardState = 'default' | 'loading' | 'connected' | 'error';
 
-const SKELETON_COUNT = 12;
+const credentialsStore = useCredentialsStore();
+const nodeTypesStore = useNodeTypesStore();
+
+const SKELETON_COUNT = 20;
+const ICONS_TO_PRELOAD = 20;
+const SEARCH_KEYS = [{ key: 'app.displayName', weight: 1 }];
+const MIN_SEARCH_SCORE = 0;
 
 const props = defineProps<{
 	appEntries: AppEntry[];
-	cardStates: Map<string, CardState>;
+	invalidCredentials: Set<string>;
+	validatedCredentials: Set<string>;
 	searchQuery: string;
 	loading?: boolean;
 }>();
@@ -22,39 +33,135 @@ const emit = defineEmits<{
 
 const i18n = useI18n();
 
+const hasCredential = (entry: AppEntry): boolean => {
+	if (!entry.credentialType) return false;
+	return credentialsStore.allCredentials.some((c) => c.type === entry.credentialType?.name);
+};
+
+const sortConnectedFirst = (entries: AppEntry[]): AppEntry[] => {
+	return [...entries].sort((a, b) => {
+		const aConnected = hasCredential(a);
+		const bConnected = hasCredential(b);
+		if (aConnected && !bConnected) return -1;
+		if (!aConnected && bConnected) return 1;
+		return 0;
+	});
+};
+
 const filteredAppEntries = computed(() => {
 	if (!props.searchQuery.trim()) {
-		return props.appEntries;
+		return sortConnectedFirst(props.appEntries);
 	}
 
-	const query = props.searchQuery.toLowerCase();
-	return props.appEntries.filter((entry) => entry.app.displayName.toLowerCase().includes(query));
+	const searchResults = sublimeSearch(props.searchQuery, props.appEntries, SEARCH_KEYS);
+	const filtered = searchResults
+		.filter(({ score }) => score >= MIN_SEARCH_SCORE)
+		.map(({ item }) => item);
+	return sortConnectedFirst(filtered);
 });
 
 const getCardState = (entry: AppEntry): CardState => {
-	return props.cardStates.get(entry.credentialType.name) ?? 'default';
+	if (hasCredential(entry)) {
+		return 'connected';
+	}
+	return 'default';
+};
+
+const isCredentialInvalid = (entry: AppEntry): boolean => {
+	const key = entry.credentialType?.name ?? entry.app.name;
+	if (props.invalidCredentials.has(key)) {
+		return true;
+	}
+	if (hasCredential(entry) && !props.validatedCredentials.has(key)) {
+		return true;
+	}
+	return false;
+};
+
+const isCredentialValidated = (entry: AppEntry): boolean => {
+	const key = entry.credentialType?.name ?? entry.app.name;
+	return props.validatedCredentials.has(key) || hasCredential(entry);
 };
 
 const handleCardClick = (entry: AppEntry) => {
 	emit('card-click', entry);
 };
+
+const iconsLoaded = ref(false);
+
+const getIconUrl = (entry: AppEntry): string | null => {
+	const { app } = entry;
+
+	const nodeType = nodeTypesStore.getNodeType(app.name);
+	if (nodeType?.iconUrl) {
+		return typeof nodeType.iconUrl === 'string' ? nodeType.iconUrl : nodeType.iconUrl.light;
+	}
+
+	const cleanedName = removePreviewToken(app.name);
+	const communityNode = nodeTypesStore.communityNodeType(cleanedName);
+	if (communityNode?.nodeDescription?.iconUrl) {
+		const iconUrl = communityNode.nodeDescription.iconUrl;
+		return typeof iconUrl === 'string' ? iconUrl : iconUrl.light;
+	}
+
+	if (app.iconUrl) {
+		return app.iconUrl;
+	}
+
+	return null;
+};
+
+const preloadIcons = async (entries: AppEntry[]) => {
+	const iconsToLoad = entries.slice(0, ICONS_TO_PRELOAD);
+	const iconUrls = iconsToLoad.map(getIconUrl).filter((url): url is string => url !== null);
+
+	if (iconUrls.length === 0) {
+		iconsLoaded.value = true;
+		return;
+	}
+
+	const loadPromises = iconUrls.map(
+		(url) =>
+			new Promise<void>((resolve) => {
+				const img = new Image();
+				img.onload = () => resolve();
+				img.onerror = () => resolve();
+				img.src = url;
+			}),
+	);
+
+	await Promise.all(loadPromises);
+	iconsLoaded.value = true;
+};
+
+watch(
+	() => props.appEntries,
+	async (entries) => {
+		if (entries.length > 0 && !props.loading) {
+			iconsLoaded.value = false;
+			await preloadIcons(entries);
+		}
+	},
+	{ immediate: true },
+);
+
+const isLoading = computed(
+	() => props.loading || (!iconsLoaded.value && props.appEntries.length > 0),
+);
 </script>
 
 <template>
 	<div :class="$style.container">
-		<!-- Skeleton loading state -->
-		<div v-if="loading" :class="$style.grid">
+		<div v-if="isLoading" :class="$style.grid">
 			<AppSelectionCard v-for="i in SKELETON_COUNT" :key="`skeleton-${i}`" skeleton />
 		</div>
 
-		<!-- Empty state -->
 		<div v-else-if="filteredAppEntries.length === 0" :class="$style.emptyState">
 			<N8nText color="text-light">
 				{{ i18n.baseText('appSelection.noResults') }}
 			</N8nText>
 		</div>
 
-		<!-- Normal grid -->
 		<div v-else :class="$style.grid">
 			<AppSelectionCard
 				v-for="entry in filteredAppEntries"
@@ -62,6 +169,9 @@ const handleCardClick = (entry: AppEntry) => {
 				:app="entry.app"
 				:supports-instant-o-auth="entry.supportsInstantOAuth"
 				:state="getCardState(entry)"
+				:installed="entry.installed"
+				:show-warning="isCredentialInvalid(entry)"
+				:show-badge="isCredentialValidated(entry)"
 				@click="handleCardClick(entry)"
 			/>
 		</div>
@@ -83,6 +193,12 @@ const handleCardClick = (entry: AppEntry) => {
 	max-height: 400px;
 	overflow-y: auto;
 	padding: var(--spacing--xs);
+	scrollbar-width: none;
+	-ms-overflow-style: none;
+
+	&::-webkit-scrollbar {
+		display: none;
+	}
 }
 
 .emptyState {

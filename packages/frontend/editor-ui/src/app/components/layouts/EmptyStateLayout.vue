@@ -8,6 +8,7 @@ import { useProjectsStore } from '@/features/collaboration/projects/projects.sto
 import { useProjectPages } from '@/features/collaboration/projects/composables/useProjectPages';
 import { useWorkflowsEmptyState } from '@/features/workflows/composables/useWorkflowsEmptyState';
 import { useEmptyStateBuilderPromptStore } from '@/experiments/emptyStateBuilderPrompt/stores/emptyStateBuilderPrompt.store';
+import { useCredentialsAppSelectionStore } from '@/experiments/credentialsAppSelection/stores/credentialsAppSelection.store';
 import RecommendedTemplatesSection from '@/features/workflows/templates/recommendations/components/RecommendedTemplatesSection.vue';
 import ReadyToRunButton from '@/features/workflows/readyToRun/components/ReadyToRunButton.vue';
 import EmptyStateBuilderPrompt from '@/experiments/emptyStateBuilderPrompt/components/EmptyStateBuilderPrompt.vue';
@@ -23,6 +24,7 @@ const bannersStore = useBannersStore();
 const projectsStore = useProjectsStore();
 const projectPages = useProjectPages();
 const emptyStateBuilderPromptStore = useEmptyStateBuilderPromptStore();
+const credentialsAppSelectionStore = useCredentialsAppSelectionStore();
 
 const {
 	showAppSelection,
@@ -57,6 +59,10 @@ const handleBuilderPromptSubmit = async (prompt: string) => {
 		builderParentFolderId.value,
 	);
 };
+
+const handleAppSelectionContinue = () => {
+	credentialsAppSelectionStore.dismiss();
+};
 </script>
 
 <template>
@@ -74,7 +80,7 @@ const handleBuilderPromptSubmit = async (prompt: string) => {
 		<div :class="[$style.content, { [$style.builderContent]: showBuilderPrompt }]">
 			<!-- State 0: App Selection -->
 			<template v-if="showAppSelection">
-				<AppSelectionPage @continue="() => {}" />
+				<AppSelectionPage @continue="handleAppSelectionContinue" />
 			</template>
 
 			<!-- State 1: AI Builder -->

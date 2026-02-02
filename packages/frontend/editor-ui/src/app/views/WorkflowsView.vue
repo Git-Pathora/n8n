@@ -439,7 +439,17 @@ const showPersonalizedTemplates = computed(
 );
 
 const shouldUseSimplifiedLayout = computed(() => {
-	return !loading.value && readyToRunStore.getSimplifiedLayoutVisibility(route);
+	const simplifiedLayoutVisible = readyToRunStore.getSimplifiedLayoutVisibility(route);
+	return !loading.value && simplifiedLayoutVisible;
+});
+
+/**
+ * Returns true when we're loading AND might show the simplified layout.
+ * This is used to prevent the ResourcesListLayout from flashing before
+ * we know whether to show the EmptyStateLayout.
+ */
+const mightShowSimplifiedLayoutWhileLoading = computed(() => {
+	return loading.value && readyToRunStore.getMightShowSimplifiedLayout(route);
 });
 
 const hasActiveCallouts = computed(() => {
@@ -1751,7 +1761,11 @@ const onNameSubmit = async (name: string) => {
 </script>
 
 <template>
-	<EmptyStateLayout v-if="shouldUseSimplifiedLayout" @click:add="addWorkflow" />
+	<!-- Show EmptyStateLayout when truly empty OR when loading and might be empty (prevents flash) -->
+	<EmptyStateLayout
+		v-if="shouldUseSimplifiedLayout || mightShowSimplifiedLayoutWhileLoading"
+		@click:add="addWorkflow"
+	/>
 
 	<ResourcesListLayout
 		v-else

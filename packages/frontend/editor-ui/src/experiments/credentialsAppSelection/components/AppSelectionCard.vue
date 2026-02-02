@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed } from 'vue';
-import { N8nIcon, N8nText } from '@n8n/design-system';
+import { N8nIcon, N8nText, N8nTooltip } from '@n8n/design-system';
+import { useI18n } from '@n8n/i18n';
 import NodeIcon from '@/app/components/NodeIcon.vue';
-import { getNodeIconSource, type NodeIconSource } from '@/app/utils/nodeIcon';
 import { useNodeTypesStore } from '@/app/stores/nodeTypes.store';
-import { useUIStore } from '@/app/stores/ui.store';
+import { removePreviewToken } from '@/features/shared/nodeCreator/nodeCreator.utils';
 import type { AppInfo } from '../composables/useAppCredentials';
+import type { SimplifiedNodeType } from '@/Interface';
 
 type CardState = 'default' | 'loading' | 'connected' | 'error';
 
@@ -14,6 +15,9 @@ const props = defineProps<{
 	state?: CardState;
 	supportsInstantOAuth?: boolean;
 	skeleton?: boolean;
+	installed?: boolean;
+	showWarning?: boolean;
+	showBadge?: boolean;
 }>();
 
 const emit = defineEmits<{
@@ -21,10 +25,17 @@ const emit = defineEmits<{
 }>();
 
 const nodeTypesStore = useNodeTypesStore();
-const uiStore = useUIStore();
+const i18n = useI18n();
+
+const isInstalled = computed(() => props.installed !== false);
 
 const isClickable = computed(
-	() => !props.skeleton && (props.state === 'default' || props.state === 'error'),
+	() =>
+		!props.skeleton &&
+		(props.state === 'default' ||
+			props.state === 'error' ||
+			props.state === 'connected' ||
+			props.state === undefined),
 );
 
 const handleClick = () => {
@@ -33,41 +44,44 @@ const handleClick = () => {
 	}
 };
 
-// Get the appropriate icon based on current theme
-const getThemedIcon = (app: AppInfo): string | undefined => {
-	const isDark = uiStore.appliedTheme === 'dark';
-	// Prefer dark icon in dark mode if available
-	if (isDark && app.iconDark) {
-		return app.iconDark;
-	}
-	return app.icon;
-};
-
-// Build icon source from app info
-// Try to get the full node type from store for proper icon resolution
-const iconSource = computed((): NodeIconSource | undefined => {
+const nodeTypeForIcon = computed((): SimplifiedNodeType | null => {
 	const { app } = props;
-	if (!app) return undefined;
+	if (!app) return null;
 
-	// Try to get the node type from the store using the app name
-	// This gives us access to iconBasePath for file: icons and proper theme handling
 	const nodeType = nodeTypesStore.getNodeType(app.name);
 	if (nodeType) {
-		return getNodeIconSource(nodeType);
+		return nodeType;
 	}
 
-	// Fallback: use app icon data with theme awareness
-	const icon = getThemedIcon(app);
-	if (icon?.startsWith('fa:')) {
-		return { type: 'icon', name: icon.replace('fa:', '') };
+	const cleanedName = removePreviewToken(app.name);
+	const communityNode = nodeTypesStore.communityNodeType(cleanedName);
+
+	if (communityNode?.nodeDescription) {
+		return communityNode.nodeDescription;
 	}
 
-	return undefined;
+	if (app.iconUrl || app.icon) {
+		return {
+			name: app.name,
+			displayName: app.displayName,
+			iconUrl: app.iconUrl,
+			icon: app.icon,
+			iconColor: app.iconColor,
+			group: [],
+			inputs: [],
+			outputs: [],
+			properties: [],
+			version: 1,
+			defaults: { name: app.displayName },
+			description: '',
+		} as SimplifiedNodeType;
+	}
+
+	return null;
 });
 </script>
 
 <template>
-	<!-- Skeleton state -->
 	<div
 		v-if="skeleton"
 		:class="[$style.card, $style.skeleton]"
@@ -79,14 +93,14 @@ const iconSource = computed((): NodeIconSource | undefined => {
 		<div :class="$style.skeletonText" />
 	</div>
 
-	<!-- Normal state -->
 	<div
 		v-else
 		:class="[
 			$style.card,
 			{
 				[$style.clickable]: isClickable,
-				[$style.connected]: state === 'connected',
+				[$style.connected]: state === 'connected' && !showWarning,
+				[$style.warning]: state === 'connected' && showWarning,
 				[$style.error]: state === 'error',
 				[$style.loading]: state === 'loading',
 			},
@@ -99,13 +113,37 @@ const iconSource = computed((): NodeIconSource | undefined => {
 		@keydown.space.prevent="handleClick"
 	>
 		<Transition name="fade">
-			<div v-if="state === 'connected'" :class="$style.connectedBadge">
+			<div
+				v-if="showBadge && showWarning && state === 'connected'"
+				:class="$style.warningBadgeWrapper"
+			>
+				<N8nTooltip placement="top" :show-after="300">
+					<template #content>
+						{{ i18n.baseText('credentialsAppSelection.credentialsNotValid') }}
+					</template>
+					<div :class="$style.warningBadge">
+						<N8nIcon icon="exclamation-triangle" :class="$style.badgeIcon" />
+					</div>
+				</N8nTooltip>
+			</div>
+			<div v-else-if="showBadge && state === 'connected'" :class="$style.connectedBadge">
 				<N8nIcon icon="check" :class="$style.badgeIcon" />
 			</div>
 		</Transition>
 
+		<div v-if="!isInstalled" :class="$style.installBadgeWrapper">
+			<N8nTooltip placement="top" :show-after="300">
+				<template #content>
+					{{ i18n.baseText('credentialsAppSelection.installToConnect') }}
+				</template>
+				<div :class="$style.installBadge">
+					<N8nIcon icon="download" :class="$style.installBadgeIcon" />
+				</div>
+			</N8nTooltip>
+		</div>
+
 		<div :class="$style.iconContainer">
-			<NodeIcon :icon-source="iconSource" :size="32" :class="$style.icon" />
+			<NodeIcon :node-type="nodeTypeForIcon" :size="32" :class="$style.icon" />
 		</div>
 
 		<N8nText :class="$style.name" size="small">
@@ -123,7 +161,7 @@ const iconSource = computed((): NodeIconSource | undefined => {
 	justify-content: flex-start;
 	padding: var(--spacing--xs);
 	padding-top: var(--spacing--sm);
-	border: var(--border);
+	border: 2px solid var(--color--foreground);
 	border-radius: var(--radius--lg);
 	background-color: var(--color--background--light-3);
 	width: 140px;
@@ -135,32 +173,51 @@ const iconSource = computed((): NodeIconSource | undefined => {
 	&.clickable {
 		cursor: pointer;
 
-		&:hover {
+		&:hover,
+		&:focus-visible {
 			border-color: var(--color--primary);
 			background-color: var(--color--background--light-2);
-		}
-
-		&:focus {
-			outline: 2px solid var(--color--primary);
-			outline-offset: 2px;
+			outline: none;
 		}
 	}
 
 	&.connected {
-		border-color: var(--color--success);
-		border-width: 2px;
+		border: 2px solid var(--color--success);
+		cursor: pointer;
+
+		&:hover,
+		&:focus-visible {
+			border-color: var(--color--primary);
+			background-color: var(--color--background--light-2);
+			outline: none;
+		}
+	}
+
+	&.warning {
+		border: 2px solid var(--color--warning);
+		cursor: pointer;
+
+		&:hover,
+		&:focus-visible {
+			border-color: var(--color--primary);
+			background-color: var(--color--background--light-2);
+			outline: none;
+		}
 	}
 
 	&.error {
 		border-color: var(--color--danger);
 
-		&:hover {
+		&:hover,
+		&:focus-visible {
 			background-color: var(--color--danger--tint-4);
 		}
 	}
 
 	&.loading {
 		cursor: wait;
+		border-color: var(--color--primary);
+		background-color: var(--color--background--light-2);
 	}
 
 	&.skeleton {
@@ -202,12 +259,17 @@ const iconSource = computed((): NodeIconSource | undefined => {
 	align-items: center;
 	justify-content: center;
 	margin-bottom: var(--spacing--2xs);
+
+	:deep(img) {
+		width: 100%;
+		height: 100%;
+		object-fit: contain;
+	}
 }
 
 .icon {
 	width: 32px;
 	height: 32px;
-	object-fit: contain;
 }
 
 .connectedBadge {
@@ -220,6 +282,23 @@ const iconSource = computed((): NodeIconSource | undefined => {
 	align-items: center;
 	justify-content: center;
 	background: var(--color--success);
+	border-radius: 50%;
+}
+
+.warningBadgeWrapper {
+	position: absolute;
+	top: var(--spacing--3xs);
+	right: var(--spacing--3xs);
+	z-index: 1;
+}
+
+.warningBadge {
+	width: 20px;
+	height: 20px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--color--warning);
 	border-radius: 50%;
 }
 
@@ -238,6 +317,28 @@ const iconSource = computed((): NodeIconSource | undefined => {
 	line-height: 1.3;
 	max-width: 100%;
 	word-break: break-word;
+}
+
+.installBadgeWrapper {
+	position: absolute;
+	top: var(--spacing--3xs);
+	right: var(--spacing--3xs);
+	z-index: 1;
+}
+
+.installBadge {
+	width: 20px;
+	height: 20px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: var(--color--foreground);
+	border-radius: 50%;
+}
+
+.installBadgeIcon {
+	color: var(--color--text--tint-1);
+	font-size: 10px;
 }
 </style>
 

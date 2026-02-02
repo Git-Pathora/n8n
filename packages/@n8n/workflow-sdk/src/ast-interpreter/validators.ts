@@ -39,7 +39,6 @@ export const ALLOWED_SDK_FUNCTIONS = new Set([
 	'reranker',
 
 	// Utility
-	'fanOut',
 	'fromAi', // NEW: replaces ($) => $.fromAi() pattern
 ]);
 

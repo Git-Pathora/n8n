@@ -67,7 +67,6 @@ const createMockSDKFunctions = (): SDKFunctions => ({
 	documentLoader: jest.fn((config: unknown) => ({ type: 'documentLoader', config })),
 	textSplitter: jest.fn((config: unknown) => ({ type: 'textSplitter', config })),
 	reranker: jest.fn((config: unknown) => ({ type: 'reranker', config })),
-	fanOut: jest.fn((...args: unknown[]) => args),
 	fromAi: jest.fn(
 		(key: string, desc?: string) => `={{ $fromAI('${key}'${desc ? `, '${desc}'` : ''}) }}`,
 	),

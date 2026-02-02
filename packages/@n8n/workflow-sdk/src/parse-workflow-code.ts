@@ -36,10 +36,6 @@ import { interpretSDKCode, InterpreterError, SecurityError } from './ast-interpr
 import type { SDKFunctions } from './ast-interpreter';
 import type { WorkflowJSON, WorkflowBuilder } from './types/base';
 
-// Backward compatibility shim: fanOut() just returns its arguments as an array
-// This allows parsing older generated code that used fanOut()
-const fanOutFn = (...args: unknown[]): unknown[] => args;
-
 /**
  * Known n8n runtime variables that need to be escaped in template literals.
  * These are evaluated at workflow runtime, not at parse time.
@@ -504,7 +500,6 @@ const sdkFunctions: SDKFunctions = {
 	documentLoader: documentLoaderFn,
 	textSplitter: textSplitterFn,
 	reranker: rerankerFn,
-	fanOut: fanOutFn,
 	fromAi: fromAiFn,
 };
 

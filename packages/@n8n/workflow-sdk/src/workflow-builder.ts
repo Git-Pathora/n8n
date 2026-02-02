@@ -3990,7 +3990,7 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 				}
 				// For arrays, don't update prevDoneNode - subsequent single nodes will chain from SIB or prev
 				// This matches the semantics of .onDone([a, b]) with subsequent single nodes - invalid usage
-				// For valid cases like .onDone(fanOut(a.then(c), b.then(c))), the tails are merged elsewhere
+				// For valid cases like .onDone([a.then(c), b.then(c)]), the tails are merged elsewhere
 			} else {
 				// Single node: chain to previous or connect to output 0
 				const doneNode = batch;

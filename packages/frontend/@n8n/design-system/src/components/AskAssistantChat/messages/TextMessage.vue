@@ -3,7 +3,7 @@ import { computed, ref, onMounted, nextTick, watch } from 'vue';
 
 import BaseMessage from './BaseMessage.vue';
 import RestoreVersionLink from './RestoreVersionLink.vue';
-import { useMarkdown } from './useMarkdown';
+import { useMarkdown, parseThinkingSegments } from './useMarkdown';
 import { useI18n } from '../../../composables/useI18n';
 import type { ChatUI, RatingFeedback } from '../../../types/assistant';
 import BlinkingCursor from '../../BlinkingCursor/BlinkingCursor.vue';
@@ -36,6 +36,9 @@ const { t } = useI18n();
 const isClipboardSupported = computed(() => {
 	return navigator.clipboard?.writeText;
 });
+
+// Parse content into segments (text and thinking)
+const parsedContent = computed(() => parseThinkingSegments(props.message.content));
 
 // User message expand/collapse functionality
 const isExpanded = ref(false);
@@ -114,13 +117,20 @@ async function onCopyButtonClick(content: string, e: MouseEvent) {
 					{{ isExpanded ? t('notice.showLess') : t('notice.showMore') }}
 				</button>
 			</div>
-			<!-- Assistant message - simple text without container -->
+			<!-- Assistant message - render segments with thinking sections as collapsible -->
 			<div
 				v-else
-				v-n8n-html="renderMarkdown(message.content)"
 				:class="[$style.assistantText, $style.renderedContent]"
 				:style="color ? { color } : undefined"
-			></div>
+			>
+				<template v-for="(segment, idx) in parsedContent" :key="idx">
+					<span v-if="segment.type === 'text'" v-n8n-html="renderMarkdown(segment.content)" />
+					<details v-else class="n8n-thinking-section">
+						<summary>{{ t('assistantChat.thinking.thinking') }}...</summary>
+						<span v-n8n-html="renderMarkdown(segment.content)" />
+					</details>
+				</template>
+			</div>
 			<div
 				v-if="message?.codeSnippet"
 				:class="$style.codeSnippet"

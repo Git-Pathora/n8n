@@ -119,7 +119,56 @@ Follow these rules strictly when generating workflows:
       - Pre-configured parameters for common operations
       - Better error handling and response parsing
       - Easier to configure and maintain
-    - **Example:** If user says "send email via Gmail", use the Gmail node, NOT HTTP Request to Gmail API`;
+    - **Example:** If user says "send email via Gmail", use the Gmail node, NOT HTTP Request to Gmail API
+
+13. **OUTPUT DECLARATION (MANDATORY)**
+    Every node MUST include an \`output\` property showing sample output data.
+    This forces you to reason about what data is available at each step.
+
+    ### Data Flow Rules
+    1. **Each node replaces $json** - After a node executes, $json contains ONLY that node's output
+    2. **Approval/Wait nodes lose input data** - Nodes like Slack sendAndWait, Wait, Form return only their response. Use \`$('Previous Node').item.json\` to access earlier data
+    3. **Branches may have different outputs** - After Switch/IF, use optional chaining or reference a node that always runs
+
+    ### Example - Output Declaration
+    \`\`\`typescript
+    const webhook = trigger({{
+      type: 'n8n-nodes-base.webhook',
+      version: 2.1,
+      config: {{ name: 'Webhook', parameters: {{ httpMethod: 'POST' }} }},
+      output: [{{ amount: 100, description: 'Laptop' }}]
+    }});
+
+    const approval = node({{
+      type: 'n8n-nodes-base.slack',
+      version: 2.3,
+      config: {{ parameters: {{ operation: 'sendAndWait' }} }},
+      output: [{{ data: {{ approved: true }} }}]
+    }});
+
+    const email = node({{
+      type: 'n8n-nodes-base.emailSend',
+      version: 2.1,
+      config: {{ parameters: {{}} }},
+      output: [{{ messageId: 'msg_123' }}]
+    }});
+    \`\`\`
+
+    ### Data Flow After Approval Nodes
+    After approval/wait nodes like Slack sendAndWait:
+    - **$json** contains ONLY the approval response: \`{{ data: {{ approved: true }} }}\`
+    - Original webhook data is NO LONGER in $json
+    - To access original data, use: \`={{{{ $("Webhook").item.json.amount }}}}\`
+
+    ### Wrong vs Right Expression References
+    - WRONG: \`={{{{ $json.amount }}}}\` after approval node (amount doesn't exist in approval output)
+    - RIGHT: \`={{{{ $("Webhook").item.json.amount }}}}\` (references webhook node directly)
+
+    ### Handling Multiple Branches
+    When a node receives data from multiple paths (after Switch, IF, Merge):
+    - **Option A**: Use optional chaining: \`$json.data?.approved ?? $json.status\`
+    - **Option B**: Reference a node that ALWAYS runs: \`$("Webhook").item.json.field\`
+    - **Option C**: Normalize data before convergence with Set nodes`;
 
 /**
  * Workflow patterns - condensed examples

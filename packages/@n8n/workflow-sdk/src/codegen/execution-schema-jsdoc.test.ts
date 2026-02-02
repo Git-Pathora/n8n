@@ -1,8 +1,124 @@
 import { describe, it, expect } from '@jest/globals';
-import { generateSchemaJSDoc } from './execution-schema-jsdoc';
+import { generateSchemaJSDoc, schemaToOutputSample } from './execution-schema-jsdoc';
 import type { Schema } from 'n8n-workflow';
 
 describe('execution-schema-jsdoc', () => {
+	describe('schemaToOutputSample', () => {
+		it('converts object schema with primitive fields to sample object', () => {
+			const schema: Schema = {
+				type: 'object',
+				path: '',
+				value: [
+					{ type: 'string', key: 'id', value: 'usr_12345', path: 'id' },
+					{ type: 'string', key: 'name', value: 'John Doe', path: 'name' },
+					{ type: 'number', key: 'age', value: '30', path: 'age' },
+					{ type: 'boolean', key: 'active', value: 'true', path: 'active' },
+				],
+			};
+
+			const result = schemaToOutputSample(schema);
+
+			expect(result).toEqual({
+				id: 'usr_12345',
+				name: 'John Doe',
+				age: 30,
+				active: true,
+			});
+		});
+
+		it('returns null for non-object schemas', () => {
+			const stringSchema: Schema = {
+				type: 'string',
+				path: '',
+				value: 'hello',
+			};
+
+			expect(schemaToOutputSample(stringSchema)).toBeNull();
+		});
+
+		it('handles nested object fields', () => {
+			const schema: Schema = {
+				type: 'object',
+				path: '',
+				value: [
+					{ type: 'string', key: 'id', value: '123', path: 'id' },
+					{
+						type: 'object',
+						key: 'data',
+						path: 'data',
+						value: [{ type: 'boolean', key: 'approved', value: 'true', path: 'data.approved' }],
+					},
+				],
+			};
+
+			const result = schemaToOutputSample(schema);
+
+			expect(result).toEqual({
+				id: '123',
+				data: {
+					approved: true,
+				},
+			});
+		});
+
+		it('handles array fields with empty default', () => {
+			const schema: Schema = {
+				type: 'object',
+				path: '',
+				value: [{ type: 'array', key: 'items', value: [], path: 'items' }],
+			};
+
+			const result = schemaToOutputSample(schema);
+
+			expect(result).toEqual({
+				items: [],
+			});
+		});
+
+		it('returns empty object for empty schema', () => {
+			const schema: Schema = {
+				type: 'object',
+				path: '',
+				value: [],
+			};
+
+			const result = schemaToOutputSample(schema);
+
+			expect(result).toEqual({});
+		});
+
+		it('handles null type fields', () => {
+			const schema: Schema = {
+				type: 'object',
+				path: '',
+				value: [{ type: 'null', key: 'empty', value: 'null', path: 'empty' }],
+			};
+
+			const result = schemaToOutputSample(schema);
+
+			expect(result).toEqual({
+				empty: null,
+			});
+		});
+
+		it('skips fields without keys', () => {
+			const schema: Schema = {
+				type: 'object',
+				path: '',
+				value: [
+					{ type: 'string', key: 'valid', value: 'value', path: 'valid' },
+					{ type: 'string', value: 'no-key', path: '' }, // missing key
+				],
+			};
+
+			const result = schemaToOutputSample(schema);
+
+			expect(result).toEqual({
+				valid: 'value',
+			});
+		});
+	});
+
 	describe('generateSchemaJSDoc', () => {
 		it('generates JSDoc for object schema with primitive fields', () => {
 			const schema: Schema = {

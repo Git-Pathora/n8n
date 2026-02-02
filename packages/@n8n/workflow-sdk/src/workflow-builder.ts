@@ -964,6 +964,9 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 			}
 		}
 
+		// Check: Expression paths reference valid output fields (uses pinData)
+		this.checkExpressionPaths(warnings);
+
 		return {
 			valid: errors.length === 0,
 			errors,
@@ -1632,6 +1635,253 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 			}
 		}
 		return false;
+	}
+
+	/**
+	 * Check that $json and $('NodeName') expressions reference fields that exist
+	 * in the predecessor node's output (from pinData)
+	 */
+	private checkExpressionPaths(warnings: import('./validation/index').ValidationWarning[]): void {
+		// Build output shapes from node config's output property first, then fall back to pinData
+		const outputShapes = new Map<string, Record<string, unknown>>();
+
+		// First: collect output declarations from node configs (LLM-generated)
+		for (const [mapKey, graphNode] of this._nodes) {
+			const output = graphNode.instance.config?.output;
+			if (output && output.length > 0) {
+				outputShapes.set(mapKey, output[0] as Record<string, unknown>);
+			}
+		}
+
+		// Second: fall back to pinData for nodes without output declarations
+		if (this._pinData) {
+			for (const [nodeName, pinData] of Object.entries(this._pinData)) {
+				// Only use pinData if we don't already have output from config
+				if (!outputShapes.has(nodeName) && pinData.length > 0) {
+					outputShapes.set(nodeName, pinData[0] as Record<string, unknown>);
+				}
+			}
+		}
+
+		// Skip if no output data declared
+		if (outputShapes.size === 0) return;
+
+		for (const [mapKey, graphNode] of this._nodes) {
+			const params = graphNode.instance.config?.parameters;
+			if (!params) continue;
+
+			const expressions = this.extractExpressions(params);
+			const predecessors = this.findPredecessors(mapKey);
+
+			for (const { expression, path } of expressions) {
+				const parsed = this.parseExpression(expression);
+
+				if (parsed.type === '$json' && parsed.fieldPath.length > 0) {
+					this.validateJsonPath(
+						mapKey,
+						path,
+						parsed.fieldPath,
+						predecessors,
+						outputShapes,
+						warnings,
+					);
+				}
+
+				if (parsed.type === '$node' && parsed.nodeName && parsed.fieldPath.length > 0) {
+					this.validateNodePath(
+						mapKey,
+						path,
+						parsed.nodeName,
+						parsed.fieldPath,
+						outputShapes,
+						warnings,
+					);
+				}
+			}
+		}
+	}
+
+	/**
+	 * Validate that $json.path exists in predecessor outputs
+	 */
+	private validateJsonPath(
+		nodeName: string,
+		paramPath: string,
+		fieldPath: string[],
+		predecessors: string[],
+		outputShapes: Map<string, Record<string, unknown>>,
+		warnings: import('./validation/index').ValidationWarning[],
+	): void {
+		const { ValidationWarning } = require('./validation/index');
+		const validIn: string[] = [];
+		const invalidIn: string[] = [];
+
+		for (const pred of predecessors) {
+			const shape = outputShapes.get(pred);
+			if (shape) {
+				if (this.hasPath(shape, fieldPath)) {
+					validIn.push(pred);
+				} else {
+					invalidIn.push(pred);
+				}
+			}
+		}
+
+		const fieldPathStr = fieldPath.join('.');
+
+		if (invalidIn.length > 0 && validIn.length === 0) {
+			warnings.push(
+				new ValidationWarning(
+					'INVALID_EXPRESSION_PATH',
+					`'${nodeName}' parameter '${paramPath}' uses $json.${fieldPathStr} but no predecessor outputs this field.`,
+					nodeName,
+				),
+			);
+		} else if (invalidIn.length > 0 && validIn.length > 0) {
+			warnings.push(
+				new ValidationWarning(
+					'PARTIAL_EXPRESSION_PATH',
+					`'${nodeName}' parameter '${paramPath}' uses $json.${fieldPathStr} - exists in [${validIn.join(', ')}] but NOT in [${invalidIn.join(', ')}].`,
+					nodeName,
+				),
+			);
+		}
+	}
+
+	/**
+	 * Validate that $('NodeName').item.json.path references a valid field
+	 */
+	private validateNodePath(
+		nodeName: string,
+		paramPath: string,
+		referencedNode: string,
+		fieldPath: string[],
+		outputShapes: Map<string, Record<string, unknown>>,
+		warnings: import('./validation/index').ValidationWarning[],
+	): void {
+		const { ValidationWarning } = require('./validation/index');
+		const shape = outputShapes.get(referencedNode);
+
+		if (shape && !this.hasPath(shape, fieldPath)) {
+			warnings.push(
+				new ValidationWarning(
+					'INVALID_EXPRESSION_PATH',
+					`'${nodeName}' parameter '${paramPath}' uses $('${referencedNode}').item.json.${fieldPath.join('.')} but '${referencedNode}' doesn't output this field.`,
+					nodeName,
+				),
+			);
+		}
+	}
+
+	/**
+	 * Extract all expressions from node parameters (recursive)
+	 */
+	private extractExpressions(params: unknown): Array<{ expression: string; path: string }> {
+		const results: Array<{ expression: string; path: string }> = [];
+
+		const recurse = (value: unknown, path: string) => {
+			if (typeof value === 'string') {
+				// Check if it's an expression (starts with =)
+				if (value.startsWith('=')) {
+					results.push({ expression: value, path });
+				}
+			} else if (Array.isArray(value)) {
+				value.forEach((item, index) => {
+					recurse(item, `${path}[${index}]`);
+				});
+			} else if (value && typeof value === 'object') {
+				for (const [key, val] of Object.entries(value)) {
+					const newPath = path ? `${path}.${key}` : key;
+					recurse(val, newPath);
+				}
+			}
+		};
+
+		recurse(params, '');
+		return results;
+	}
+
+	/**
+	 * Parse expression into structured form
+	 */
+	private parseExpression(expr: string): {
+		type: '$json' | '$node' | '$input' | 'other';
+		nodeName?: string;
+		fieldPath: string[];
+	} {
+		// Pattern for $json.field.path
+		const jsonMatch = expr.match(/\$json\.([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)/);
+		if (jsonMatch) {
+			return {
+				type: '$json',
+				fieldPath: jsonMatch[1].split('.'),
+			};
+		}
+
+		// Pattern for $('NodeName').item.json.field.path
+		const nodeMatch = expr.match(
+			/\$\(['"]([^'"]+)['"]\)\.item\.json\.([a-zA-Z_][a-zA-Z0-9_]*(?:\.[a-zA-Z_][a-zA-Z0-9_]*)*)/,
+		);
+		if (nodeMatch) {
+			return {
+				type: '$node',
+				nodeName: nodeMatch[1],
+				fieldPath: nodeMatch[2].split('.'),
+			};
+		}
+
+		return { type: 'other', fieldPath: [] };
+	}
+
+	/**
+	 * Check if path exists in object shape
+	 */
+	private hasPath(shape: Record<string, unknown>, path: string[]): boolean {
+		let current: unknown = shape;
+		for (const key of path) {
+			if (current === null || current === undefined || typeof current !== 'object') {
+				return false;
+			}
+			if (!(key in current)) {
+				return false;
+			}
+			current = (current as Record<string, unknown>)[key];
+		}
+		return true;
+	}
+
+	/**
+	 * Find all possible predecessors for a node (handles branches)
+	 */
+	private findPredecessors(nodeName: string): string[] {
+		const predecessors: string[] = [];
+
+		// Scan all nodes' connections to find which ones connect to this node
+		for (const [sourceNodeName, graphNode] of this._nodes) {
+			const mainConns = graphNode.connections.get('main');
+			if (mainConns) {
+				for (const [_outputIndex, targets] of mainConns) {
+					for (const target of targets) {
+						if (typeof target === 'object' && 'node' in target && target.node === nodeName) {
+							predecessors.push(sourceNodeName);
+						}
+					}
+				}
+			}
+
+			// Also check connections declared via node's .then()
+			if (typeof graphNode.instance.getConnections === 'function') {
+				const connections = graphNode.instance.getConnections();
+				for (const conn of connections) {
+					const targetName = this.resolveTargetNodeName(conn.target);
+					if (targetName === nodeName) {
+						predecessors.push(sourceNodeName);
+					}
+				}
+			}
+		}
+
+		return [...new Set(predecessors)]; // Deduplicate
 	}
 
 	toString(): string {

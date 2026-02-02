@@ -836,4 +836,311 @@ describe('Validation', () => {
 			expect(modelParam?.value).toBe('gpt-4o');
 		});
 	});
+
+	describe('expression path validation', () => {
+		it('should warn when $json references a field not in predecessor output', () => {
+			const webhookTrigger = trigger({
+				type: 'n8n-nodes-base.webhook',
+				version: 2,
+				config: {
+					name: 'Webhook',
+					pinData: [{ amount: 100, description: 'Laptop' }],
+				},
+			});
+
+			const slackApproval = node({
+				type: 'n8n-nodes-base.slack',
+				version: 2,
+				config: {
+					name: 'Approval',
+					pinData: [{ data: { approved: true } }],
+				},
+			});
+
+			// This email node incorrectly uses $json.amount after the Slack node
+			// which doesn't output 'amount'
+			const emailNode = node({
+				type: 'n8n-nodes-base.emailSend',
+				version: 2,
+				config: {
+					name: 'Send Email',
+					parameters: {
+						subject: '={{ $json.amount }}', // WRONG - amount is not in Slack output
+					},
+				},
+			});
+
+			const wf = workflow('test', 'Test').add(webhookTrigger).then(slackApproval).then(emailNode);
+
+			const result = wf.validate();
+			const expressionWarnings = result.warnings.filter(
+				(w) => w.code === 'INVALID_EXPRESSION_PATH' || w.code === 'PARTIAL_EXPRESSION_PATH',
+			);
+
+			expect(expressionWarnings.length).toBeGreaterThan(0);
+			expect(expressionWarnings[0].message).toContain('$json.amount');
+		});
+
+		it('should not warn when $json references a field that exists in predecessor output', () => {
+			const webhookTrigger = trigger({
+				type: 'n8n-nodes-base.webhook',
+				version: 2,
+				config: {
+					name: 'Webhook',
+					pinData: [{ amount: 100, description: 'Laptop' }],
+				},
+			});
+
+			// This node correctly uses $json.amount - which exists in webhook output
+			const setNode = node({
+				type: 'n8n-nodes-base.set',
+				version: 3,
+				config: {
+					name: 'Set',
+					parameters: {
+						value: '={{ $json.amount }}', // CORRECT - amount exists in Webhook output
+					},
+				},
+			});
+
+			const wf = workflow('test', 'Test').add(webhookTrigger).then(setNode);
+
+			const result = wf.validate();
+			const expressionWarnings = result.warnings.filter(
+				(w) => w.code === 'INVALID_EXPRESSION_PATH' || w.code === 'PARTIAL_EXPRESSION_PATH',
+			);
+
+			expect(expressionWarnings).toHaveLength(0);
+		});
+
+		it('should warn when $("NodeName").item.json references a field that does not exist', () => {
+			const webhookTrigger = trigger({
+				type: 'n8n-nodes-base.webhook',
+				version: 2,
+				config: {
+					name: 'Webhook',
+					pinData: [{ amount: 100 }],
+				},
+			});
+
+			const processNode = node({
+				type: 'n8n-nodes-base.set',
+				version: 3,
+				config: {
+					name: 'Process',
+				},
+			});
+
+			// This node references a field that doesn't exist in Webhook output
+			const emailNode = node({
+				type: 'n8n-nodes-base.emailSend',
+				version: 2,
+				config: {
+					name: 'Send Email',
+					parameters: {
+						subject: '={{ $("Webhook").item.json.nonexistent }}', // nonexistent doesn't exist
+					},
+				},
+			});
+
+			const wf = workflow('test', 'Test').add(webhookTrigger).then(processNode).then(emailNode);
+
+			const result = wf.validate();
+			const expressionWarnings = result.warnings.filter(
+				(w) => w.code === 'INVALID_EXPRESSION_PATH',
+			);
+
+			expect(expressionWarnings.length).toBeGreaterThan(0);
+			expect(expressionWarnings[0].message).toContain('nonexistent');
+		});
+
+		it('should not warn when no pinData is available', () => {
+			// Without pinData, we can't validate expression paths
+			const webhookTrigger = trigger({
+				type: 'n8n-nodes-base.webhook',
+				version: 2,
+				config: { name: 'Webhook' },
+			});
+
+			const setNode = node({
+				type: 'n8n-nodes-base.set',
+				version: 3,
+				config: {
+					name: 'Set',
+					parameters: {
+						value: '={{ $json.anyField }}', // No warning without pinData
+					},
+				},
+			});
+
+			const wf = workflow('test', 'Test').add(webhookTrigger).then(setNode);
+
+			const result = wf.validate();
+			const expressionWarnings = result.warnings.filter(
+				(w) => w.code === 'INVALID_EXPRESSION_PATH' || w.code === 'PARTIAL_EXPRESSION_PATH',
+			);
+
+			expect(expressionWarnings).toHaveLength(0);
+		});
+
+		it('should warn for partial paths when some branches have the field and others do not', () => {
+			// Create an IF node that branches to two paths, then merge
+			// One branch provides a field, the other doesn't
+			const webhookTrigger = trigger({
+				type: 'n8n-nodes-base.webhook',
+				version: 2,
+				config: {
+					name: 'Webhook',
+					pinData: [{ amount: 100 }],
+				},
+			});
+
+			const branchA = node({
+				type: 'n8n-nodes-base.set',
+				version: 3,
+				config: {
+					name: 'Branch A',
+					pinData: [{ status: 'approved', amount: 100 }],
+				},
+			});
+
+			const branchB = node({
+				type: 'n8n-nodes-base.set',
+				version: 3,
+				config: {
+					name: 'Branch B',
+					pinData: [{ status: 'rejected' }], // No amount field
+				},
+			});
+
+			// This node gets input from both branches but only one has 'amount'
+			const finalNode = node({
+				type: 'n8n-nodes-base.set',
+				version: 3,
+				config: {
+					name: 'Final',
+					parameters: {
+						value: '={{ $json.amount }}', // exists in A but not B
+					},
+				},
+			});
+
+			// Build workflow with branches
+			const wf = workflow('test', 'Test')
+				.add(webhookTrigger.then(branchA))
+				.add(webhookTrigger.then(branchB))
+				.add(branchA.then(finalNode))
+				.add(branchB.then(finalNode));
+
+			const result = wf.validate();
+			const partialWarnings = result.warnings.filter((w) => w.code === 'PARTIAL_EXPRESSION_PATH');
+
+			expect(partialWarnings.length).toBeGreaterThan(0);
+			expect(partialWarnings[0].message).toContain('Branch A');
+			expect(partialWarnings[0].message).toContain('Branch B');
+		});
+
+		it('should use output property over pinData for expression validation', () => {
+			// When both output and pinData are set, output should take priority
+			const webhookTrigger = trigger({
+				type: 'n8n-nodes-base.webhook',
+				version: 2,
+				config: {
+					name: 'Webhook',
+					// pinData has 'oldField' but output has 'newField'
+					pinData: [{ oldField: 'from-pinData' }],
+					output: [{ newField: 'from-output' }],
+				},
+			});
+
+			const setNode = node({
+				type: 'n8n-nodes-base.set',
+				version: 3,
+				config: {
+					name: 'Set',
+					parameters: {
+						value: '={{ $json.newField }}', // Should validate against output, not pinData
+					},
+				},
+			});
+
+			const wf = workflow('test', 'Test').add(webhookTrigger).then(setNode);
+
+			const result = wf.validate();
+			const expressionWarnings = result.warnings.filter(
+				(w) => w.code === 'INVALID_EXPRESSION_PATH' || w.code === 'PARTIAL_EXPRESSION_PATH',
+			);
+
+			// No warning because 'newField' exists in output (which takes priority over pinData)
+			expect(expressionWarnings).toHaveLength(0);
+		});
+
+		it('should warn when referencing field that exists in pinData but not in output', () => {
+			// When output is set, pinData fields are ignored
+			const webhookTrigger = trigger({
+				type: 'n8n-nodes-base.webhook',
+				version: 2,
+				config: {
+					name: 'Webhook',
+					pinData: [{ oldField: 'from-pinData' }],
+					output: [{ newField: 'from-output' }],
+				},
+			});
+
+			const setNode = node({
+				type: 'n8n-nodes-base.set',
+				version: 3,
+				config: {
+					name: 'Set',
+					parameters: {
+						value: '={{ $json.oldField }}', // oldField only in pinData, not output
+					},
+				},
+			});
+
+			const wf = workflow('test', 'Test').add(webhookTrigger).then(setNode);
+
+			const result = wf.validate();
+			const expressionWarnings = result.warnings.filter(
+				(w) => w.code === 'INVALID_EXPRESSION_PATH',
+			);
+
+			// Should warn because 'oldField' doesn't exist in output (which takes priority)
+			expect(expressionWarnings).toHaveLength(1);
+			expect(expressionWarnings[0].message).toContain('oldField');
+		});
+
+		it('should fall back to pinData when output is not set', () => {
+			// Without output property, pinData should be used
+			const webhookTrigger = trigger({
+				type: 'n8n-nodes-base.webhook',
+				version: 2,
+				config: {
+					name: 'Webhook',
+					pinData: [{ amount: 100 }], // No output property
+				},
+			});
+
+			const setNode = node({
+				type: 'n8n-nodes-base.set',
+				version: 3,
+				config: {
+					name: 'Set',
+					parameters: {
+						value: '={{ $json.amount }}', // Should validate against pinData
+					},
+				},
+			});
+
+			const wf = workflow('test', 'Test').add(webhookTrigger).then(setNode);
+
+			const result = wf.validate();
+			const expressionWarnings = result.warnings.filter(
+				(w) => w.code === 'INVALID_EXPRESSION_PATH' || w.code === 'PARTIAL_EXPRESSION_PATH',
+			);
+
+			// No warning because 'amount' exists in pinData (fallback)
+			expect(expressionWarnings).toHaveLength(0);
+		});
+	});
 });

@@ -3,6 +3,48 @@ import markdownLink from 'markdown-it-link-attributes';
 
 import { useI18n } from '../../../composables/useI18n';
 
+export interface ContentSegment {
+	type: 'text' | 'thinking';
+	content: string;
+}
+
+/**
+ * Parse content to extract thinking tags as segments.
+ * - Complete tags: extracted as thinking segments
+ * - Incomplete tags (streaming): hidden along with content after
+ * - Text before/between tags: extracted as text segments
+ */
+export function parseThinkingSegments(content: string): ContentSegment[] {
+	const segments: ContentSegment[] = [];
+	const regex = /<n8n_thinking>([\s\S]*?)<\/n8n_thinking>/gi;
+	let lastIndex = 0;
+	let match;
+
+	while ((match = regex.exec(content)) !== null) {
+		// Add text before the thinking tag
+		if (match.index > lastIndex) {
+			segments.push({ type: 'text', content: content.slice(lastIndex, match.index) });
+		}
+		// Add thinking content
+		segments.push({ type: 'thinking', content: match[1].trim() });
+		lastIndex = regex.lastIndex;
+	}
+
+	// Handle remaining text (and incomplete thinking tags for streaming)
+	const remaining = content.slice(lastIndex);
+	const incompleteTagIndex = remaining.indexOf('<n8n_thinking>');
+	if (incompleteTagIndex !== -1) {
+		// Only include text before incomplete tag
+		if (incompleteTagIndex > 0) {
+			segments.push({ type: 'text', content: remaining.slice(0, incompleteTagIndex) });
+		}
+	} else if (remaining) {
+		segments.push({ type: 'text', content: remaining });
+	}
+
+	return segments;
+}
+
 export function useMarkdown() {
 	const { t } = useI18n();
 
@@ -17,34 +59,9 @@ export function useMarkdown() {
 		},
 	});
 
-	/**
-	 * Process <n8n_thinking> tags into collapsible sections.
-	 * - Complete tags: transform to <details> elements
-	 * - Incomplete tags (streaming): hide the tag and content after it
-	 */
-	function processThinkingTags(content: string): string {
-		// First, transform complete <n8n_thinking>...</n8n_thinking> pairs into collapsible details
-		let processed = content.replace(
-			/<n8n_thinking>([\s\S]*?)<\/n8n_thinking>/gi,
-			(_, innerContent: string) => {
-				return `<details class="n8n-thinking-section"><summary>Thinking...</summary>\n\n${innerContent.trim()}\n\n</details>`;
-			},
-		);
-
-		// Then, hide any incomplete opening tag (streaming case)
-		// If there's an <n8n_thinking> without a closing tag, remove it and everything after
-		const incompleteTagIndex = processed.indexOf('<n8n_thinking>');
-		if (incompleteTagIndex !== -1) {
-			processed = processed.substring(0, incompleteTagIndex);
-		}
-
-		return processed;
-	}
-
 	function renderMarkdown(content: string) {
 		try {
-			const processedContent = processThinkingTags(content);
-			return md.render(processedContent);
+			return md.render(content);
 		} catch (e) {
 			console.error(`Error parsing markdown content ${content}`);
 			return `<p>${t('assistantChat.errorParsingMarkdown')}</p>`;

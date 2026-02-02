@@ -8,7 +8,7 @@ import type { WorkflowJSON } from '../types/base';
 import type { SemanticGraph, SemanticNode, AiConnectionType } from './types';
 import type { Schema } from 'n8n-workflow';
 import type { NodeExecutionStatus } from './execution-status';
-import { generateSchemaJSDoc } from './execution-schema-jsdoc';
+import { generateSchemaJSDoc, schemaToOutputSample } from './execution-schema-jsdoc';
 import type {
 	CompositeTree,
 	CompositeNode,
@@ -576,6 +576,16 @@ function generateNodeConfig(node: SemanticNode, ctx: GenerationContext): string 
 		parts.push(`${innerIndent}config: { ${configParts.join(', ')} }`);
 	} else {
 		parts.push(`${innerIndent}config: {}`);
+	}
+
+	// Add output from execution schema if available (for data flow awareness)
+	const nodeName = node.json.name;
+	if (nodeName && ctx.nodeSchemas?.has(nodeName)) {
+		const schema = ctx.nodeSchemas.get(nodeName)!;
+		const outputSample = schemaToOutputSample(schema);
+		if (outputSample && Object.keys(outputSample).length > 0) {
+			parts.push(`${innerIndent}output: [${formatValue(outputSample, ctx)}]`);
+		}
 	}
 
 	return `{\n${parts.join(',\n')}\n${indent}}`;

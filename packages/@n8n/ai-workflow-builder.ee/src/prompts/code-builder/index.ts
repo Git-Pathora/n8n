@@ -619,9 +619,25 @@ Your code must:
 Now, analyze the user's request and generate the workflow code following all the steps above.`;
 
 /**
- * Build the complete system prompt for the code builder agent
+ * History context for multi-turn conversations
  */
-export function buildCodeBuilderPrompt(currentWorkflow?: WorkflowJSON): ChatPromptTemplate {
+export interface HistoryContext {
+	/** Previous user messages in this session */
+	userMessages: string[];
+	/** Compacted summary of older conversations (if any) */
+	previousSummary?: string;
+}
+
+/**
+ * Build the complete system prompt for the code builder agent
+ *
+ * @param currentWorkflow - Optional current workflow JSON context
+ * @param historyContext - Optional conversation history for multi-turn refinement
+ */
+export function buildCodeBuilderPrompt(
+	currentWorkflow?: WorkflowJSON,
+	historyContext?: HistoryContext,
+): ChatPromptTemplate {
 	const systemMessage = [
 		ROLE,
 		WORKFLOW_RULES,
@@ -633,14 +649,36 @@ export function buildCodeBuilderPrompt(currentWorkflow?: WorkflowJSON): ChatProm
 	// User message template
 	const userMessageParts: string[] = [];
 
+	// 1. Compacted summary (if exists from previous compactions)
+	if (historyContext?.previousSummary) {
+		userMessageParts.push(
+			`<conversation_summary>\n${escapeCurlyBrackets(historyContext.previousSummary)}\n</conversation_summary>`,
+		);
+	}
+
+	// 2. Previous user requests (raw messages for recent context)
+	if (historyContext?.userMessages && historyContext.userMessages.length > 0) {
+		userMessageParts.push('<previous_requests>');
+		historyContext.userMessages.forEach((msg, i) => {
+			userMessageParts.push(`${i + 1}. ${escapeCurlyBrackets(msg)}`);
+		});
+		userMessageParts.push('</previous_requests>');
+	}
+
+	// 3. Current workflow context (existing logic)
 	if (currentWorkflow) {
 		// Convert WorkflowJSON to SDK code and escape curly brackets for LangChain
 		const workflowCode = generateWorkflowCode(currentWorkflow);
 		const escapedWorkflowCode = escapeCurlyBrackets(workflowCode);
 		userMessageParts.push(`<current_workflow>\n${escapedWorkflowCode}\n</current_workflow>`);
+	}
+
+	// 4. Add context separator if we have any context
+	if (userMessageParts.length > 0) {
 		userMessageParts.push('\nUser request:');
 	}
 
+	// 5. Current user message (the actual request)
 	userMessageParts.push('{userMessage}');
 
 	const userMessageTemplate = userMessageParts.join('\n');

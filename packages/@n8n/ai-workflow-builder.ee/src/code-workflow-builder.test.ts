@@ -197,6 +197,7 @@ describe('CodeWorkflowBuilder', () => {
 			expect(mockLogger.debug).toHaveBeenCalledWith('CodeWorkflowBuilder starting', {
 				userId: 'user-456',
 				messageLength: 5,
+				hasCheckpointer: false,
 			});
 		});
 	});

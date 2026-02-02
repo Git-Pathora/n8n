@@ -21,7 +21,7 @@ import type { WorkflowJSON } from '@n8n/workflow-sdk';
 
 import { extractWorkflowCode } from './utils/extract-code';
 import { NodeTypeParser } from './utils/node-type-parser';
-import { buildCodeBuilderPrompt } from './prompts/code-builder';
+import { buildCodeBuilderPrompt, type HistoryContext } from './prompts/code-builder';
 import { createCodeBuilderSearchTool } from './tools/code-builder-search.tool';
 import { createCodeBuilderGetTool } from './tools/code-builder-get.tool';
 import { createGetSuggestedNodesTool } from './tools/get-suggested-nodes.tool';
@@ -171,11 +171,17 @@ export class CodeBuilderAgent {
 	/**
 	 * Main chat method - generates workflow and streams output
 	 * Implements an agentic loop that handles tool calls for node discovery
+	 *
+	 * @param payload - Chat payload with message and workflow context
+	 * @param userId - User ID for logging
+	 * @param abortSignal - Optional abort signal
+	 * @param historyContext - Optional conversation history for multi-turn refinement
 	 */
 	async *chat(
 		payload: ChatPayload,
 		userId: string,
 		abortSignal?: AbortSignal,
+		historyContext?: HistoryContext,
 	): AsyncGenerator<StreamOutput, void, unknown> {
 		const startTime = Date.now();
 		this.debugLog('CHAT', '========== STARTING CHAT ==========');
@@ -205,8 +211,12 @@ export class CodeBuilderAgent {
 				});
 			}
 
-			const prompt = buildCodeBuilderPrompt(currentWorkflow);
-			this.debugLog('CHAT', 'Prompt built successfully');
+			const prompt = buildCodeBuilderPrompt(currentWorkflow, historyContext);
+			this.debugLog('CHAT', 'Prompt built successfully', {
+				hasHistoryContext: !!historyContext,
+				historyMessagesCount: historyContext?.userMessages?.length ?? 0,
+				hasPreviousSummary: !!historyContext?.previousSummary,
+			});
 
 			// Bind tools to LLM
 			this.debugLog('CHAT', 'Binding tools to LLM...');

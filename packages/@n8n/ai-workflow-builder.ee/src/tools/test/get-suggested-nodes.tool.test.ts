@@ -133,8 +133,8 @@ describe('GetSuggestedNodesTool', () => {
 
 			const result = await tool.invoke({ categories: ['chatbot'] });
 
-			// Agent has note "Always connect memory for conversation context"
-			expect(result).toContain('Always connect memory for conversation context');
+			// Agent has note "For multi-turn conversations, connect memory to maintain context"
+			expect(result).toContain('For multi-turn conversations, connect memory to maintain context');
 		});
 
 		it('should not include note marker when no note', async () => {

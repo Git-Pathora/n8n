@@ -21,11 +21,11 @@ export const suggestedNodesData: Record<string, CategoryData> = {
 		nodes: [
 			{
 				name: '@n8n/n8n-nodes-langchain.chatTrigger',
-				note: 'For production, prefer platform triggers (Slack, Telegram)',
+				note: 'For production deployments, consider platform triggers (Slack, Telegram) over built-in chat',
 			},
 			{
 				name: '@n8n/n8n-nodes-langchain.agent',
-				note: 'Always connect memory for conversation context',
+				note: 'For multi-turn conversations, connect memory to maintain context',
 			},
 			{ name: '@n8n/n8n-nodes-langchain.lmChatOpenAi' },
 			{ name: '@n8n/n8n-nodes-langchain.lmChatGoogleGemini' },
@@ -58,7 +58,10 @@ export const suggestedNodesData: Record<string, CategoryData> = {
 				note: 'For services without dedicated nodes (Teams, Discord)',
 			},
 			{ name: 'n8n-nodes-base.if', note: 'Check alert conditions before sending' },
-			{ name: 'n8n-nodes-base.switch', note: 'Route by severity/type to different channels' },
+			{
+				name: 'n8n-nodes-base.switch',
+				note: 'If routing by severity/type is needed, use Switch to direct to different channels',
+			},
 		],
 	},
 
@@ -92,7 +95,10 @@ export const suggestedNodesData: Record<string, CategoryData> = {
 			{ name: 'n8n-nodes-base.sort' },
 			{ name: 'n8n-nodes-base.limit' },
 			{ name: 'n8n-nodes-base.removeDuplicates' },
-			{ name: 'n8n-nodes-base.splitInBatches', note: 'Use for 100+ items to prevent timeouts' },
+			{
+				name: 'n8n-nodes-base.splitInBatches',
+				note: 'For large datasets (100+ items), batch processing prevents timeouts',
+			},
 		],
 	},
 
@@ -103,9 +109,12 @@ export const suggestedNodesData: Record<string, CategoryData> = {
 			{ name: 'n8n-nodes-base.dataTable', note: 'PREFERRED - no external config needed' },
 			{
 				name: 'n8n-nodes-base.googleSheets',
-				note: 'Good for collaboration, degrades >10k rows',
+				note: 'For collaboration needs; if >10k rows expected, consider DataTable instead',
 			},
-			{ name: 'n8n-nodes-base.airtable', note: 'Supports relationships between tables' },
+			{
+				name: 'n8n-nodes-base.airtable',
+				note: 'If relationships between tables are needed, Airtable supports them',
+			},
 			{ name: 'n8n-nodes-base.postgres' },
 			{ name: 'n8n-nodes-base.mySql' },
 			{ name: 'n8n-nodes-base.mongoDb' },
@@ -116,7 +125,10 @@ export const suggestedNodesData: Record<string, CategoryData> = {
 		description: 'Pulling specific information from structured or unstructured inputs',
 		patternHint: 'Source → Extract → Parse → Structure',
 		nodes: [
-			{ name: 'n8n-nodes-base.extractFromFile', note: 'Check file type with IF/Switch first' },
+			{
+				name: 'n8n-nodes-base.extractFromFile',
+				note: 'For multiple file types, route by file type first with IF/Switch',
+			},
 			{ name: 'n8n-nodes-base.htmlExtract', note: 'JS-rendered content may be empty' },
 			{ name: 'n8n-nodes-base.splitOut', note: 'Use before Loop Over Items for arrays' },
 			{
@@ -138,12 +150,12 @@ export const suggestedNodesData: Record<string, CategoryData> = {
 		nodes: [
 			{
 				name: 'n8n-nodes-base.gmailTrigger',
-				note: 'Set Simplify=FALSE, Download Attachments=TRUE',
+				note: 'To access attachments, set Simplify=FALSE and Download Attachments=TRUE',
 			},
 			{ name: 'n8n-nodes-base.googleDriveTrigger' },
 			{
 				name: 'n8n-nodes-base.extractFromFile',
-				note: 'Each file type needs different operation',
+				note: 'Different file types require different operations - route accordingly',
 			},
 			{ name: 'n8n-nodes-base.awsTextract', note: 'For tables and forms in scanned docs' },
 			{ name: 'n8n-nodes-base.mindee', note: 'Specialized invoice/receipt parsing' },
@@ -194,12 +206,18 @@ export const suggestedNodesData: Record<string, CategoryData> = {
 		nodes: [
 			{ name: 'n8n-nodes-base.if', note: 'Simple binary decisions' },
 			{ name: 'n8n-nodes-base.switch', note: 'ALWAYS configure Default output' },
-			{ name: 'n8n-nodes-base.merge', note: 'Consolidate branches for unified logging' },
+			{
+				name: 'n8n-nodes-base.merge',
+				note: 'If unified logging is needed, use Merge to consolidate branches',
+			},
 			{
 				name: '@n8n/n8n-nodes-langchain.textClassifier',
 				note: 'Set "When No Clear Match" to Other branch',
 			},
-			{ name: '@n8n/n8n-nodes-langchain.agent', note: 'Use temperature 0-0.2 for consistency' },
+			{
+				name: '@n8n/n8n-nodes-langchain.agent',
+				note: 'For consistent/deterministic classification, use temperature 0-0.2',
+			},
 		],
 	},
 
@@ -207,7 +225,10 @@ export const suggestedNodesData: Record<string, CategoryData> = {
 		description: 'Collecting information from websites or APIs',
 		patternHint: 'Trigger → Fetch → Extract → Store',
 		nodes: [
-			{ name: 'n8n-nodes-base.httpRequest', note: 'For social media, use Phantombuster instead' },
+			{
+				name: 'n8n-nodes-base.httpRequest',
+				note: 'For social media scraping (LinkedIn, Facebook), Phantombuster is more reliable than HTTP Request',
+			},
 			{ name: 'n8n-nodes-base.htmlExtract', note: 'JS-rendered sites may return empty' },
 			{ name: 'n8n-nodes-base.splitInBatches', note: 'Process 200 rows at a time' },
 			{ name: 'n8n-nodes-base.wait', note: 'Avoid rate limits (429 errors)' },

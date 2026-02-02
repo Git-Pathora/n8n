@@ -16,7 +16,7 @@ export class Gmail extends VersionedNodeType {
 			defaultVersion: 2.2,
 			builderHint: {
 				message:
-					'To fetch emails on a schedule, prefer n8n-nodes-base.gmailTrigger instead of combining scheduleTrigger with Gmail getAll operation.',
+					'For scheduled email fetching, Gmail Trigger is simpler than combining Schedule Trigger with Gmail getAll.',
 				relatedNodes: [
 					{
 						nodeType: 'n8n-nodes-base.gmailTrigger',

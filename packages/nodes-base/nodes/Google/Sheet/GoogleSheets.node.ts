@@ -16,7 +16,7 @@ export class GoogleSheets extends VersionedNodeType {
 			description: 'Read, update and write data to Google Sheets',
 			builderHint: {
 				message:
-					'For storing workflow data (e.g., job leads, records), prefer n8n-nodes-base.dataTable with upsert operation to avoid duplicates. Use Google Sheets only when user explicitly needs spreadsheet integration.',
+					'For workflow data storage, DataTable with upsert avoids duplicates. Use Google Sheets when spreadsheet collaboration is specifically needed.',
 				relatedNodes: [
 					{
 						nodeType: 'n8n-nodes-base.dataTable',

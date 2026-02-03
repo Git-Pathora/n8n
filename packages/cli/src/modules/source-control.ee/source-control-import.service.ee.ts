@@ -455,9 +455,17 @@ export class SourceControlImportService {
 					// Remove oauthTokenData as it's excluded from export
 					const { oauthTokenData, ...rest } = decryptedData;
 					sanitizedData = sanitizeCredentialData({ ...rest });
-				} catch {
+				} catch (error) {
 					// If decryption fails, leave data undefined
 					// This matches existing behavior where decryption errors are handled gracefully
+					// Only log safe error information to avoid potential credential data leakage
+					this.logger.warn(
+						`Failed to decrypt credential "${local.name}" (ID: ${local.id}) for status comparison`,
+						{
+							credentialType: local.type,
+							errorMessage: error instanceof Error ? error.message : 'Unknown error',
+						},
+					);
 				}
 			}
 

@@ -649,7 +649,7 @@ function mapNestedPropertyType(
 
 	switch (prop.type) {
 		case 'string':
-			return 'string | Expression<string>';
+			return 'string | Expression<string> | PlaceholderValue';
 		case 'number':
 			return 'number | Expression<number>';
 		case 'boolean':
@@ -1063,7 +1063,7 @@ export function mapPropertyType(
 
 	switch (prop.type) {
 		case 'string':
-			return 'string | Expression<string>';
+			return 'string | Expression<string> | PlaceholderValue';
 
 		case 'number':
 			return 'number | Expression<number>';

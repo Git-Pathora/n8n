@@ -355,7 +355,7 @@ describe('generate-types', () => {
 		it('should map string type with Expression wrapper', () => {
 			const prop: NodeProperty = { name: 'url', displayName: 'URL', type: 'string', default: '' };
 			const result = generateTypes.mapPropertyType(prop);
-			expect(result).toBe('string | Expression<string>');
+			expect(result).toBe('string | Expression<string> | PlaceholderValue');
 		});
 
 		it('should map number type with Expression wrapper', () => {
@@ -644,7 +644,7 @@ describe('generate-types', () => {
 			const result = generateTypes.mapPropertyType(prop);
 			// Should generate nested structure with proper types
 			expect(result).toContain('systemMessage?:');
-			expect(result).toContain('string | Expression<string>');
+			expect(result).toContain('string | Expression<string> | PlaceholderValue');
 			expect(result).toContain('maxIterations?:');
 			expect(result).toContain('number | Expression<number>');
 			expect(result).toContain('returnIntermediateSteps?:');
@@ -724,6 +724,72 @@ describe('generate-types', () => {
 			const result = generateTypes.mapPropertyType(prop);
 			// Should include @builderHint in the JSDoc for the group (not just nested property)
 			expect(result).toContain('@builderHint You can add multiple intervals');
+		});
+
+		// PlaceholderValue tests - string type should include PlaceholderValue, other types should not
+		it('should NOT include PlaceholderValue in options type', () => {
+			const prop: NodeProperty = {
+				name: 'method',
+				displayName: 'Method',
+				type: 'options',
+				options: [
+					{ name: 'GET', value: 'GET' },
+					{ name: 'POST', value: 'POST' },
+				],
+				default: 'GET',
+			};
+			const result = generateTypes.mapPropertyType(prop);
+			expect(result).toBe("'GET' | 'POST' | Expression<string>");
+			expect(result).not.toContain('PlaceholderValue');
+		});
+
+		it('should NOT include PlaceholderValue in json type', () => {
+			const prop: NodeProperty = {
+				name: 'body',
+				displayName: 'Body',
+				type: 'json',
+				default: '{}',
+			};
+			const result = generateTypes.mapPropertyType(prop);
+			expect(result).toBe('IDataObject | string | Expression<string>');
+			expect(result).not.toContain('PlaceholderValue');
+		});
+
+		it('should NOT include PlaceholderValue in dateTime type', () => {
+			const prop: NodeProperty = {
+				name: 'startDate',
+				displayName: 'Start Date',
+				type: 'dateTime',
+				default: '',
+			};
+			const result = generateTypes.mapPropertyType(prop);
+			expect(result).toBe('string | Expression<string>');
+			expect(result).not.toContain('PlaceholderValue');
+		});
+
+		it('should NOT include PlaceholderValue in color type', () => {
+			const prop: NodeProperty = {
+				name: 'backgroundColor',
+				displayName: 'Background Color',
+				type: 'color',
+				default: '#ffffff',
+			};
+			const result = generateTypes.mapPropertyType(prop);
+			expect(result).toBe('string | Expression<string>');
+			expect(result).not.toContain('PlaceholderValue');
+		});
+
+		it('should NOT include PlaceholderValue in resourceLocator type', () => {
+			const prop: NodeProperty = {
+				name: 'channel',
+				displayName: 'Channel',
+				type: 'resourceLocator',
+				default: {},
+				modes: [{ name: 'list' }, { name: 'id' }],
+			};
+			const result = generateTypes.mapPropertyType(prop);
+			expect(result).toContain('__rl: true');
+			expect(result).not.toContain('PlaceholderValue');
 		});
 	});
 
@@ -2050,7 +2116,7 @@ describe('generate-types', () => {
 				default: null,
 			};
 			const result = generateTypes.mapPropertyType(prop);
-			expect(result).toBe('string | Expression<string>');
+			expect(result).toBe('string | Expression<string> | PlaceholderValue');
 		});
 
 		it('should handle options with numeric values', () => {

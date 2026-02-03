@@ -101,6 +101,15 @@ export interface CredentialReference {
 }
 
 /**
+ * Opaque placeholder value returned by placeholder().
+ * CANNOT be concatenated with strings - must be assigned as the entire value.
+ */
+export interface PlaceholderValue {
+	readonly __placeholder: true;
+	readonly hint: string;
+}
+
+/**
  * Error handling behavior for nodes
  */
 export type OnError = 'stopWorkflow' | 'continueRegularOutput' | 'continueErrorOutput';
@@ -556,12 +565,21 @@ export type StickyFn = (
 
 /**
  * placeholder(hint) - Creates a placeholder for user input
- * Use for simple string parameters only
  *
- * @example Single value
+ * Returns an opaque PlaceholderValue object that CANNOT be concatenated or used
+ * in string interpolation. Placeholders must be assigned to entire parameter values.
+ *
+ * CORRECT:
+ *   parameters: { url: placeholder('Full API URL (e.g., https://api.example.com/v1/users)') }
+ *
+ * WRONG - will cause type errors:
+ *   parameters: { url: 'https://api.example.com/' + placeholder('path') }  // NO!
+ *   parameters: { url: \`https://api.example.com/\${placeholder('path')}\` }  // NO!
+ *
+ * @example
  * parameters: { url: placeholder('API endpoint URL (e.g., https://api.example.com/v1)') }
  */
-export type PlaceholderFn = (hint: string) => string;
+export type PlaceholderFn = (hint: string) => PlaceholderValue;
 
 /**
  * newCredential(name) - Creates a new credential marker

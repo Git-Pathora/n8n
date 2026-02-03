@@ -1390,8 +1390,26 @@ describe('graph validation', () => {
 		});
 	});
 
-	describe('checkMultipleManualTriggers', () => {
-		test('returns no error when workflow has single ManualTrigger', () => {
+	describe('checkMaxNodes', () => {
+		// Mock nodeTypesProvider for maxNodes validation
+		const createMockNodeTypesProvider = (maxNodesMap: Record<string, number>) => ({
+			getByNameAndVersion: (type: string, _version: number) => {
+				const maxNodes = maxNodesMap[type];
+				if (maxNodes === undefined) return undefined;
+				return {
+					description: {
+						maxNodes,
+						displayName: type.split('.').pop() ?? type,
+					},
+				};
+			},
+		});
+
+		test('returns no error when node count is within maxNodes limit', () => {
+			const nodeTypesProvider = createMockNodeTypesProvider({
+				'n8n-nodes-base.manualTrigger': 1,
+			});
+
 			const wf = workflow('test-id', 'Test Workflow').add(
 				trigger({
 					type: 'n8n-nodes-base.manualTrigger',
@@ -1400,13 +1418,17 @@ describe('graph validation', () => {
 				}),
 			);
 
-			const result = wf.validate();
+			const result = wf.validate({ nodeTypesProvider: nodeTypesProvider as never });
 
-			const multiTriggerError = result.errors.find((e) => e.code === 'MULTIPLE_MANUAL_TRIGGERS');
-			expect(multiTriggerError).toBeUndefined();
+			const maxNodesError = result.errors.find((e) => e.code === 'MAX_NODES_EXCEEDED');
+			expect(maxNodesError).toBeUndefined();
 		});
 
-		test('returns error when workflow has multiple ManualTrigger nodes', () => {
+		test('returns error when workflow exceeds maxNodes limit', () => {
+			const nodeTypesProvider = createMockNodeTypesProvider({
+				'n8n-nodes-base.manualTrigger': 1,
+			});
+
 			const wf = workflow('test-id', 'Test Workflow')
 				.add(
 					trigger({
@@ -1423,18 +1445,157 @@ describe('graph validation', () => {
 					}),
 				);
 
-			const result = wf.validate();
+			const result = wf.validate({ nodeTypesProvider: nodeTypesProvider as never });
 
 			expect(result.valid).toBe(false);
 			expect(result.errors).toContainEqual(
 				expect.objectContaining({
-					code: 'MULTIPLE_MANUAL_TRIGGERS',
-					message: expect.stringContaining('2 ManualTrigger nodes'),
+					code: 'MAX_NODES_EXCEEDED',
+					message: expect.stringContaining('2'),
 				}),
 			);
 		});
 
-		test('allows mixing ManualTrigger with other trigger types', () => {
+		test('returns error for chat trigger when maxNodes: 1 exceeded', () => {
+			const nodeTypesProvider = createMockNodeTypesProvider({
+				'@n8n/n8n-nodes-langchain.chatTrigger': 1,
+			});
+
+			const wf = workflow('test-id', 'Test Workflow')
+				.add(
+					trigger({
+						type: '@n8n/n8n-nodes-langchain.chatTrigger',
+						version: 1.1,
+						config: { name: 'Chat 1' },
+					}),
+				)
+				.add(
+					trigger({
+						type: '@n8n/n8n-nodes-langchain.chatTrigger',
+						version: 1.1,
+						config: { name: 'Chat 2' },
+					}),
+				);
+
+			const result = wf.validate({ nodeTypesProvider: nodeTypesProvider as never });
+
+			expect(result.valid).toBe(false);
+			expect(result.errors).toContainEqual(
+				expect.objectContaining({
+					code: 'MAX_NODES_EXCEEDED',
+				}),
+			);
+		});
+
+		test('allows maxNodes: 2 when exactly 2 nodes exist', () => {
+			const nodeTypesProvider = createMockNodeTypesProvider({
+				'n8n-nodes-base.set': 2,
+			});
+
+			const wf = workflow('test-id', 'Test Workflow')
+				.add(
+					trigger({
+						type: 'n8n-nodes-base.manualTrigger',
+						version: 1.1,
+						config: { name: 'Start' },
+					}),
+				)
+				.then(
+					node({
+						type: 'n8n-nodes-base.set',
+						version: 3.4,
+						config: { name: 'Set 1' },
+					}),
+				)
+				.then(
+					node({
+						type: 'n8n-nodes-base.set',
+						version: 3.4,
+						config: { name: 'Set 2' },
+					}),
+				);
+
+			const result = wf.validate({ nodeTypesProvider: nodeTypesProvider as never });
+
+			const maxNodesError = result.errors.find((e) => e.code === 'MAX_NODES_EXCEEDED');
+			expect(maxNodesError).toBeUndefined();
+		});
+
+		test('returns error when exceeding maxNodes: 2', () => {
+			const nodeTypesProvider = createMockNodeTypesProvider({
+				'n8n-nodes-base.set': 2,
+			});
+
+			const set1 = node({
+				type: 'n8n-nodes-base.set',
+				version: 3.4,
+				config: { name: 'Set 1' },
+			});
+			const set2 = node({
+				type: 'n8n-nodes-base.set',
+				version: 3.4,
+				config: { name: 'Set 2' },
+			});
+			const set3 = node({
+				type: 'n8n-nodes-base.set',
+				version: 3.4,
+				config: { name: 'Set 3' },
+			});
+
+			const wf = workflow('test-id', 'Test Workflow')
+				.add(
+					trigger({
+						type: 'n8n-nodes-base.manualTrigger',
+						version: 1.1,
+						config: { name: 'Start' },
+					}),
+				)
+				.then(set1)
+				.then(set2)
+				.then(set3);
+
+			const result = wf.validate({ nodeTypesProvider: nodeTypesProvider as never });
+
+			expect(result.valid).toBe(false);
+			expect(result.errors).toContainEqual(
+				expect.objectContaining({
+					code: 'MAX_NODES_EXCEEDED',
+					message: expect.stringContaining('3'),
+				}),
+			);
+		});
+
+		test('skips validation when nodeTypesProvider not provided', () => {
+			const wf = workflow('test-id', 'Test Workflow')
+				.add(
+					trigger({
+						type: 'n8n-nodes-base.manualTrigger',
+						version: 1.1,
+						config: { name: 'Start 1' },
+					}),
+				)
+				.add(
+					trigger({
+						type: 'n8n-nodes-base.manualTrigger',
+						version: 1.1,
+						config: { name: 'Start 2' },
+					}),
+				);
+
+			// No nodeTypesProvider - validation should be skipped
+			const result = wf.validate();
+
+			// No error because maxNodes validation requires nodeTypesProvider
+			const maxNodesError = result.errors.find((e) => e.code === 'MAX_NODES_EXCEEDED');
+			expect(maxNodesError).toBeUndefined();
+		});
+
+		test('allows mixing different node types with maxNodes: 1', () => {
+			const nodeTypesProvider = createMockNodeTypesProvider({
+				'n8n-nodes-base.manualTrigger': 1,
+				'n8n-nodes-base.scheduleTrigger': 1,
+			});
+
 			const wf = workflow('test-id', 'Test Workflow')
 				.add(
 					trigger({
@@ -1451,10 +1612,10 @@ describe('graph validation', () => {
 					}),
 				);
 
-			const result = wf.validate();
+			const result = wf.validate({ nodeTypesProvider: nodeTypesProvider as never });
 
-			const multiTriggerError = result.errors.find((e) => e.code === 'MULTIPLE_MANUAL_TRIGGERS');
-			expect(multiTriggerError).toBeUndefined();
+			const maxNodesError = result.errors.find((e) => e.code === 'MAX_NODES_EXCEEDED');
+			expect(maxNodesError).toBeUndefined();
 		});
 	});
 });

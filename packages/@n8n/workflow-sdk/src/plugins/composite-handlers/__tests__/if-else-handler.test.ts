@@ -1,11 +1,12 @@
 import { ifElseHandler } from '../if-else-handler';
-import type { IfElseComposite, NodeInstance } from '../../../types/base';
+import type { IfElseComposite, NodeInstance, GraphNode } from '../../../types/base';
+import type { MutablePluginContext } from '../../types';
 
 // Helper to create a mock if node
-function createMockIfNode(): NodeInstance<string, string, unknown> {
+function createMockIfNode(name = 'If Node'): NodeInstance<string, string, unknown> {
 	return {
 		type: 'n8n-nodes-base.if',
-		name: 'If Node',
+		name,
 		version: '2',
 		config: { parameters: {} },
 	} as NodeInstance<string, string, unknown>;
@@ -24,16 +25,50 @@ function createMockNode(name: string): NodeInstance<string, string, unknown> {
 // Helper to create a mock IfElseComposite
 function createIfElseComposite(
 	options: {
-		trueBranch?: NodeInstance<string, string, unknown> | null;
-		falseBranch?: NodeInstance<string, string, unknown> | null;
+		ifNodeName?: string;
+		trueBranch?:
+			| NodeInstance<string, string, unknown>
+			| NodeInstance<string, string, unknown>[]
+			| null;
+		falseBranch?:
+			| NodeInstance<string, string, unknown>
+			| NodeInstance<string, string, unknown>[]
+			| null;
 	} = {},
 ): IfElseComposite {
 	return {
 		_isIfElseComposite: true,
-		ifNode: createMockIfNode(),
-		trueBranch: options.trueBranch ?? createMockNode('True Branch'),
-		falseBranch: options.falseBranch ?? createMockNode('False Branch'),
+		ifNode: createMockIfNode(options.ifNodeName),
+		// Use 'in' operator to check if property was explicitly provided (even if null)
+		trueBranch: 'trueBranch' in options ? options.trueBranch : createMockNode('True Branch'),
+		falseBranch: 'falseBranch' in options ? options.falseBranch : createMockNode('False Branch'),
 	} as IfElseComposite;
+}
+
+// Helper to create a mock MutablePluginContext
+function createMockContext(): MutablePluginContext {
+	const nodes = new Map<string, GraphNode>();
+	return {
+		nodes,
+		workflowId: 'test-workflow',
+		workflowName: 'Test Workflow',
+		settings: {},
+		addNodeWithSubnodes: jest.fn((node: NodeInstance<string, string, unknown>) => {
+			nodes.set(node.name, {
+				instance: node,
+				connections: new Map(),
+			});
+			return node.name;
+		}),
+		addBranchToGraph: jest.fn((branch: unknown) => {
+			const branchNode = branch as NodeInstance<string, string, unknown>;
+			nodes.set(branchNode.name, {
+				instance: branchNode,
+				connections: new Map(),
+			});
+			return branchNode.name;
+		}),
+	};
 }
 
 describe('ifElseHandler', () => {
@@ -73,6 +108,132 @@ describe('ifElseHandler', () => {
 		it('returns false for primitive values', () => {
 			expect(ifElseHandler.canHandle('string')).toBe(false);
 			expect(ifElseHandler.canHandle(123)).toBe(false);
+		});
+	});
+
+	describe('addNodes', () => {
+		it('returns the IF node name as head', () => {
+			const composite = createIfElseComposite({ ifNodeName: 'My If' });
+			const ctx = createMockContext();
+
+			const headName = ifElseHandler.addNodes(composite, ctx);
+
+			expect(headName).toBe('My If');
+		});
+
+		it('adds IF node to the context nodes map', () => {
+			const composite = createIfElseComposite();
+			const ctx = createMockContext();
+
+			ifElseHandler.addNodes(composite, ctx);
+
+			expect(ctx.nodes.has('If Node')).toBe(true);
+			expect(ctx.nodes.get('If Node')?.instance).toBe(composite.ifNode);
+		});
+
+		it('adds true branch using addBranchToGraph', () => {
+			const trueBranch = createMockNode('True Branch');
+			const composite = createIfElseComposite({ trueBranch });
+			const ctx = createMockContext();
+
+			ifElseHandler.addNodes(composite, ctx);
+
+			expect(ctx.addBranchToGraph).toHaveBeenCalledWith(trueBranch);
+		});
+
+		it('adds false branch using addBranchToGraph', () => {
+			const falseBranch = createMockNode('False Branch');
+			const composite = createIfElseComposite({ falseBranch });
+			const ctx = createMockContext();
+
+			ifElseHandler.addNodes(composite, ctx);
+
+			expect(ctx.addBranchToGraph).toHaveBeenCalledWith(falseBranch);
+		});
+
+		it('creates connection from IF output 0 to true branch', () => {
+			const trueBranch = createMockNode('True Branch');
+			const composite = createIfElseComposite({ trueBranch, falseBranch: null });
+			const ctx = createMockContext();
+
+			ifElseHandler.addNodes(composite, ctx);
+
+			const ifNode = ctx.nodes.get('If Node');
+			const mainConns = ifNode?.connections.get('main');
+			const output0Conns = mainConns?.get(0);
+
+			expect(output0Conns).toBeDefined();
+			expect(output0Conns).toContainEqual(
+				expect.objectContaining({ node: 'True Branch', type: 'main', index: 0 }),
+			);
+		});
+
+		it('creates connection from IF output 1 to false branch', () => {
+			const falseBranch = createMockNode('False Branch');
+			const composite = createIfElseComposite({ trueBranch: null, falseBranch });
+			const ctx = createMockContext();
+
+			ifElseHandler.addNodes(composite, ctx);
+
+			const ifNode = ctx.nodes.get('If Node');
+			const mainConns = ifNode?.connections.get('main');
+			const output1Conns = mainConns?.get(1);
+
+			expect(output1Conns).toBeDefined();
+			expect(output1Conns).toContainEqual(
+				expect.objectContaining({ node: 'False Branch', type: 'main', index: 0 }),
+			);
+		});
+
+		it('handles null true branch (no connection at output 0)', () => {
+			const composite = createIfElseComposite({ trueBranch: null });
+			const ctx = createMockContext();
+
+			ifElseHandler.addNodes(composite, ctx);
+
+			const ifNode = ctx.nodes.get('If Node');
+			const mainConns = ifNode?.connections.get('main');
+
+			// Output 0 should have no connections
+			expect(mainConns?.get(0)).toBeUndefined();
+		});
+
+		it('handles null false branch (no connection at output 1)', () => {
+			const composite = createIfElseComposite({ falseBranch: null });
+			const ctx = createMockContext();
+
+			ifElseHandler.addNodes(composite, ctx);
+
+			const ifNode = ctx.nodes.get('If Node');
+			const mainConns = ifNode?.connections.get('main');
+
+			// Output 1 should have no connections
+			expect(mainConns?.get(1)).toBeUndefined();
+		});
+
+		it('handles array true branch (fan-out)', () => {
+			const branch1 = createMockNode('True Branch 1');
+			const branch2 = createMockNode('True Branch 2');
+			const composite = createIfElseComposite({
+				trueBranch: [branch1, branch2],
+				falseBranch: null,
+			});
+			const ctx = createMockContext();
+
+			ifElseHandler.addNodes(composite, ctx);
+
+			// Both branches should be added
+			expect(ctx.addBranchToGraph).toHaveBeenCalledWith(branch1);
+			expect(ctx.addBranchToGraph).toHaveBeenCalledWith(branch2);
+
+			// Output 0 should connect to both
+			const ifNode = ctx.nodes.get('If Node');
+			const mainConns = ifNode?.connections.get('main');
+			const output0Conns = mainConns?.get(0);
+
+			expect(output0Conns).toHaveLength(2);
+			expect(output0Conns).toContainEqual(expect.objectContaining({ node: 'True Branch 1' }));
+			expect(output0Conns).toContainEqual(expect.objectContaining({ node: 'True Branch 2' }));
 		});
 	});
 });

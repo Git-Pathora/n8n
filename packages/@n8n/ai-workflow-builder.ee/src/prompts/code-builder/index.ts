@@ -722,13 +722,14 @@ export function buildCodeBuilderPrompt(
 		userMessageParts.push(`<workflow_file path="/workflow.ts">\n${escapedCode}\n</workflow_file>`);
 	}
 
-	// 4. Add context separator if we have any context
+	// 4. Wrap user message in XML tag for easy extraction when loading sessions
 	if (userMessageParts.length > 0) {
-		userMessageParts.push('\nUser request:');
+		userMessageParts.push('<user_request>');
+		userMessageParts.push('{userMessage}');
+		userMessageParts.push('</user_request>');
+	} else {
+		userMessageParts.push('{userMessage}');
 	}
-
-	// 5. Current user message (the actual request)
-	userMessageParts.push('{userMessage}');
 
 	const userMessageTemplate = userMessageParts.join('\n');
 

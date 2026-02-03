@@ -1444,6 +1444,57 @@ describe('stream-processor', () => {
 			const result = cleanContextTags(input);
 			expect(result).toBe('Plain text without any tags');
 		});
+
+		it('should extract user request from XML tag format', () => {
+			const input = `<previous_requests>
+test
+</previous_requests>
+<workflow_file path="/workflow.ts">
+1: const wf = workflow('id', 'name');
+</workflow_file>
+<user_request>
+add set node
+</user_request>`;
+
+			const result = cleanContextTags(input);
+			expect(result).toBe('add set node');
+		});
+
+		it('should extract multiline user request from XML tag', () => {
+			const input = `<workflow_file path="/workflow.ts">
+code
+</workflow_file>
+<user_request>
+add a set node
+and connect it to the trigger
+</user_request>`;
+
+			const result = cleanContextTags(input);
+			expect(result).toBe('add a set node\nand connect it to the trigger');
+		});
+
+		it('should handle backwards compatible "User request:" text format', () => {
+			const input = `<workflow_file path="/workflow.ts">
+code
+</workflow_file>
+User request:
+old format request`;
+
+			const result = cleanContextTags(input);
+			expect(result).toBe('old format request');
+		});
+
+		it('should strip code builder tags when no user request marker found', () => {
+			const input = `<previous_requests>
+old request
+</previous_requests>
+<workflow_file path="/workflow.ts">
+code
+</workflow_file>`;
+
+			const result = cleanContextTags(input);
+			expect(result).toBe('');
+		});
 	});
 
 	describe('edge cases', () => {

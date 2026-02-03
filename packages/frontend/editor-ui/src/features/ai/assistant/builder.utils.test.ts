@@ -8,10 +8,19 @@ import {
 } from './builder.utils';
 import type { IWorkflowDb } from '@/Interface';
 import type { IRunExecutionData } from 'n8n-workflow';
+import { CODE_WORKFLOW_BUILDER_EXPERIMENT } from '@/app/constants/experiments';
 
 // Mock workflowHistory API
 vi.mock('@n8n/rest-api-client/api/workflowHistory', () => ({
 	getWorkflowVersionsByIds: vi.fn(),
+}));
+
+// Mock usePostHog
+const mockGetVariant = vi.fn();
+vi.mock('@/app/stores/posthog.store', () => ({
+	usePostHog: () => ({
+		getVariant: mockGetVariant,
+	}),
 }));
 
 // Mock useAIAssistantHelpers
@@ -26,13 +35,6 @@ vi.mock('./composables/useAIAssistantHelpers', () => ({
 		simplifyResultData: mockSimplifyResultData,
 		extractExpressionsFromWorkflow: mockExtractExpressionsFromWorkflow,
 		getNodesSchemas: mockGetNodesSchemas,
-	}),
-}));
-
-// Mock usePostHog
-vi.mock('@/app/stores/posthog.store', () => ({
-	usePostHog: () => ({
-		getVariant: vi.fn().mockReturnValue('control'),
 	}),
 }));
 
@@ -350,6 +352,7 @@ describe('builder.utils', () => {
 			vi.clearAllMocks();
 
 			// Setup default mock implementations
+			mockGetVariant.mockReturnValue('control');
 			mockSimplifyWorkflowForAssistant.mockResolvedValue({
 				name: mockWorkflow.name,
 				active: mockWorkflow.active,
@@ -426,18 +429,6 @@ describe('builder.utils', () => {
 			expect(result.workflowContext?.expressionValues).toBeUndefined();
 		});
 
-		it('should always include executionSchema regardless of privacy setting', async () => {
-			const result = await createBuilderPayload('test message', 'msg-1', {
-				workflow: mockWorkflow,
-				executionData: mockExecutionData,
-				nodesForSchema: ['Node 1'],
-				allowSendingParameterValues: false,
-			});
-
-			expect(mockGetNodesSchemas).toHaveBeenCalledWith(['Node 1'], true);
-			expect(result.workflowContext?.executionSchema).toBeDefined();
-		});
-
 		it('should include workflow in payload when privacy is OFF but with trimmed parameter values', async () => {
 			const result = await createBuilderPayload('test message', 'msg-1', {
 				workflow: mockWorkflow,
@@ -448,6 +439,70 @@ describe('builder.utils', () => {
 				excludeParameterValues: true,
 			});
 			expect(result.workflowContext?.currentWorkflow).toBeDefined();
+		});
+
+		it('should exclude schema values when code builder is disabled', async () => {
+			mockGetVariant.mockReturnValue('control');
+
+			await createBuilderPayload('test message', 'msg-1', {
+				nodesForSchema: ['Node1', 'Node2'],
+			});
+
+			expect(mockGetNodesSchemas).toHaveBeenCalledWith(['Node1', 'Node2'], true);
+		});
+
+		it('should include schema values when code builder is enabled', async () => {
+			mockGetVariant.mockImplementation((experimentName: string) => {
+				if (experimentName === CODE_WORKFLOW_BUILDER_EXPERIMENT.name) {
+					return CODE_WORKFLOW_BUILDER_EXPERIMENT.test;
+				}
+				return 'control';
+			});
+
+			await createBuilderPayload('test message', 'msg-1', {
+				nodesForSchema: ['Node1', 'Node2'],
+			});
+
+			expect(mockGetNodesSchemas).toHaveBeenCalledWith(['Node1', 'Node2'], false);
+		});
+
+		it('should set codeBuilder feature flag correctly when enabled', async () => {
+			mockGetVariant.mockImplementation((experimentName: string) => {
+				if (experimentName === CODE_WORKFLOW_BUILDER_EXPERIMENT.name) {
+					return CODE_WORKFLOW_BUILDER_EXPERIMENT.test;
+				}
+				return 'control';
+			});
+
+			const result = await createBuilderPayload('test message', 'msg-1', {});
+
+			expect(result.featureFlags?.codeBuilder).toBe(true);
+		});
+
+		it('should set codeBuilder feature flag correctly when disabled', async () => {
+			mockGetVariant.mockReturnValue('control');
+
+			const result = await createBuilderPayload('test message', 'msg-1', {});
+
+			expect(result.featureFlags?.codeBuilder).toBe(false);
+		});
+
+		it('should not call getNodesSchemas when nodesForSchema is empty', async () => {
+			mockGetVariant.mockReturnValue('control');
+
+			await createBuilderPayload('test message', 'msg-1', {
+				nodesForSchema: [],
+			});
+
+			expect(mockGetNodesSchemas).not.toHaveBeenCalled();
+		});
+
+		it('should not call getNodesSchemas when nodesForSchema is not provided', async () => {
+			mockGetVariant.mockReturnValue('control');
+
+			await createBuilderPayload('test message', 'msg-1', {});
+
+			expect(mockGetNodesSchemas).not.toHaveBeenCalled();
 		});
 	});
 });

@@ -99,13 +99,21 @@ export class AuthService {
 		return `invalid-auth-token:${token}`;
 	}
 
+	private async cacheInvalidatedToken(token: string, exp: number) {
+		const ttlMs = Math.max(0, exp * 1000 - Date.now());
+		if (ttlMs > 0) {
+			const cacheKey = this.cacheKeyForInvalidToken(token);
+			await this.cacheService.set(cacheKey, '1', ttlMs);
+		}
+	}
+
 	private async isTokenInvalid(token: string): Promise<boolean> {
 		const cacheKey = this.cacheKeyForInvalidToken(token);
 
 		try {
 			if ((await this.cacheService.get(cacheKey)) !== undefined) return true;
-		} catch {
-			// fall through
+		} catch (error) {
+			this.logger.warn('Failed to check invalid token cache', { error });
 		}
 
 		const isInvalidPerDb = await this.invalidAuthTokenRepository.existsBy({ token });
@@ -113,12 +121,9 @@ export class AuthService {
 		if (isInvalidPerDb) {
 			try {
 				const { exp } = this.jwtService.decode(token);
-				if (exp) {
-					const ttlMs = Math.max(0, exp * 1000 - Date.now());
-					if (ttlMs > 0) await this.cacheService.set(cacheKey, '1', ttlMs);
-				}
-			} catch {
-				// non-critical
+				if (exp) await this.cacheInvalidatedToken(token, exp);
+			} catch (error) {
+				this.logger.warn('Failed to cache invalid token', { error });
 			}
 		}
 
@@ -228,11 +233,7 @@ export class AuthService {
 					expiresAt: new Date(exp * 1000),
 				});
 
-				const ttlMs = Math.max(0, exp * 1000 - Date.now());
-				if (ttlMs > 0) {
-					const cacheKey = this.cacheKeyForInvalidToken(token);
-					await this.cacheService.set(cacheKey, '1', ttlMs);
-				}
+				await this.cacheInvalidatedToken(token, exp);
 			}
 		} catch (e) {
 			this.logger.warn('failed to invalidate auth token', { error: (e as Error).message });

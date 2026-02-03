@@ -11,6 +11,8 @@ import {
 	type ChatHubInputModality,
 	type AgentIconOrEmoji,
 	type ChatProviderSettingsDto,
+	ChatHubMessageWithButtons,
+	chatHubMessageWithButtonsSchema,
 } from '@n8n/api-types';
 import type {
 	ChatMessage,
@@ -566,4 +568,16 @@ export function splitMarkdownIntoChunks(content: string): string[] {
 	endChunk();
 
 	return chunks;
+}
+
+export function parseChatHubMessageContent(content: string): ChatHubMessageWithButtons | string {
+	if (!content.startsWith('{')) return content;
+
+	try {
+		const parsed: unknown = JSON.parse(content);
+		const result = chatHubMessageWithButtonsSchema.safeParse(parsed);
+		return result.success ? result.data : content;
+	} catch {
+		return content;
+	}
 }

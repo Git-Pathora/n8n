@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import ChatAgentAvatar from '@/features/ai/chatHub/components/ChatAgentAvatar.vue';
 import ChatTypingIndicator from '@/features/ai/chatHub/components/ChatTypingIndicator.vue';
+import ChatMessageWithButtons from '@/features/ai/chatHub/components/ChatMessageWithButtons.vue';
 import type { AgentIconOrEmoji, ChatMessageId, ChatModelDto } from '@n8n/api-types';
 import { N8nButton, N8nIcon, N8nIconButton, N8nInput } from '@n8n/design-system';
 import { useSpeechSynthesis } from '@vueuse/core';
@@ -14,7 +15,11 @@ import {
 } from 'vue';
 import type { ChatMessage } from '../chat.types';
 import ChatMessageActions from './ChatMessageActions.vue';
-import { unflattenModel, splitMarkdownIntoChunks } from '@/features/ai/chatHub/chat.utils';
+import {
+	unflattenModel,
+	splitMarkdownIntoChunks,
+	parseChatHubMessageContent,
+} from '@/features/ai/chatHub/chat.utils';
 import { useChatStore } from '@/features/ai/chatHub/chat.store';
 import ChatFile from '@n8n/chat/components/ChatFile.vue';
 import { buildChatAttachmentUrl } from '@/features/ai/chatHub/chat.api';
@@ -73,6 +78,10 @@ const removedExistingIndices = ref<Set<number>>(new Set());
 const fileInputRef = useTemplateRef('fileInputRef');
 const textareaRef = useTemplateRef('textarea');
 const messageContent = computed(() => message.content);
+const parsedContent = computed(() => parseChatHubMessageContent(message.content));
+const buttonMessage = computed(() =>
+	typeof parsedContent.value === 'object' ? parsedContent.value : null,
+);
 const markdownChunkRefs = ref<
 	Array<ComponentPublicInstance<{
 		hoveredCodeBlockActions: HTMLElement | null;
@@ -353,13 +362,17 @@ onBeforeMount(() => {
 					<div v-if="message.type === 'human'">
 						{{ message.content }}
 					</div>
+					<ChatMessageWithButtons
+						v-else-if="buttonMessage"
+						:text="buttonMessage.text"
+						:buttons="buttonMessage.buttons"
+						:is-waiting="message.status === 'waiting'"
+					/>
 					<div v-else :class="$style.markdownContent">
 						<ChatMarkdownChunk
 							v-for="(chunk, index) in messageChunks"
 							:key="index"
-							:ref="
-								(el) => (markdownChunkRefs[index] = el as (typeof markdownChunkRefs.value)[number])
-							"
+							:ref="(el) => (markdownChunkRefs[index] = el as (typeof markdownChunkRefs)[number])"
 							:source="chunk"
 						/>
 						<Teleport v-if="activeCodeBlockTeleport" :to="activeCodeBlockTeleport.target">
@@ -378,7 +391,7 @@ onBeforeMount(() => {
 					@edit="handleEdit"
 					@regenerate="handleRegenerate"
 					@read-aloud="handleReadAloud"
-					@switchAlternative="handleSwitchAlternative"
+					@switch-alternative="handleSwitchAlternative"
 				/>
 			</template>
 		</div>

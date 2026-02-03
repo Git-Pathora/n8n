@@ -542,3 +542,21 @@ export interface ChatReconnectResponse {
 	/** Last sequence number received by client (for gap detection) */
 	lastSequenceNumber: number;
 }
+
+export const chatHubMessageButtonSchema = z.object({
+	text: z.string(),
+	link: z.string(),
+	type: z.enum(['primary', 'secondary']),
+});
+
+export type ChatHubMessageButton = z.infer<typeof chatHubMessageButtonSchema>;
+
+// Structured approve message with buttons
+export const chatHubMessageWithButtonsSchema = z.object({
+	type: z.literal('with-buttons'),
+	text: z.string(),
+	blockUserInput: z.boolean(),
+	buttons: z.array(chatHubMessageButtonSchema),
+});
+
+export type ChatHubMessageWithButtons = z.infer<typeof chatHubMessageWithButtonsSchema>;

@@ -56,6 +56,10 @@ export {
 	type ChatSendMessageResponse,
 	type ChatReconnectResponse,
 	ChatReconnectRequest,
+	chatHubMessageButtonSchema,
+	type ChatHubMessageButton,
+	chatHubMessageWithButtonsSchema,
+	type ChatHubMessageWithButtons,
 } from './chat-hub';
 
 export type {

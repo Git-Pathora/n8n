@@ -5,22 +5,10 @@ import { z } from 'zod';
 
 import type { BuilderTool, BuilderToolBase } from '@/utils/stream-processor';
 
-import {
-	ConnectionError,
-	NodeNotFoundError,
-	NodeTypeNotFoundError,
-	ValidationError,
-} from '../errors';
-import type { SimpleWorkflow } from '../types/workflow';
+import { ValidationError } from '../errors';
 import { createProgressReporter, reportProgress } from './helpers/progress';
 import { createSuccessResponse, createErrorResponse } from './helpers/response';
-import { getCurrentWorkflow, getWorkflowState, updateWorkflowConnections } from './helpers/state';
-import { findNodeByName } from './helpers/validation';
-import {
-	validateConnection,
-	formatConnectionMessage,
-	inferConnectionType,
-} from './utils/connection.utils';
+import { addConnectIntentToWorkflow } from './helpers/state';
 import type { ConnectNodesOutput } from '../types/tools';
 
 /**
@@ -36,6 +24,12 @@ export const nodeConnectionSchema = z.object({
 		.string()
 		.describe(
 			'The name of the target node. For ai_* connections, use the main node that accepts the sub-node (e.g., AI Agent, Basic LLM Chain). For main connections, this is the node receiving the input',
+		),
+	connectionType: z
+		.string()
+		.optional()
+		.describe(
+			'Optional: Explicit connection type (e.g., "main", "ai_tool"). Omit to let the system infer it later.',
 		),
 	sourceOutputIndex: z
 		.number()
@@ -56,7 +50,7 @@ export const CONNECT_NODES_TOOL: BuilderToolBase = {
  * Factory function to create the connect nodes tool
  */
 export function createConnectNodesTool(
-	nodeTypes: INodeTypeDescription[],
+	_nodeTypes: INodeTypeDescription[],
 	logger?: Logger,
 ): BuilderTool {
 	const dynamicTool = tool(
@@ -75,206 +69,36 @@ export function createConnectNodesTool(
 				// Report tool start
 				reporter.start(validatedInput);
 
-				// Get current state
-				const state = getWorkflowState();
-				const workflow = getCurrentWorkflow(state);
+				const {
+					sourceNodeName,
+					targetNodeName,
+					connectionType,
+					sourceOutputIndex,
+					targetInputIndex,
+				} = validatedInput;
 
-				// Report progress
-				reportProgress(reporter, 'Finding nodes to connect...');
-
-				// Find source and target nodes by name
-				let matchedSourceNode = findNodeByName(validatedInput.sourceNodeName, workflow.nodes);
-				let matchedTargetNode = findNodeByName(validatedInput.targetNodeName, workflow.nodes);
-
-				// Check if both nodes exist
-				if (!matchedSourceNode || !matchedTargetNode) {
-					const missingNodeName = !matchedSourceNode
-						? validatedInput.sourceNodeName
-						: validatedInput.targetNodeName;
-					const nodeError = new NodeNotFoundError(missingNodeName);
-					const error = {
-						message: nodeError.message,
-						code: 'NODES_NOT_FOUND',
-						details: {
-							sourceNodeName: validatedInput.sourceNodeName,
-							targetNodeName: validatedInput.targetNodeName,
-							foundSource: !!matchedSourceNode,
-							foundTarget: !!matchedTargetNode,
-						},
-					};
-					reporter.error(error);
-					return createErrorResponse(config, error);
-				}
-
-				// Find node type descriptions
-				const sourceNodeType = nodeTypes.find((nt) => nt.name === matchedSourceNode!.type);
-				const targetNodeType = nodeTypes.find((nt) => nt.name === matchedTargetNode!.type);
-
-				if (!sourceNodeType || !targetNodeType) {
-					const missingType = !sourceNodeType ? matchedSourceNode.type : matchedTargetNode.type;
-					const typeError = new NodeTypeNotFoundError(missingType);
-					const error = {
-						message: typeError.message,
-						code: 'NODE_TYPE_NOT_FOUND',
-						details: {
-							sourceType: matchedSourceNode.type,
-							targetType: matchedTargetNode.type,
-						},
-					};
-					reporter.error(error);
-					return createErrorResponse(config, error);
-				}
-
-				// Determine connection type
-				reportProgress(reporter, 'Inferring connection type...');
+				reportProgress(reporter, `Queueing connection ${sourceNodeName} → ${targetNodeName}...`);
 
 				logger?.debug('\n=== Connect Nodes Tool ===');
-				logger?.debug(
-					`Attempting to connect: ${matchedSourceNode.name} -> ${matchedTargetNode.name}`,
-				);
+				logger?.debug(`Queued connection intent: ${sourceNodeName} -> ${targetNodeName}`);
 
-				const inferResult = inferConnectionType(
-					matchedSourceNode,
-					matchedTargetNode,
-					sourceNodeType,
-					targetNodeType,
-				);
+				const message = `Queued connection: ${sourceNodeName} → ${targetNodeName}`;
 
-				if (inferResult.error) {
-					const connectionError = new ConnectionError(inferResult.error, {
-						fromNodeId: matchedSourceNode.id,
-						toNodeId: matchedTargetNode.id,
-					});
-					const error = {
-						message: connectionError.message,
-						code: 'CONNECTION_TYPE_INFERENCE_ERROR',
-						details: {
-							sourceNode: matchedSourceNode.name,
-							targetNode: matchedTargetNode.name,
-							possibleTypes: inferResult.possibleTypes,
-						},
-					};
-					reporter.error(error);
-					return createErrorResponse(config, error);
-				}
-
-				if (!inferResult.connectionType) {
-					const error = {
-						message: 'Could not infer connection type',
-						code: 'CONNECTION_TYPE_INFERENCE_FAILED',
-						details: {
-							sourceNode: matchedSourceNode.name,
-							targetNode: matchedTargetNode.name,
-						},
-					};
-					reporter.error(error);
-					return createErrorResponse(config, error);
-				}
-
-				const connectionType = inferResult.connectionType;
-				const inferredSwap = inferResult.requiresSwap ?? false;
-
-				// If swap is required from inference, swap the nodes
-				if (inferredSwap) {
-					logger?.debug('Swapping nodes based on inference result');
-					const temp = matchedSourceNode;
-					matchedSourceNode = matchedTargetNode;
-					matchedTargetNode = temp;
-				}
-
-				reportProgress(
-					reporter,
-					`Inferred connection type: ${connectionType}${inferredSwap ? ' (swapped nodes)' : ''}`,
-				);
-				logger?.debug(
-					`Final connection: ${matchedSourceNode.name} -> ${matchedTargetNode.name} (${connectionType})\n`,
-				);
-
-				// Report progress
-				reportProgress(
-					reporter,
-					`Connecting ${matchedSourceNode.name} to ${matchedTargetNode.name}...`,
-				);
-
-				// Validate connection and check if nodes need to be swapped
-				const validation = validateConnection(
-					matchedSourceNode,
-					matchedTargetNode,
-					connectionType,
-					nodeTypes,
-				);
-
-				if (!validation.valid) {
-					const connectionError = new ConnectionError(validation.error ?? 'Invalid connection', {
-						fromNodeId: matchedSourceNode.id,
-						toNodeId: matchedTargetNode.id,
-					});
-					const error = {
-						message: connectionError.message,
-						code: 'INVALID_CONNECTION',
-						details: {
-							sourceNode: matchedSourceNode.name,
-							targetNode: matchedTargetNode.name,
-							connectionType,
-						},
-					};
-					reporter.error(error);
-					return createErrorResponse(config, error);
-				}
-
-				// Use potentially swapped nodes
-				const actualSourceNode = validation.swappedSource ?? matchedSourceNode;
-				const actualTargetNode = validation.swappedTarget ?? matchedTargetNode;
-				// Track if nodes were swapped either during inference or validation
-				const swapped = inferredSwap || !!validation.shouldSwap;
-
-				// Create only the new connection (not the full connections object)
-				// This is important for parallel execution - each tool only returns its own connection
-				const sourceIndex = validatedInput.sourceOutputIndex ?? 0;
-				const targetIndex = validatedInput.targetInputIndex ?? 0;
-
-				const newConnection: SimpleWorkflow['connections'] = {
-					[actualSourceNode.name]: {
-						[connectionType]: Array(sourceIndex + 1)
-							.fill(null)
-							.map((_, i) =>
-								i === sourceIndex
-									? [
-											{
-												node: actualTargetNode.name,
-												type: connectionType,
-												index: targetIndex,
-											},
-										]
-									: [],
-							),
-					},
-				};
-
-				// Build success message
-				const message = formatConnectionMessage(
-					actualSourceNode.name,
-					actualTargetNode.name,
-					connectionType,
-					swapped,
-				);
-
-				// Report completion
 				const output: ConnectNodesOutput = {
-					sourceNode: actualSourceNode.name,
-					targetNode: actualTargetNode.name,
+					sourceNode: sourceNodeName,
+					targetNode: targetNodeName,
 					connectionType,
-					swapped,
 					message,
-					found: {
-						sourceNode: true,
-						targetNode: true,
-					},
 				};
 				reporter.complete(output);
 
-				// Return success with state updates
-				const stateUpdates = updateWorkflowConnections(newConnection);
+				const stateUpdates = addConnectIntentToWorkflow(
+					sourceNodeName,
+					targetNodeName,
+					connectionType,
+					sourceOutputIndex ?? 0,
+					targetInputIndex ?? 0,
+				);
 				return createSuccessResponse(config, message, stateUpdates);
 			} catch (error) {
 				// Handle validation or unexpected errors
@@ -303,7 +127,7 @@ export function createConnectNodesTool(
 		},
 		{
 			name: CONNECT_NODES_TOOL.toolName,
-			description: `Connect two nodes in the workflow. The tool automatically determines the connection type based on node capabilities and ensures correct connection direction.
+			description: `Connect two nodes in the workflow. This tool queues a connection intent; the system will resolve connection type and direction after all nodes are added.
 
 UNDERSTANDING CONNECTIONS:
 - SOURCE NODE: The node that PRODUCES output/provides capability
@@ -311,9 +135,8 @@ UNDERSTANDING CONNECTIONS:
 - Flow direction: Source → Target
 
 AUTOMATIC CONNECTION TYPE DETECTION:
-- The tool analyzes the nodes' inputs and outputs to determine the appropriate connection type
-- If multiple connection types are possible, the tool will provide an error with the available options
-- The connection type is determined by matching compatible input/output types between nodes
+- Connection type is inferred after nodes exist in the workflow
+- If you already know the exact type, you can pass connectionType to skip inference
 
 For ai_* connections (ai_languageModel, ai_tool, ai_memory, ai_embedding, etc.):
 - Sub-nodes are ALWAYS the source (they provide capabilities)

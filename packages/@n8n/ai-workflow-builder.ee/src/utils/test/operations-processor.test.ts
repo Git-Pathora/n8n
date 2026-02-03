@@ -1,6 +1,6 @@
 import type { INode, IConnections } from 'n8n-workflow';
 
-import { createNode, createWorkflow } from '../../../test/test-utils';
+import { createNode, createWorkflow, nodeTypes } from '../../../test/test-utils';
 import type { SimpleWorkflow, WorkflowOperation } from '../../types/workflow';
 import type { WorkflowState } from '../../workflow-state';
 import { applyOperations, processOperations } from '../operations-processor';
@@ -1111,6 +1111,38 @@ describe('operations-processor', () => {
 			expect(result.workflowJSON?.nodes).toHaveLength(2);
 			expect(result.workflowJSON?.connections.node1).toBeDefined();
 			expect(result.workflowOperations).toBeNull();
+		});
+
+		it('should resolve connect intents after applying state operations', () => {
+			const sourceNode = createNode({
+				id: 'node1',
+				name: 'Source',
+				type: 'n8n-nodes-base.code',
+			});
+			const targetNode = createNode({
+				id: 'node2',
+				name: 'Target',
+				type: 'n8n-nodes-base.httpRequest',
+			});
+
+			const workflow = createWorkflow([sourceNode]);
+			const operations: WorkflowOperation[] = [
+				{ type: 'addNodes', nodes: [targetNode] },
+				{
+					type: 'connectIntent',
+					sourceNodeName: 'Source',
+					targetNodeName: 'Target',
+				},
+			];
+			const state = createState(workflow, operations);
+
+			const result = processOperations(state, {
+				nodeTypes: [nodeTypes.code, nodeTypes.httpRequest],
+			});
+
+			expect(result.workflowJSON?.connections['Source']?.main?.[0]).toEqual([
+				{ node: 'Target', type: 'main', index: 0 },
+			]);
 		});
 	});
 });

@@ -105,7 +105,7 @@ describe('AddNodeTool', () => {
 			expect(completeMessage).toBeDefined();
 		});
 
-		it('should generate unique name when no custom name provided', async () => {
+		it('should error when name already exists', async () => {
 			const existingWorkflow = createWorkflow([createNode({ id: 'existing', name: 'Code' })]);
 			setupWorkflowState(mockGetCurrentTaskInput, existingWorkflow);
 
@@ -120,8 +120,7 @@ describe('AddNodeTool', () => {
 			);
 
 			const content = parseToolResult<ParsedToolContent>(result);
-
-			expect(content.update.workflowOperations?.[0]?.nodes?.[0]?.name).toBe('Code1');
+			expectToolError(content, /already exists/);
 		});
 
 		it('should handle connection parameters for AI nodes', async () => {
@@ -253,7 +252,7 @@ describe('AddNodeTool', () => {
 			expect(addedNode?.name).toBe('My Custom Code Node');
 		});
 
-		it('should generate unique names when adding multiple nodes of same type', async () => {
+		it('should error when name conflicts with existing nodes', async () => {
 			const existingWorkflow = createWorkflow([
 				createNode({ id: 'node1', name: 'Code' }),
 				createNode({ id: 'node2', name: 'Code1' }),
@@ -271,9 +270,7 @@ describe('AddNodeTool', () => {
 			);
 
 			const content = parseToolResult<ParsedToolContent>(result);
-
-			const addedNode = content.update.workflowOperations?.[0]?.nodes?.[0];
-			expect(addedNode?.name).toBe('Code2');
+			expectToolError(content, /already exists/);
 		});
 
 		it('should handle sub-nodes positioning differently', async () => {

@@ -1,0 +1,3 @@
+id,prompt
+event-checkin-form,"I want a form where a user enter his email. It is matched against a csv file and if present, an url from ""QR code"" field of the csv is called to check-in. Otherwise, the user is said he is not on the list and asked for first name and last name to self-register. He can also go back to enter another email."
+tuke-helpdesk-chat,"Design a production-ready n8n workflow implementing the TUKE Helpdesk F1-Chat process using: Client communication: HTTP Webhook Trigger + Respond to Webhook. Backend: Supabase (Postgres + pgvector). LLM: Azure OpenAI (chat + embeddings). Safety: Guardrails / content filters. Session context: chat_sessions table (JSONB context)."

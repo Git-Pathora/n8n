@@ -1,6 +1,9 @@
+import type { ToolRunnableConfig } from '@langchain/core/tools';
 import { getCurrentTaskInput } from '@langchain/langgraph';
+import type { LangGraphRunnableConfig } from '@langchain/langgraph';
 import type { INode, IConnection } from 'n8n-workflow';
 
+import type { PendingNodeEntry, PendingNodeRegistry } from '../../types/pending-nodes';
 import type { SimpleWorkflow } from '../../types/workflow';
 import type { WorkflowState } from '../../workflow-state';
 
@@ -21,6 +24,36 @@ export function getWorkflowState(): typeof WorkflowState.State {
 export function getCurrentWorkflowFromTaskInput(): SimpleWorkflow {
 	const state = getWorkflowState();
 	return getCurrentWorkflow(state);
+}
+
+type PendingNodesConfig = (ToolRunnableConfig & LangGraphRunnableConfig) | undefined;
+
+function getPendingNodesRegistry(config: PendingNodesConfig): PendingNodeRegistry | undefined {
+	const configurable = config?.configurable as { pendingNodes?: PendingNodeRegistry } | undefined;
+	return configurable?.pendingNodes;
+}
+
+export function getPendingNodeEntry(
+	config: PendingNodesConfig,
+	nodeName: string,
+): PendingNodeEntry | undefined {
+	const registry = getPendingNodesRegistry(config);
+	if (!registry) return undefined;
+	return registry[nodeName.toLowerCase()];
+}
+
+export function resolvePendingNode(config: PendingNodesConfig, node: INode): void {
+	const entry = getPendingNodeEntry(config, node.name);
+	entry?.resolve(node);
+}
+
+export function rejectPendingNode(
+	config: PendingNodesConfig,
+	nodeName: string,
+	error: Error,
+): void {
+	const entry = getPendingNodeEntry(config, nodeName);
+	entry?.reject(error);
 }
 
 /**
@@ -90,6 +123,42 @@ export function updateNodeInWorkflow(
 	// Return an operation to update the node
 	return {
 		workflowOperations: [{ type: 'updateNode', nodeName, updates }],
+	};
+}
+
+/**
+ * Queue a node update intent for later resolution
+ */
+export function addUpdateNodeIntentToWorkflow(
+	nodeName: string,
+	updates: Partial<INode>,
+): Partial<typeof WorkflowState.State> {
+	return {
+		workflowOperations: [{ type: 'updateNodeIntent', nodeName, updates }],
+	};
+}
+
+/**
+ * Queue a connection intent for later resolution
+ */
+export function addConnectIntentToWorkflow(
+	sourceNodeName: string,
+	targetNodeName: string,
+	connectionType?: string,
+	sourceOutputIndex: number = 0,
+	targetInputIndex: number = 0,
+): Partial<typeof WorkflowState.State> {
+	return {
+		workflowOperations: [
+			{
+				type: 'connectIntent',
+				sourceNodeName,
+				targetNodeName,
+				connectionType,
+				sourceOutputIndex,
+				targetInputIndex,
+			},
+		],
 	};
 }
 

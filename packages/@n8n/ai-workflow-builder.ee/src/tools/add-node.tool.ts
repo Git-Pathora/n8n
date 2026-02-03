@@ -5,16 +5,19 @@ import { z } from 'zod';
 import type { BuilderTool, BuilderToolBase } from '@/utils/stream-processor';
 
 import { NodeTypeNotFoundError, ToolExecutionError, ValidationError } from '../errors';
-import {
-	createNodeInstance,
-	generateUniqueName,
-	type NodeSettings,
-} from './utils/node-creation.utils';
+import { createNodeInstance, type NodeSettings } from './utils/node-creation.utils';
 import { calculateNodePosition } from './utils/node-positioning.utils';
 import { isSubNode } from '../utils/node-helpers';
 import { createProgressReporter } from './helpers/progress';
 import { createSuccessResponse, createErrorResponse } from './helpers/response';
-import { getCurrentWorkflow, addNodeToWorkflow, getWorkflowState } from './helpers/state';
+import {
+	getCurrentWorkflow,
+	addNodeToWorkflow,
+	getWorkflowState,
+	getPendingNodeEntry,
+	resolvePendingNode,
+	rejectPendingNode,
+} from './helpers/state';
 import { findNodeType } from './helpers/validation';
 import type { AddedNode } from '../types/nodes';
 import type { AddNodeOutput } from '../types/tools';
@@ -92,9 +95,7 @@ function createNode(
 	id?: string,
 	nodeSettings?: NodeSettings,
 ): INode {
-	// Generate unique name
-	const baseName = customName ?? nodeType.defaults?.name ?? nodeType.displayName;
-	const uniqueName = generateUniqueName(baseName, existingNodes);
+	const uniqueName = customName;
 
 	// Calculate position
 	const position = calculateNodePosition(existingNodes, isSubNode(nodeType), nodeTypes);
@@ -133,6 +134,12 @@ function getCustomNodeTitle(
 
 	// single "node" not plural "nodes" because this pertains to this specific tool call
 	return 'Adding node';
+}
+
+function getNodeNameFromInput(input: unknown): string | null {
+	if (typeof input !== 'object' || input === null) return null;
+	const name = (input as { name?: unknown }).name;
+	return typeof name === 'string' ? name : null;
 }
 
 export function getAddNodeToolBase(nodeTypes: INodeTypeDescription[]): BuilderToolBase {
@@ -182,6 +189,29 @@ export function createAddNodeTool(nodeTypes: INodeTypeDescription[]): BuilderToo
 				// Report tool start
 				reporter.start(validatedInput);
 
+				const pendingEntry = getPendingNodeEntry(config, name);
+				if (pendingEntry?.count && pendingEntry.count > 1) {
+					const validationError = new ValidationError(
+						`Multiple add_nodes calls attempted for "${name}" in the same batch`,
+						{
+							field: 'name',
+							value: name,
+						},
+					);
+					const error = {
+						message: validationError.message,
+						code: 'NAME_CONFLICT',
+						details: {
+							name,
+							conflictSource: 'pendingBatch',
+							duplicateCount: pendingEntry.count,
+						},
+					};
+					reporter.error(error);
+					rejectPendingNode(config, name, new Error(error.message));
+					return createErrorResponse(config, error);
+				}
+
 				// Get current state
 				const state = getWorkflowState();
 				const workflow = getCurrentWorkflow(state);
@@ -199,6 +229,31 @@ export function createAddNodeTool(nodeTypes: INodeTypeDescription[]): BuilderToo
 						details: { nodeType },
 					};
 					reporter.error(error);
+					rejectPendingNode(config, name, new Error(error.message));
+					return createErrorResponse(config, error);
+				}
+
+				const existingNode = workflow.nodes.find(
+					(n) => n.name.toLowerCase() === name.toLowerCase(),
+				);
+				if (existingNode) {
+					const validationError = new ValidationError(
+						`A node with the name "${name}" already exists`,
+						{
+							field: 'name',
+							value: name,
+						},
+					);
+					const error = {
+						message: validationError.message,
+						code: 'NAME_CONFLICT',
+						details: {
+							name,
+							conflictingNodeName: existingNode.name,
+						},
+					};
+					reporter.error(error);
+					rejectPendingNode(config, name, new Error(error.message));
 					return createErrorResponse(config, error);
 				}
 
@@ -234,6 +289,8 @@ export function createAddNodeTool(nodeTypes: INodeTypeDescription[]): BuilderToo
 				};
 				reporter.complete(output);
 
+				resolvePendingNode(config, newNode);
+
 				// Return success with state updates - single node
 				const stateUpdates = addNodeToWorkflow(newNode);
 				return createSuccessResponse(config, message, stateUpdates);
@@ -243,6 +300,10 @@ export function createAddNodeTool(nodeTypes: INodeTypeDescription[]): BuilderToo
 					const validationError = new ValidationError('Invalid input parameters', {
 						extra: { errors: error.errors },
 					});
+					const pendingName = getNodeNameFromInput(input);
+					if (pendingName) {
+						rejectPendingNode(config, pendingName, new Error(validationError.message));
+					}
 					reporter.error(validationError);
 					return createErrorResponse(config, validationError);
 				}
@@ -254,13 +315,17 @@ export function createAddNodeTool(nodeTypes: INodeTypeDescription[]): BuilderToo
 						cause: error instanceof Error ? error : undefined,
 					},
 				);
+				const pendingName = getNodeNameFromInput(input);
+				if (pendingName) {
+					rejectPendingNode(config, pendingName, new Error(toolError.message));
+				}
 				reporter.error(toolError);
 				return createErrorResponse(config, toolError);
 			}
 		},
 		{
 			name: builderToolBase.toolName,
-			description: `Add a node to the workflow canvas. Each node represents a specific action or operation (e.g., HTTP request, data transformation, database query). Always provide descriptive names that explain what the node does (e.g., "Get Customer Data", "Filter Active Users", "Send Email Notification"). The tool handles automatic positioning. Use this tool after searching for available node types to ensure they exist.
+			description: `Add a node to the workflow canvas. Each node represents a specific action or operation (e.g., HTTP request, data transformation, database query). Node names must be unique; this tool will error on duplicates (no auto-rename). Always provide descriptive names that explain what the node does (e.g., "Get Customer Data", "Filter Active Users", "Send Email Notification"). The tool handles automatic positioning. Use this tool after searching for available node types to ensure they exist.
 
 To add multiple nodes, call this tool multiple times in parallel.
 

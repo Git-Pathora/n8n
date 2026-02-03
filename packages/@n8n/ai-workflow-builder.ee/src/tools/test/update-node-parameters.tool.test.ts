@@ -15,11 +15,13 @@ import {
 	expectToolSuccess,
 	expectToolError,
 	expectNodeUpdated,
+	expectWorkflowOperation,
 	buildUpdateNodeInput,
 	mockParameterUpdaterChain,
 	type ParsedToolContent,
 } from '../../../test/test-utils';
 import { createUpdateNodeParametersTool } from '../update-node-parameters.tool';
+import type { PendingNodeRegistry } from '../../types/pending-nodes';
 
 // Mock LangGraph dependencies
 jest.mock('@langchain/langgraph', () => ({
@@ -132,6 +134,64 @@ describe('UpdateNodeParametersTool', () => {
 				nodeName: 'HTTP Request',
 				nodeType: 'n8n-nodes-base.httpRequest',
 				appliedChanges: ['Change method to POST', 'Add Content-Type header'],
+			});
+		});
+
+		it('should update parameters for a pending node', async () => {
+			setupWorkflowState(mockGetCurrentTaskInput, createWorkflow([]));
+
+			mockChain.invoke.mockResolvedValue({
+				parameters: {
+					method: 'POST',
+					url: 'https://api.example.com',
+				},
+			});
+
+			const pendingNodeName = 'Send to Telegram';
+			const pendingNode = createNode({
+				id: 'pending-node',
+				name: pendingNodeName,
+				type: 'n8n-nodes-base.httpRequest',
+				parameters: {
+					method: 'GET',
+					url: 'https://example.com',
+				},
+			});
+
+			let resolveNode!: (node: INode) => void;
+			let rejectNode!: (error: Error) => void;
+			const pendingPromise = new Promise<INode>((resolve, reject) => {
+				resolveNode = resolve;
+				rejectNode = reject;
+			});
+
+			const pendingNodes: PendingNodeRegistry = {
+				[pendingNodeName.toLowerCase()]: {
+					promise: pendingPromise,
+					resolve: resolveNode,
+					reject: rejectNode,
+					count: 1,
+				},
+			};
+
+			const mockConfig = {
+				...createToolConfig('update_node_parameters', 'test-call-pending'),
+				configurable: { pendingNodes },
+			};
+
+			const invokePromise = updateNodeParametersTool.invoke(
+				buildUpdateNodeInput(pendingNodeName, ['Change method to POST']),
+				mockConfig,
+			);
+
+			resolveNode(pendingNode);
+
+			const result = await invokePromise;
+			const content = parseToolResult<ParsedToolContent>(result);
+
+			expectToolSuccess(content, `Updated "${pendingNodeName}"`);
+			expectWorkflowOperation(content, 'updateNodeIntent', {
+				nodeName: pendingNodeName,
 			});
 		});
 

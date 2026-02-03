@@ -1,6 +1,17 @@
-import type { INode, IConnections, INodeTypes } from 'n8n-workflow';
+import type {
+	INode,
+	IConnections,
+	INodeTypes,
+	INodeTypeDescription,
+	NodeConnectionType,
+} from 'n8n-workflow';
 import { Workflow } from 'n8n-workflow';
 
+import {
+	createConnection,
+	inferConnectionType,
+	validateConnection,
+} from '../tools/utils/connection.utils';
 import type { SimpleWorkflow, WorkflowOperation } from '../types/workflow';
 
 /**
@@ -25,6 +36,8 @@ const minimalNodeTypes: INodeTypes = {
  * Type for operation handler functions
  */
 type OperationHandler = (workflow: SimpleWorkflow, operation: WorkflowOperation) => SimpleWorkflow;
+type ConnectIntentOperation = Extract<WorkflowOperation, { type: 'connectIntent' }>;
+type UpdateNodeIntentOperation = Extract<WorkflowOperation, { type: 'updateNodeIntent' }>;
 
 /**
  * Handle 'clear' operation - reset workflow to empty state
@@ -96,6 +109,10 @@ function hasMatchingName(name: string, names: Set<string>): boolean {
 		}
 	}
 	return false;
+}
+
+function findNodeByNameCaseInsensitive(name: string, nodes: INode[]): INode | null {
+	return nodes.find((n) => n.name.toLowerCase() === name.toLowerCase()) ?? null;
 }
 
 /**
@@ -297,6 +314,99 @@ function applyRemoveConnectionOperation(
 	};
 }
 
+function applyConnectIntentOperation(
+	workflow: SimpleWorkflow,
+	operation: WorkflowOperation,
+): SimpleWorkflow {
+	if (operation.type !== 'connectIntent') return workflow;
+	return workflow;
+}
+
+function applyUpdateNodeIntentOperation(
+	workflow: SimpleWorkflow,
+	operation: WorkflowOperation,
+): SimpleWorkflow {
+	if (operation.type !== 'updateNodeIntent') return workflow;
+	return workflow;
+}
+
+function resolveConnectIntent(
+	workflow: SimpleWorkflow,
+	intent: ConnectIntentOperation,
+	nodeTypes: INodeTypeDescription[],
+): SimpleWorkflow {
+	const sourceNode = findNodeByNameCaseInsensitive(intent.sourceNodeName, workflow.nodes);
+	const targetNode = findNodeByNameCaseInsensitive(intent.targetNodeName, workflow.nodes);
+
+	if (!sourceNode || !targetNode) {
+		return workflow;
+	}
+
+	const sourceNodeType = nodeTypes.find((nt) => nt.name === sourceNode.type);
+	const targetNodeType = nodeTypes.find((nt) => nt.name === targetNode.type);
+
+	if (!sourceNodeType || !targetNodeType) {
+		return workflow;
+	}
+
+	const inference = intent.connectionType
+		? { connectionType: intent.connectionType, requiresSwap: false }
+		: inferConnectionType(sourceNode, targetNode, sourceNodeType, targetNodeType);
+
+	if (!inference.connectionType) {
+		return workflow;
+	}
+
+	let actualSourceNode = sourceNode;
+	let actualTargetNode = targetNode;
+
+	if (inference.requiresSwap) {
+		[actualSourceNode, actualTargetNode] = [actualTargetNode, actualSourceNode];
+	}
+
+	const validation = validateConnection(
+		actualSourceNode,
+		actualTargetNode,
+		inference.connectionType,
+		nodeTypes,
+	);
+
+	if (!validation.valid) {
+		return workflow;
+	}
+
+	actualSourceNode = validation.swappedSource ?? actualSourceNode;
+	actualTargetNode = validation.swappedTarget ?? actualTargetNode;
+
+	const sourceIndex = intent.sourceOutputIndex ?? 0;
+	const targetIndex = intent.targetInputIndex ?? 0;
+
+	const connections = createConnection(
+		{ ...workflow.connections },
+		actualSourceNode.name,
+		actualTargetNode.name,
+		inference.connectionType as NodeConnectionType,
+		sourceIndex,
+		targetIndex,
+	);
+
+	return {
+		...workflow,
+		connections,
+	};
+}
+
+function resolveUpdateNodeIntent(
+	workflow: SimpleWorkflow,
+	intent: UpdateNodeIntentOperation,
+): SimpleWorkflow {
+	return applyUpdateNodeOperation(workflow, {
+		type: 'updateNode',
+		nodeName: intent.nodeName,
+		updates: intent.updates,
+	});
+}
+
 /**
  * Handle 'setName' operation - update workflow name
  */
@@ -352,9 +462,11 @@ const operationHandlers: Record<WorkflowOperation['type'], OperationHandler> = {
 	removeNode: applyRemoveNodeOperation,
 	addNodes: applyAddNodesOperation,
 	updateNode: applyUpdateNodeOperation,
+	updateNodeIntent: applyUpdateNodeIntentOperation,
 	setConnections: applySetConnectionsOperation,
 	mergeConnections: applyMergeConnectionsOperation,
 	removeConnection: applyRemoveConnectionOperation,
+	connectIntent: applyConnectIntentOperation,
 	setName: applySetNameOperation,
 	renameNode: applyRenameNodeOperation,
 };
@@ -386,10 +498,13 @@ export function applyOperations(
  * Process operations node for the LangGraph workflow
  * This node applies accumulated operations to the workflow state
  */
-export function processOperations(state: {
-	workflowJSON: SimpleWorkflow;
-	workflowOperations?: WorkflowOperation[] | null;
-}) {
+export function processOperations(
+	state: {
+		workflowJSON: SimpleWorkflow;
+		workflowOperations?: WorkflowOperation[] | null;
+	},
+	options?: { nodeTypes?: INodeTypeDescription[] },
+) {
 	const { workflowJSON, workflowOperations } = state;
 
 	// If no operations to process, return unchanged
@@ -397,8 +512,32 @@ export function processOperations(state: {
 		return {};
 	}
 
-	// Apply all operations to get the new workflow
-	const newWorkflow = applyOperations(workflowJSON, workflowOperations);
+	const regularOperations = workflowOperations.filter(
+		(op) => op.type !== 'connectIntent' && op.type !== 'updateNodeIntent',
+	);
+	const updateIntentOperations = workflowOperations.filter(
+		(op): op is UpdateNodeIntentOperation => op.type === 'updateNodeIntent',
+	);
+	const intentOperations = workflowOperations.filter(
+		(op): op is ConnectIntentOperation => op.type === 'connectIntent',
+	);
+
+	let newWorkflow = workflowJSON;
+	if (regularOperations.length > 0) {
+		newWorkflow = applyOperations(workflowJSON, regularOperations);
+	}
+
+	if (updateIntentOperations.length > 0) {
+		for (const intent of updateIntentOperations) {
+			newWorkflow = resolveUpdateNodeIntent(newWorkflow, intent);
+		}
+	}
+
+	if (intentOperations.length > 0 && options?.nodeTypes?.length) {
+		for (const intent of intentOperations) {
+			newWorkflow = resolveConnectIntent(newWorkflow, intent, options.nodeTypes);
+		}
+	}
 
 	// Return updated state with cleared operations
 	return {

@@ -19,9 +19,16 @@ import { trimWorkflowJSON } from '@/utils/trim-workflow-context';
 import { createParameterUpdaterChain } from '../chains/parameter-updater';
 import { ValidationError, ParameterUpdateError, ToolExecutionError } from '../errors';
 import type { UpdateNodeParametersOutput } from '../types/tools';
+import type { SimpleWorkflow } from '../types/workflow';
 import { createProgressReporter, reportProgress } from './helpers/progress';
 import { createSuccessResponse, createErrorResponse } from './helpers/response';
-import { getCurrentWorkflow, getWorkflowState, updateNodeInWorkflow } from './helpers/state';
+import {
+	getCurrentWorkflow,
+	getWorkflowState,
+	updateNodeInWorkflow,
+	addUpdateNodeIntentToWorkflow,
+	getPendingNodeEntry,
+} from './helpers/state';
 import {
 	findNodeByName,
 	findNodeType,
@@ -300,8 +307,9 @@ async function processParameterUpdates(
 	llm: BaseChatModel,
 	logger?: Logger,
 	instanceUrl?: string,
+	workflowOverride?: SimpleWorkflow,
 ): Promise<INodeParameters> {
-	const workflow = getCurrentWorkflow(state);
+	const workflow = workflowOverride ?? getCurrentWorkflow(state);
 
 	// Get current parameters
 	const currentParameters = extractNodeParameters(node);
@@ -421,8 +429,33 @@ export function createUpdateNodeParametersTool(
 					customDisplayTitle: getCustomNodeTitle(input, workflow.nodes),
 				});
 
-				// Find the node by name
-				const node = findNodeByName(nodeName, workflow.nodes);
+				// Find the node by name (case-insensitive)
+				let node = findNodeByName(nodeName, workflow.nodes);
+				let isPendingNode = false;
+
+				if (!node) {
+					const pendingEntry = getPendingNodeEntry(config, nodeName);
+					if (pendingEntry) {
+						reportProgress(reporter, `Waiting for node "${nodeName}" to be added`, {
+							nodeName,
+						});
+						try {
+							node = await pendingEntry.promise;
+							isPendingNode = true;
+						} catch (error) {
+							const pendingError = createNodeNotFoundError(nodeName);
+							if (pendingError.details && error instanceof Error) {
+								pendingError.details = {
+									...pendingError.details,
+									reason: error.message,
+								};
+							}
+							reporter.error(pendingError);
+							return createErrorResponse(config, pendingError);
+						}
+					}
+				}
+
 				if (!node) {
 					const error = createNodeNotFoundError(nodeName);
 					reporter.error(error);
@@ -443,6 +476,10 @@ export function createUpdateNodeParametersTool(
 					changes,
 				});
 
+				const workflowForContext = isPendingNode
+					? { ...workflow, nodes: [...workflow.nodes, node] }
+					: workflow;
+
 				try {
 					// Resource/operation filtering happens automatically inside processParameterUpdates
 					// based on node.parameters (set by Builder via initialParameters)
@@ -455,6 +492,7 @@ export function createUpdateNodeParametersTool(
 						llm,
 						logger,
 						instanceUrl,
+						workflowForContext,
 					);
 
 					// Create updated node
@@ -474,7 +512,9 @@ export function createUpdateNodeParametersTool(
 					reporter.complete(output);
 
 					// Return success with state updates (use node name)
-					const stateUpdates = updateNodeInWorkflow(state, node.name, updatedNode);
+					const stateUpdates = isPendingNode
+						? addUpdateNodeIntentToWorkflow(node.name, updatedNode)
+						: updateNodeInWorkflow(state, node.name, updatedNode);
 					return createSuccessResponse(config, message, stateUpdates);
 				} catch (error) {
 					if (error instanceof ParameterUpdateError) {

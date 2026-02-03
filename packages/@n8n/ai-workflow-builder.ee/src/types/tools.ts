@@ -85,10 +85,10 @@ export interface AddNodeOutput {
 export interface ConnectNodesOutput {
 	sourceNode: string;
 	targetNode: string;
-	connectionType: string;
-	swapped: boolean;
 	message: string;
-	found: {
+	connectionType?: string;
+	swapped?: boolean;
+	found?: {
 		sourceNode: boolean;
 		targetNode: boolean;
 	};

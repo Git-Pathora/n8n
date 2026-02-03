@@ -1,9 +1,11 @@
 import type { BaseMessage } from '@langchain/core/messages';
 import { isAIMessage, ToolMessage, HumanMessage } from '@langchain/core/messages';
 import type { StructuredTool } from '@langchain/core/tools';
-import { isCommand, END } from '@langchain/langgraph';
+import { isCommand, END, getConfig } from '@langchain/langgraph';
+import type { INode } from 'n8n-workflow';
 
 import { isBaseMessage } from '../types/langchain';
+import type { PendingNodeRegistry } from '../types/pending-nodes';
 import type { WorkflowMetadata } from '../types/tools';
 import type { WorkflowOperation } from '../types/workflow';
 
@@ -58,6 +60,41 @@ function isCommandUpdate(value: unknown): value is CommandUpdate {
 	return true;
 }
 
+function createDeferred<T>() {
+	let resolve!: (value: T) => void;
+	let reject!: (error: Error) => void;
+	const promise = new Promise<T>((res, rej) => {
+		resolve = res;
+		reject = rej;
+	});
+	// Prevent unhandled rejection crashes - errors are reported through tool responses
+	promise.catch(() => {});
+	return { promise, resolve, reject };
+}
+
+function buildPendingNodesRegistry(
+	toolCalls: Array<{ name: string; args?: Record<string, unknown> }>,
+): PendingNodeRegistry {
+	const registry: PendingNodeRegistry = {};
+
+	for (const toolCall of toolCalls) {
+		if (toolCall.name !== 'add_nodes') continue;
+
+		const name = typeof toolCall.args?.name === 'string' ? toolCall.args.name : null;
+		if (!name) continue;
+
+		const key = name.toLowerCase();
+		if (!registry[key]) {
+			const deferred = createDeferred<INode>();
+			registry[key] = { ...deferred, count: 1 };
+		} else {
+			registry[key].count += 1;
+		}
+	}
+
+	return registry;
+}
+
 /**
  * Execute tools in a subgraph node
  *
@@ -84,6 +121,12 @@ export async function executeSubgraphTools(
 		return {};
 	}
 
+	const pendingNodes = buildPendingNodesRegistry(lastMessage.tool_calls);
+	const hasPendingNodes = Object.keys(pendingNodes).length > 0;
+
+	// Get parent config to preserve LangGraph's internal state (scratchpad)
+	const parentConfig = getConfig();
+
 	// Execute all tools in parallel
 	const toolResults = await Promise.all(
 		lastMessage.tool_calls.map(async (toolCall) => {
@@ -97,10 +140,15 @@ export async function executeSubgraphTools(
 
 			try {
 				const result: unknown = await tool.invoke(toolCall.args ?? {}, {
+					...parentConfig,
 					toolCall: {
 						id: toolCall.id,
 						name: toolCall.name,
 						args: toolCall.args ?? {},
+					},
+					configurable: {
+						...parentConfig.configurable,
+						...(hasPendingNodes ? { pendingNodes } : {}),
 					},
 				});
 				// Result can be a Command (with update) or a BaseMessage

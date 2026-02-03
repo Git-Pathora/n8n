@@ -13,6 +13,7 @@ export type WorkflowOperation =
 	| { type: 'removeNode'; nodeNames: string[] }
 	| { type: 'addNodes'; nodes: INode[] }
 	| { type: 'updateNode'; nodeName: string; updates: Partial<INode> }
+	| { type: 'updateNodeIntent'; nodeName: string; updates: Partial<INode> }
 	| { type: 'setConnections'; connections: IConnections }
 	| { type: 'mergeConnections'; connections: IConnections }
 	| {
@@ -24,4 +25,12 @@ export type WorkflowOperation =
 			targetInputIndex: number;
 	  }
 	| { type: 'setName'; name: string }
-	| { type: 'renameNode'; oldName: string; newName: string };
+	| { type: 'renameNode'; oldName: string; newName: string }
+	| {
+			type: 'connectIntent';
+			sourceNodeName: string;
+			targetNodeName: string;
+			connectionType?: string;
+			sourceOutputIndex?: number;
+			targetInputIndex?: number;
+	  };

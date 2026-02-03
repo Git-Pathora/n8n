@@ -316,7 +316,9 @@ export class BuilderSubgraph extends BaseSubgraph<
 			.addNode('prefetch_rlc', prefetchRLCNode)
 			.addNode('agent', callAgent)
 			.addNode('tools', async (state) => await executeSubgraphTools(state, this.toolMap))
-			.addNode('process_operations', processOperations)
+			.addNode('process_operations', (state) =>
+				processOperations(state, { nodeTypes: this.nodeTypes }),
+			)
 			.addEdge('__start__', 'prefetch_rlc')
 			.addEdge('prefetch_rlc', 'agent')
 			// Map 'tools' to tools node, END is handled automatically

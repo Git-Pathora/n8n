@@ -68,7 +68,7 @@ Plan all nodes before starting to avoid backtracking.`;
 
 const NODE_CREATION = `Each add_nodes call creates one node:
 - nodeType: Exact type from discovery (e.g., "n8n-nodes-base.httpRequest")
-- name: Descriptive name (e.g., "Fetch Weather Data")
+- name: Descriptive unique name (e.g., "Fetch Weather Data")
 - initialParametersReasoning: Brief explanation
 - initialParameters: Parameters to set initially (or empty object if none)
 

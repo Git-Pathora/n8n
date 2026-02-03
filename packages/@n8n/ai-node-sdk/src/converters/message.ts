@@ -2,10 +2,6 @@ import * as LangchainMessages from '@langchain/core/messages';
 
 import type * as N8nMessages from '../types/message';
 
-function isLcToolMessage(msg: LangchainMessages.BaseMessage): msg is LangchainMessages.ToolMessage {
-	return msg.type === 'tool';
-}
-
 function convertToN8nRole(role: LangchainMessages.MessageType): N8nMessages.MessageRole {
 	switch (role) {
 		case 'system':

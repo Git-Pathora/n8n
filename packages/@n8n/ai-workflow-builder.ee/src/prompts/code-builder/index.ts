@@ -609,56 +609,21 @@ When validation passes, stop calling tools and output a one-liner summary of wha
  */
 const TEXT_EDITOR_INSTRUCTIONS = `# Text Editor Tool
 
-You MUST use the \`str_replace_based_edit_tool\` for all workflow code. Do NOT output code in markdown blocks.
+Use \`str_replace_based_edit_tool\` for all workflow code. Do NOT output code in markdown blocks.
+The only supported file path is \`/workflow.ts\`.
 
-## Commands
+## Text Editor Commands
 
-- **view**: View code with line numbers. Use view_range for specific lines.
-  \`\`\`json
-  {{"command": "view", "path": "/workflow.ts"}}
-  {{"command": "view", "path": "/workflow.ts", "view_range": [1, 10]}}
-  \`\`\`
-
-- **str_replace**: Replace exact string match. old_str must match exactly one occurrence.
-  \`\`\`json
-  {{"command": "str_replace", "path": "/workflow.ts", "old_str": "...", "new_str": "..."}}
-  \`\`\`
-
-- **insert**: Insert text after a specific line (0 = beginning of file).
-  \`\`\`json
-  {{"command": "insert", "path": "/workflow.ts", "insert_line": 5, "new_str": "..."}}
-  \`\`\`
-
-## Validate Tool
-
-Use \`validate_workflow\` to check your code for errors:
-\`\`\`json
-{{"path": "/workflow.ts"}}
-\`\`\`
-
-Returns validation results - either success or a list of errors to fix.
-
-## When to Use Each Command
-
-- **str_replace**: Modify existing code - change parameters, fix errors, update node configs
-- **insert**: Add new code without touching existing lines - new node declarations, new imports
+- **str_replace**: Modify existing code. old_str must match EXACTLY one occurrence (add more context if multiple matches).
+- **insert**: Add new lines after a specific line number (0 = beginning of file).
+- **view**: Refresh the view after multiple edits (code is pre-loaded in \`<workflow_file>\`).
 
 ## Workflow
 
-1. If \`<workflow_file>\` is shown above, the code is already visible with line numbers
-2. Use \`str_replace\` to modify existing code, \`insert\` to add new lines
-3. Use \`view\` only if you need to refresh the view after multiple edits
-4. Use \`validate_workflow\` to check your code at any time - it will report any errors
-5. When you're satisfied with your edits, simply stop calling tools - the workflow will auto-finalize
-6. SDK types are available via the \`get_node_types\` tool
-
-## Important Notes
-
-- The only supported file path is \`/workflow.ts\`
-- When using \`str_replace\`, ensure old_str matches EXACTLY one occurrence in the file
-- If you get "multiple matches" error, include more context in old_str to make it unique
-- When using \`insert\`, specify the line number AFTER which to insert (0 = beginning of file)
-- When done editing, stop calling tools to auto-finalize (or use \`validate_workflow\` first to check)`;
+1. Code is already visible in \`<workflow_file>\` with line numbers
+2. Use \`str_replace\` to modify, \`insert\` to add new lines
+3. Use \`validate_workflow\` tool to check for errors
+4. Stop calling tools to auto-finalize`;
 
 /**
  * History context for multi-turn conversations

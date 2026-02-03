@@ -12,7 +12,6 @@ import {
 	placeholder as placeholderFn,
 	newCredential as newCredentialFn,
 	ifElse as ifElseFn,
-	ifNode as ifNodeFn,
 	switchCase as switchCaseFn,
 	merge as mergeFn,
 } from './node-builder';
@@ -485,7 +484,6 @@ const sdkFunctions: SDKFunctions = {
 	placeholder: placeholderFn,
 	newCredential: newCredentialFn,
 	ifElse: ifElseFn,
-	ifNode: ifNodeFn,
 	switchCase: switchCaseFn,
 	merge: mergeFn,
 	splitInBatches: splitInBatchesFn,

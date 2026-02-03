@@ -19,7 +19,6 @@ export const ALLOWED_SDK_FUNCTIONS = new Set([
 
 	// Control flow
 	'ifElse',
-	'ifNode',
 	'switchCase',
 	'merge',
 	'splitInBatches',

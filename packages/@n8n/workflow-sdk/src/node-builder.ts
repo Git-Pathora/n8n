@@ -924,9 +924,6 @@ export function ifElse<TOutput = unknown>(
 	}) as NodeInstance<'n8n-nodes-base.if', string, TOutput>;
 }
 
-/** Alias for ifElse() */
-export const ifNode = ifElse;
-
 /**
  * Config for merge() factory function
  */

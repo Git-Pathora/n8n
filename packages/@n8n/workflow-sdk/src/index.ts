@@ -96,7 +96,6 @@ export {
 	placeholder,
 	newCredential,
 	ifElse,
-	ifNode,
 	switchCase,
 	merge,
 } from './node-builder';

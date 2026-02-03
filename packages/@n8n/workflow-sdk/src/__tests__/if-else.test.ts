@@ -1,12 +1,12 @@
 import { workflow } from '../workflow-builder';
-import { node, trigger, isIfElseBuilder, ifElse, ifNode } from '../node-builder';
+import { node, trigger, isIfElseBuilder, ifElse } from '../node-builder';
 import { parseWorkflowCode } from '../parse-workflow-code';
 import type { NodeInstance } from '../types/base';
 
 // Helper type for IF node
 type IfNode = NodeInstance<'n8n-nodes-base.if', string, unknown>;
 
-describe('ifElse() and ifNode() factory functions', () => {
+describe('ifElse() factory function', () => {
 	it('ifElse() creates an IF node with correct type', () => {
 		const ifN = ifElse({ version: 2.2, config: { name: 'My IF' } });
 		expect(ifN.type).toBe('n8n-nodes-base.if');
@@ -26,27 +26,14 @@ describe('ifElse() and ifNode() factory functions', () => {
 		const builder = ifN.onTrue!(trueBranch).onFalse(falseBranch);
 		expect(isIfElseBuilder(builder)).toBe(true);
 	});
-
-	it('ifNode() is an alias for ifElse()', () => {
-		expect(ifNode).toBe(ifElse);
-	});
 });
 
-describe('parseWorkflowCode with ifElse/ifNode', () => {
+describe('parseWorkflowCode with ifElse', () => {
 	it('parseWorkflowCode recognizes ifElse()', () => {
 		const code = `
 return workflow('test', 'Test')
   .add(trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: {} }))
   .then(ifElse({ version: 2.2, config: { name: 'Check' } }).onTrue(node({ type: 'n8n-nodes-base.noOp', version: 1, config: {} })).onFalse(null));
-`;
-		expect(() => parseWorkflowCode(code)).not.toThrow();
-	});
-
-	it('parseWorkflowCode recognizes ifNode()', () => {
-		const code = `
-return workflow('test', 'Test')
-  .add(trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: {} }))
-  .then(ifNode({ version: 2.2, config: { name: 'Check' } }).onTrue(node({ type: 'n8n-nodes-base.noOp', version: 1, config: {} })).onFalse(null));
 `;
 		expect(() => parseWorkflowCode(code)).not.toThrow();
 	});

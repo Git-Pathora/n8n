@@ -51,7 +51,6 @@ const createMockSDKFunctions = (): SDKFunctions => ({
 	placeholder: jest.fn((value: string) => `__PLACEHOLDER__${value}__`),
 	newCredential: jest.fn((name: string) => ({ __newCredential: true, name })),
 	ifElse: jest.fn(),
-	ifNode: jest.fn(),
 	switchCase: jest.fn(),
 	merge: jest.fn((config: unknown) => ({ type: 'merge', config, input: jest.fn() })),
 	splitInBatches: jest.fn(),

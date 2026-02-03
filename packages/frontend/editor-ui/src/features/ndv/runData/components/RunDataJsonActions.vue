@@ -4,7 +4,6 @@ import type { INodeUi } from '@/Interface';
 import { NodeConnectionTypes, type IDataObject, type IRunExecutionData } from 'n8n-workflow';
 import { clearJsonKey, convertPath } from '@/app/utils/typesUtils';
 import { executionDataToJson } from '@/app/utils/nodeTypesUtils';
-import { useWorkflowsStore } from '@/app/stores/workflows.store';
 import { useNDVStore } from '@/features/ndv/shared/ndv.store';
 import { useNodeHelpers } from '@/app/composables/useNodeHelpers';
 import { useToast } from '@/app/composables/useToast';
@@ -44,7 +43,6 @@ const popOutWindow = inject(PopOutWindowKey, ref<Window | undefined>());
 const isInPopOutWindow = computed(() => popOutWindow?.value !== undefined);
 
 const ndvStore = useNDVStore();
-const workflowsStore = useWorkflowsStore();
 const workflowId = useInjectWorkflowId();
 
 const clipboard = useClipboard();

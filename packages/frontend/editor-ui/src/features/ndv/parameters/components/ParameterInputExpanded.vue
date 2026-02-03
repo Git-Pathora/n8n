@@ -3,7 +3,6 @@ import type { IUpdateInformation } from '@/Interface';
 import { useI18n } from '@n8n/i18n';
 import { useTelemetry } from '@/app/composables/useTelemetry';
 import { useInjectWorkflowId } from '@/app/composables/useInjectWorkflowId';
-import { useWorkflowsStore } from '@/app/stores/workflows.store';
 import { isValueExpression as isValueExpressionUtil } from '@/app/utils/nodeTypesUtils';
 import { createEventBus } from '@n8n/utils/event-bus';
 import {
@@ -51,8 +50,6 @@ const blurredEver = ref(false);
 const menuExpanded = ref(false);
 const eventBus = ref(createEventBus());
 const uiStore = useUIStore();
-
-const workflowsStore = useWorkflowsStore();
 const workflowId = useInjectWorkflowId();
 
 const i18n = useI18n();

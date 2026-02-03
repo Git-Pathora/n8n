@@ -108,7 +108,7 @@ watch(
 			resolvedExpressionValue,
 		});
 
-		if (!newValue) {
+		if (!newValue && workflowId.value) {
 			const telemetryPayload = createExpressionTelemetryPayload(
 				segments.value,
 				props.modelValue.toString(),

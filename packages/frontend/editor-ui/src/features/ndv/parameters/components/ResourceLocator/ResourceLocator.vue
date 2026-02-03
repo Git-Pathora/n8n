@@ -13,7 +13,6 @@ import { useNDVStore } from '@/features/ndv/shared/ndv.store';
 import { useNodeTypesStore } from '@/app/stores/nodeTypes.store';
 import { useRootStore } from '@n8n/stores/useRootStore';
 import { useUIStore } from '@/app/stores/ui.store';
-import { useWorkflowsStore } from '@/app/stores/workflows.store';
 import {
 	getAppNameFromNodeName,
 	getMainAuthField,
@@ -158,7 +157,6 @@ const nodeTypesStore = useNodeTypesStore();
 const ndvStore = useNDVStore();
 const rootStore = useRootStore();
 const uiStore = useUIStore();
-const workflowsStore = useWorkflowsStore();
 const workflowId = useInjectWorkflowId();
 const projectsStore = useProjectsStore();
 

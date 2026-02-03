@@ -22,10 +22,11 @@ const annotationDropdownRef = ref<InstanceType<typeof ElDropdown> | null>(null);
 const isDropdownVisible = ref(false);
 
 const workflowId = injectStrict(WorkflowIdKey);
-const workflowPermissions = computed(
-	() =>
-		getResourcePermissions(workflowsListStore.getWorkflowById(workflowId.value)?.scopes).workflow,
-);
+const workflowPermissions = computed(() => {
+	if (!workflowId.value) return getResourcePermissions().workflow;
+	return getResourcePermissions(workflowsListStore.getWorkflowById(workflowId.value)?.scopes)
+		.workflow;
+});
 
 const customDataLength = computed(() => {
 	return props.execution?.customData ? Object.keys(props.execution?.customData).length : 0;

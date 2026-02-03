@@ -89,8 +89,8 @@ describe('useInjectWorkflowId', () => {
 	});
 
 	it('should be reactive to provided value changes', async () => {
+		const workflowIdValue = 'initial-id';
 		const providedWorkflowId = computed(() => workflowIdValue);
-		let workflowIdValue = 'initial-id';
 
 		const ChildComponent = defineComponent({
 			setup() {

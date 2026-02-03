@@ -449,6 +449,10 @@ async function initializeRoute(force = false) {
 				return await initializeWorkspaceForNewWorkflow();
 			}
 
+			if (!workflowId.value) {
+				return await initializeWorkspaceForNewWorkflow();
+			}
+
 			// Check if we should initialize for a new workflow
 			if (isNewWorkflowRoute.value) {
 				const exists = await workflowsListStore.checkWorkflowExists(workflowId.value);
@@ -1272,7 +1276,9 @@ async function onRunWorkflowToNode(id: string) {
 		});
 	} else {
 		trackRunWorkflowToNode(node);
-		agentRequestStore.clearAgentRequests(workflowId.value, node.id);
+		if (workflowId.value) {
+			agentRequestStore.clearAgentRequests(workflowId.value, node.id);
+		}
 
 		void runWorkflow({
 			destinationNode: { nodeName: node.name, mode: 'inclusive' },

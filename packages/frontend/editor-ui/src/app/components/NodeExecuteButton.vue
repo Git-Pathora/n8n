@@ -271,6 +271,8 @@ const shouldGenerateCode = computed(() => {
 });
 
 async function stopWaitingForWebhook() {
+	if (!workflowId.value) return;
+
 	try {
 		await workflowsStore.removeTestWebhook(workflowId.value);
 	} catch (error) {

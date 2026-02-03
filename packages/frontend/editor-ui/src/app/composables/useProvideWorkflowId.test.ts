@@ -1,10 +1,10 @@
 import { mount } from '@vue/test-utils';
-import { computed, defineComponent, h, inject } from 'vue';
+import { defineComponent, h, inject } from 'vue';
 import { useProvideWorkflowId } from './useProvideWorkflowId';
 import { WorkflowIdKey } from '@/app/constants/injectionKeys';
 
-const mockRoute = {
-	params: { name: 'test-workflow-id' },
+const mockRoute: { params: { name?: string | string[] } } = {
+	params: { name: 'test-workflow-id' as string | undefined },
 };
 
 vi.mock('vue-router', () => ({

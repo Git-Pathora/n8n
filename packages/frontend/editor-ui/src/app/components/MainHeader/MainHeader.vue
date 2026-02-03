@@ -226,7 +226,9 @@ async function navigateToExecutionsView(openInNewTab: boolean) {
 		window.open(href, '_blank');
 	} else if (route.name !== routeToNavigateTo.name) {
 		dirtyState.value = uiStore.stateIsDirty;
-		workflowToReturnTo.value = workflowId.value;
+		if (workflowId.value) {
+			workflowToReturnTo.value = workflowId.value;
+		}
 		activeHeaderTab.value = MAIN_HEADER_TABS.EXECUTIONS;
 		await router.push(routeToNavigateTo);
 	}
@@ -244,7 +246,9 @@ async function navigateToEvaluationsView(openInNewTab: boolean) {
 		window.open(href, '_blank');
 	} else if (route.name !== routeToNavigateTo.name) {
 		dirtyState.value = uiStore.stateIsDirty;
-		workflowToReturnTo.value = workflowId.value;
+		if (workflowId.value) {
+			workflowToReturnTo.value = workflowId.value;
+		}
 		activeHeaderTab.value = MAIN_HEADER_TABS.EXECUTIONS;
 		await router.push(routeToNavigateTo);
 	}

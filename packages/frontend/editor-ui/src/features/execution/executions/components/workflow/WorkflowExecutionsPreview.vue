@@ -46,10 +46,11 @@ const workflowsListStore = useWorkflowsListStore();
 const settingsStore = useSettingsStore();
 const retryDropdownRef = ref<RetryDropdownRef | null>(null);
 const workflowId = injectStrict(WorkflowIdKey);
-const workflowPermissions = computed(
-	() =>
-		getResourcePermissions(workflowsListStore.getWorkflowById(workflowId.value)?.scopes).workflow,
-);
+const workflowPermissions = computed(() => {
+	if (!workflowId.value) return getResourcePermissions().workflow;
+	return getResourcePermissions(workflowsListStore.getWorkflowById(workflowId.value)?.scopes)
+		.workflow;
+});
 const executionId = computed(() => route.params.executionId as string);
 const nodeId = computed(() => route.params.nodeId as string);
 const executionUIDetails = computed<IExecutionUIData | null>(() =>

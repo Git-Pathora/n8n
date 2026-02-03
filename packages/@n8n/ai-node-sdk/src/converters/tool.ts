@@ -11,7 +11,7 @@ import type * as N8nTools from '../types/tool';
  * Convert various tool formats to N8nTool
  * Supports LangChain BindToolsInput, OpenAI-style tools, and custom formats
  */
-export function toN8nTool(tool: LangchainChatModels.BindToolsInput): N8nTools.Tool {
+export function fromLcTool(tool: LangchainChatModels.BindToolsInput): N8nTools.Tool {
 	if ('schema' in tool && 'invoke' in tool) {
 		const structuredTool = tool as LangchainTools.StructuredTool;
 		return {

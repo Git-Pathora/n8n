@@ -9,7 +9,7 @@ import { ChatGenerationChunk } from '@langchain/core/outputs';
 import type { Runnable } from '@langchain/core/runnables';
 
 import { fromLcMessage } from '../converters/message';
-import { toN8nTool } from '../converters/tool';
+import { fromLcTool } from '../converters/tool';
 import type { ChatModel, ChatModelConfig } from '../types/chat-model';
 
 export class LangchainAdapter<
@@ -180,7 +180,7 @@ export class LangchainAdapter<
 		tools: BindToolsInput[],
 	): Runnable<BaseLanguageModelInput, AIMessageChunk, CallOptions> {
 		// Convert tools to generic format
-		const genericTools = tools.map(toN8nTool);
+		const genericTools = tools.map(fromLcTool);
 
 		// Create a new adapter with bound tools
 		const newN8nModel = this.genericModel.withTools(genericTools);

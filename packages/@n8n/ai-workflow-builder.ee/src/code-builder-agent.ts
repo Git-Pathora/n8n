@@ -439,6 +439,7 @@ ${'='.repeat(50)}
 			// Text editor mode state
 			let textEditorHandler: TextEditorHandler | null = null;
 			let textEditorValidateAttempts = 0;
+			let validatePassedThisIteration = false;
 
 			if (textEditorEnabled) {
 				// Pass debug log function to handler for detailed logging
@@ -467,6 +468,7 @@ ${'='.repeat(50)}
 				}
 
 				iteration++;
+				validatePassedThisIteration = false;
 				this.debugLog('CHAT', `========== ITERATION ${iteration} ==========`);
 
 				// Log message history state at start of iteration
@@ -625,7 +627,8 @@ ${'='.repeat(50)}
 							// If validate succeeded, the workflow is validated but we don't exit the loop
 							// Let auto-finalize happen when LLM stops calling tools
 							if (result?.workflowReady) {
-								this.debugLog('CHAT', 'Validate tool succeeded');
+								this.debugLog('CHAT', 'Validate tool succeeded, letting agent finalize');
+								validatePassedThisIteration = true;
 							}
 						} else {
 							yield* this.executeToolCall(
@@ -636,7 +639,8 @@ ${'='.repeat(50)}
 					}
 
 					// Check if we should exit after text editor finalize
-					if (textEditorEnabled && workflow) {
+					// Skip if validate just passed - let agent have another turn to finalize
+					if (textEditorEnabled && workflow && !validatePassedThisIteration) {
 						this.debugLog('CHAT', 'Workflow ready from text editor, exiting loop');
 						break;
 					}
@@ -1525,9 +1529,9 @@ ${'='.repeat(50)}
 					} as ToolProgressChunk,
 				],
 			};
-			// Workflow is saved above, but return workflowReady: false to let auto-finalize
-			// happen when LLM stops calling tools (if we're not on the last iteration)
-			return { workflowReady: false };
+			// Return workflowReady: true so main loop knows validation passed
+			// Main loop will let agent have another turn to finalize
+			return { workflowReady: true };
 		} catch (error) {
 			const parseDuration = Date.now() - parseStartTime;
 			state.setParseDuration(parseDuration);

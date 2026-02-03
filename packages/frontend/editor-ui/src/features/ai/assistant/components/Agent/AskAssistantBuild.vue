@@ -8,6 +8,7 @@ import { useWorkflowAutosaveStore } from '@/app/stores/workflowAutosave.store';
 import { AutoSaveState } from '@/app/constants';
 import { computed, watch, ref, useSlots } from 'vue';
 import { useTelemetry } from '@/app/composables/useTelemetry';
+import { useInjectWorkflowId } from '@/app/composables/useInjectWorkflowId';
 import { useI18n } from '@n8n/i18n';
 import { useWorkflowsStore } from '@/app/stores/workflows.store';
 import { useRoute, useRouter } from 'vue-router';
@@ -45,6 +46,7 @@ const workflowAutosaveStore = useWorkflowAutosaveStore();
 const telemetry = useTelemetry();
 const slots = useSlots();
 const workflowsStore = useWorkflowsStore();
+const workflowId = useInjectWorkflowId();
 const assistantStore = useAssistantStore();
 const router = useRouter();
 const i18n = useI18n();
@@ -192,14 +194,14 @@ function onFeedback(feedback: RatingFeedback) {
 	if (feedback.rating) {
 		telemetry.track('User rated workflow generation', {
 			helpful: feedback.rating === 'up',
-			workflow_id: workflowsStore.workflowId,
+			workflow_id: workflowId.value,
 			session_id: builderStore.trackingSessionId,
 		});
 	}
 	if (feedback.feedback) {
 		telemetry.track('User submitted workflow generation feedback', {
 			feedback: feedback.feedback,
-			workflow_id: workflowsStore.workflowId,
+			workflow_id: workflowId.value,
 			session_id: builderStore.trackingSessionId,
 			user_message_id: builderStore.lastUserMessageId,
 		});
@@ -368,7 +370,7 @@ function onShowVersion(versionId: string) {
 	const route = router.resolve({
 		name: VIEWS.WORKFLOW_HISTORY,
 		params: {
-			workflowId: workflowsStore.workflowId,
+			workflowId: workflowId.value,
 			versionId,
 		},
 	});
@@ -405,7 +407,7 @@ defineExpose({
 			:show-ask-owner-tooltip="showAskOwnerTooltip"
 			:suggestions="workflowSuggestions"
 			:input-placeholder="i18n.baseText('aiAssistant.builder.assistantPlaceholder')"
-			:workflow-id="workflowsStore.workflowId"
+			:workflow-id="workflowId"
 			:prune-time-hours="workflowHistoryStore.evaluatedPruneTime"
 			:disabled="isInputDisabled"
 			:disabled-tooltip="disabledTooltip"

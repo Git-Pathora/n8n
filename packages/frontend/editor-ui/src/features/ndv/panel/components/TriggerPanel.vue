@@ -24,6 +24,7 @@ import { useWorkflowHelpers } from '@/app/composables/useWorkflowHelpers';
 import { isTriggerPanelObject } from '@/app/utils/typeGuards';
 import { useI18n } from '@n8n/i18n';
 import { useTelemetry } from '@/app/composables/useTelemetry';
+import { useInjectWorkflowId } from '@/app/composables/useInjectWorkflowId';
 
 import {
 	N8nButton,
@@ -58,6 +59,7 @@ const router = useRouter();
 const workflowHelpers = useWorkflowHelpers();
 const i18n = useI18n();
 const telemetry = useTelemetry();
+const workflowId = useInjectWorkflowId();
 
 const executionsHelpEventBus = createEventBus();
 
@@ -332,7 +334,7 @@ const expandExecutionHelp = () => {
 
 const openWebhookUrl = () => {
 	telemetry.track('User clicked ndv link', {
-		workflow_id: workflowsStore.workflowId,
+		workflow_id: workflowId.value,
 		push_ref: props.pushRef,
 		pane: 'input',
 		type: 'open-chat',
@@ -355,7 +357,7 @@ const onLinkClick = (e: MouseEvent) => {
 			emit('activate');
 		} else if (target.dataset.key === 'executions') {
 			telemetry.track('User clicked ndv link', {
-				workflow_id: workflowsStore.workflowId,
+				workflow_id: workflowId.value,
 				push_ref: props.pushRef,
 				pane: 'input',
 				type: 'open-executions-log',

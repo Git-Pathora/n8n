@@ -4,11 +4,14 @@ import { computed, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { VIEWS } from '@/app/constants';
 import { useStyles } from '@/app/composables/useStyles';
+import { useProvideWorkflowId } from '@/app/composables/useProvideWorkflowId';
 import { useCommandBar } from '@/features/shared/commandBar/composables/useCommandBar';
 import { hasPermission } from '@/app/utils/rbac/permissions';
 
 const route = useRoute();
 const { APP_Z_INDEXES } = useStyles();
+
+useProvideWorkflowId();
 
 const {
 	initialize: initializeCommandBar,

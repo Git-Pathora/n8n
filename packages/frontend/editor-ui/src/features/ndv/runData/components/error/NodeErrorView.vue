@@ -8,6 +8,7 @@ import { useNodeTypesStore } from '@/app/stores/nodeTypes.store';
 import { useNDVStore } from '@/features/ndv/shared/ndv.store';
 import { useWorkflowsStore } from '@/app/stores/workflows.store';
 import { useRootStore } from '@n8n/stores/useRootStore';
+import { useInjectWorkflowId } from '@/app/composables/useInjectWorkflowId';
 import type {
 	IDataObject,
 	INodeProperties,
@@ -57,7 +58,7 @@ const assistantStore = useAssistantStore();
 const chatPanelStore = useChatPanelStore();
 const uiStore = useUIStore();
 
-const workflowId = computed(() => workflowsStore.workflowId);
+const workflowId = useInjectWorkflowId();
 const executionId = computed(() => workflowsStore.getWorkflowExecution?.id);
 
 const displayCause = computed(() => {

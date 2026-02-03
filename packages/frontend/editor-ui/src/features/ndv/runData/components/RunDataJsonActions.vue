@@ -15,6 +15,7 @@ import { usePinnedData } from '@/app/composables/usePinnedData';
 import { inject, computed, ref } from 'vue';
 import { useRoute } from 'vue-router';
 import { useTelemetry } from '@/app/composables/useTelemetry';
+import { useInjectWorkflowId } from '@/app/composables/useInjectWorkflowId';
 import { ElDropdown, ElDropdownItem, ElDropdownMenu } from 'element-plus';
 import { N8nIconButton } from '@n8n/design-system';
 type JsonPathData = {
@@ -44,6 +45,7 @@ const isInPopOutWindow = computed(() => popOutWindow?.value !== undefined);
 
 const ndvStore = useNDVStore();
 const workflowsStore = useWorkflowsStore();
+const workflowId = useInjectWorkflowId();
 
 const clipboard = useClipboard();
 
@@ -184,7 +186,7 @@ function handleCopyClick(commandData: { command: string }) {
 		run_index: props.runIndex,
 		view: 'json',
 		copy_type: copyType,
-		workflow_id: workflowsStore.workflowId,
+		workflow_id: workflowId.value,
 		pane: props.paneType,
 		in_execution_log: isReadOnlyRoute.value,
 	});

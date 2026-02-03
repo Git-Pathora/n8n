@@ -11,6 +11,7 @@ import { useExternalHooks } from '@/app/composables/useExternalHooks';
 import { useInstalledCommunityPackage } from '@/features/settings/communityNodes/composables/useInstalledCommunityPackage';
 import { useNodeDocsUrl } from '@/app/composables/useNodeDocsUrl';
 import { useTelemetry } from '@/app/composables/useTelemetry';
+import { useInjectWorkflowId } from '@/app/composables/useInjectWorkflowId';
 import type { NodeSettingsTab } from '@/app/types/nodeSettings';
 import { useI18n } from '@n8n/i18n';
 
@@ -41,6 +42,7 @@ const emit = defineEmits<{
 const externalHooks = useExternalHooks();
 const ndvStore = useNDVStore();
 const workflowsStore = useWorkflowsStore();
+const workflowId = useInjectWorkflowId();
 const i18n = useI18n();
 const telemetry = useTelemetry();
 const { docsUrl } = useNodeDocsUrl({ nodeType: () => props.nodeType });
@@ -137,7 +139,7 @@ function onTabSelect(tab: NodeSettingsTab) {
 
 		telemetry.track('User clicked ndv link', {
 			node_type: activeNode.value?.type,
-			workflow_id: workflowsStore.workflowId,
+			workflow_id: workflowId.value,
 			push_ref: props.pushRef,
 			pane: NodeConnectionTypes.Main,
 			type: 'docs',
@@ -147,7 +149,7 @@ function onTabSelect(tab: NodeSettingsTab) {
 	if (tab === 'settings' && props.nodeType) {
 		telemetry.track('User viewed node settings', {
 			node_type: props.nodeType.name,
-			workflow_id: workflowsStore.workflowId,
+			workflow_id: workflowId.value,
 		});
 	}
 

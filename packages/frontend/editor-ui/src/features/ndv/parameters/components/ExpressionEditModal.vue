@@ -9,6 +9,7 @@ import { useWorkflowsStore } from '@/app/stores/workflows.store';
 import { createExpressionTelemetryPayload } from '@/app/utils/telemetryUtils';
 
 import { useTelemetry } from '@/app/composables/useTelemetry';
+import { useInjectWorkflowId } from '@/app/composables/useInjectWorkflowId';
 import type { Segment } from '@/app/types/expressions';
 import type { INodeProperties } from 'n8n-workflow';
 import { NodeConnectionTypes } from 'n8n-workflow';
@@ -58,6 +59,7 @@ const emit = defineEmits<{
 
 const ndvStore = useNDVStore();
 const workflowsStore = useWorkflowsStore();
+const workflowId = useInjectWorkflowId();
 
 const telemetry = useTelemetry();
 const i18n = useI18n();
@@ -110,7 +112,7 @@ watch(
 			const telemetryPayload = createExpressionTelemetryPayload(
 				segments.value,
 				props.modelValue.toString(),
-				workflowsStore.workflowId,
+				workflowId.value,
 				ndvStore.pushRef,
 				ndvStore.activeNode?.type ?? '',
 			);

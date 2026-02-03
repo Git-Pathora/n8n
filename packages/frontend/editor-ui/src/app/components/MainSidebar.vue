@@ -12,7 +12,7 @@ import { useSettingsStore } from '@/app/stores/settings.store';
 import { useTemplatesStore } from '@/features/workflows/templates/templates.store';
 import { useUIStore } from '@/app/stores/ui.store';
 import { useVersionsStore } from '@/app/stores/versions.store';
-import { useWorkflowsStore } from '@/app/stores/workflows.store';
+import { useInjectWorkflowId } from '@/app/composables/useInjectWorkflowId';
 import { useTelemetry } from '@/app/composables/useTelemetry';
 import { useBugReporting } from '@/app/composables/useBugReporting';
 import { usePageRedirectionHelper } from '@/app/composables/usePageRedirectionHelper';
@@ -34,8 +34,9 @@ const settingsStore = useSettingsStore();
 const templatesStore = useTemplatesStore();
 const uiStore = useUIStore();
 const versionsStore = useVersionsStore();
-const workflowsStore = useWorkflowsStore();
 const resourceCenterStore = useResourceCenterStore();
+
+const workflowId = useInjectWorkflowId();
 
 const i18n = useI18n();
 const router = useRouter();
@@ -252,7 +253,7 @@ onBeforeUnmount(() => {
 const trackHelpItemClick = (itemType: string) => {
 	telemetry.track('User clicked help resource', {
 		type: itemType,
-		workflow_id: workflowsStore.workflowId,
+		workflow_id: workflowId.value,
 	});
 };
 

@@ -2,6 +2,7 @@
 import type { IUpdateInformation } from '@/Interface';
 import { useI18n } from '@n8n/i18n';
 import { useTelemetry } from '@/app/composables/useTelemetry';
+import { useInjectWorkflowId } from '@/app/composables/useInjectWorkflowId';
 import { useWorkflowsStore } from '@/app/stores/workflows.store';
 import { isValueExpression as isValueExpressionUtil } from '@/app/utils/nodeTypesUtils';
 import { createEventBus } from '@n8n/utils/event-bus';
@@ -52,6 +53,7 @@ const eventBus = ref(createEventBus());
 const uiStore = useUIStore();
 
 const workflowsStore = useWorkflowsStore();
+const workflowId = useInjectWorkflowId();
 
 const i18n = useI18n();
 const telemetry = useTelemetry();
@@ -160,7 +162,7 @@ function onDocumentationUrlClick(): void {
 	telemetry.track('User clicked credential modal docs link', {
 		docs_link: props.documentationUrl,
 		source: 'field',
-		workflow_id: workflowsStore.workflowId,
+		workflow_id: workflowId.value,
 	});
 }
 </script>

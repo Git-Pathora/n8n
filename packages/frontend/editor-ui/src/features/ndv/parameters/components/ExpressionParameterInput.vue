@@ -11,6 +11,7 @@ import { useWorkflowsStore } from '@/app/stores/workflows.store';
 import { createExpressionTelemetryPayload } from '@/app/utils/telemetryUtils';
 
 import { useTelemetry } from '@/app/composables/useTelemetry';
+import { useInjectWorkflowId } from '@/app/composables/useInjectWorkflowId';
 import { dropInExpressionEditor } from '@/features/shared/editors/plugins/codemirror/dragAndDrop';
 import type { Segment } from '@/app/types/expressions';
 import { startCompletion } from '@codemirror/autocomplete';
@@ -58,6 +59,7 @@ const emit = defineEmits<{
 const telemetry = useTelemetry();
 const ndvStore = useNDVStore();
 const workflowsStore = useWorkflowsStore();
+const workflowId = useInjectWorkflowId();
 
 const canvas = inject(CanvasKey, undefined);
 const isInExperimentalNdv = useIsInExperimentalNdv();
@@ -106,7 +108,7 @@ function onBlur(event?: FocusEvent | KeyboardEvent) {
 		const telemetryPayload = createExpressionTelemetryPayload(
 			segments.value,
 			props.modelValue,
-			workflowsStore.workflowId,
+			workflowId.value,
 			ndvStore.pushRef,
 			ndvStore.activeNode?.type ?? '',
 		);

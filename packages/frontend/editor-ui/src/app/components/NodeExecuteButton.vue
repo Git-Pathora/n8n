@@ -15,6 +15,7 @@ import {
 	type INodeTypeDescription,
 } from 'n8n-workflow';
 import { useWorkflowsStore } from '@/app/stores/workflows.store';
+import { useInjectWorkflowId } from '@/app/composables/useInjectWorkflowId';
 import { useNDVStore } from '@/features/ndv/shared/ndv.store';
 import { useNodeTypesStore } from '@/app/stores/nodeTypes.store';
 import { useMessage } from '@/app/composables/useMessage';
@@ -85,6 +86,7 @@ const router = useRouter();
 const { runWorkflow, stopCurrentExecution } = useRunWorkflow({ router });
 
 const workflowsStore = useWorkflowsStore();
+const workflowId = useInjectWorkflowId();
 const workflowState = injectWorkflowState();
 const externalHooks = useExternalHooks();
 const toast = useToast();
@@ -270,7 +272,7 @@ const shouldGenerateCode = computed(() => {
 
 async function stopWaitingForWebhook() {
 	try {
-		await workflowsStore.removeTestWebhook(workflowsStore.workflowId);
+		await workflowsStore.removeTestWebhook(workflowId.value);
 	} catch (error) {
 		toast.showError(error, 'Error stopping webhook');
 	}
@@ -377,7 +379,7 @@ async function onClick() {
 			} else {
 				const telemetryPayload = {
 					node_type: nodeType.value ? nodeType.value.name : null,
-					workflow_id: workflowsStore.workflowId,
+					workflow_id: workflowId.value,
 					source: props.telemetrySource,
 					push_ref: ndvStore.pushRef,
 				};

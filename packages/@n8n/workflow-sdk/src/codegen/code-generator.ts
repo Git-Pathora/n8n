@@ -8,7 +8,21 @@ import type { WorkflowJSON } from '../types/base';
 import type { SemanticGraph, SemanticNode, AiConnectionType } from './types';
 import type { Schema } from 'n8n-workflow';
 import type { NodeExecutionStatus } from './execution-status';
-import { schemaToOutputSample } from './execution-schema-jsdoc';
+import { generateSchemaJSDoc, schemaToOutputSample } from './execution-schema-jsdoc';
+import { escapeString, formatKey, escapeRegexChars } from './string-utils';
+import {
+	AI_CONNECTION_TO_CONFIG_KEY,
+	AI_CONNECTION_TO_BUILDER,
+	AI_ALWAYS_ARRAY_TYPES,
+	AI_OPTIONAL_ARRAY_TYPES,
+} from './constants';
+import { getVarName, getUniqueVarName } from './variable-names';
+import {
+	isTriggerType,
+	isStickyNote,
+	isMergeType,
+	generateDefaultNodeName,
+} from './node-type-utils';
 import type {
 	CompositeTree,
 	CompositeNode,
@@ -64,146 +78,6 @@ function getIndent(ctx: GenerationContext): string {
 }
 
 /**
- * Escape a string for use in generated code
- * Uses unicode escape sequences to preserve special characters through roundtrip
- */
-function escapeString(str: string): string {
-	return str
-		.replace(/\\/g, '\\\\')
-		.replace(/'/g, "\\'")
-		.replace(/\u2018/g, '\\u2018') // LEFT SINGLE QUOTATION MARK - preserve as unicode
-		.replace(/\u2019/g, '\\u2019') // RIGHT SINGLE QUOTATION MARK - preserve as unicode
-		.replace(/\u201C/g, '\\u201C') // LEFT DOUBLE QUOTATION MARK - preserve as unicode
-		.replace(/\u201D/g, '\\u201D') // RIGHT DOUBLE QUOTATION MARK - preserve as unicode
-		.replace(/\n/g, '\\n')
-		.replace(/\r/g, '\\r');
-}
-
-/**
- * Generate the default node name from a node type
- * e.g., 'n8n-nodes-base.httpRequest' -> 'HTTP Request'
- */
-function generateDefaultNodeName(type: string): string {
-	const parts = type.split('.');
-	const nodeName = parts[parts.length - 1];
-
-	return nodeName
-		.replace(/([a-z])([A-Z])/g, '$1 $2')
-		.replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
-		.replace(/^./, (str) => str.toUpperCase())
-		.replace(/Http/g, 'HTTP')
-		.replace(/Api/g, 'API')
-		.replace(/Url/g, 'URL')
-		.replace(/Id/g, 'ID')
-		.replace(/Json/g, 'JSON')
-		.replace(/Xml/g, 'XML')
-		.replace(/Sql/g, 'SQL')
-		.replace(/Ai/g, 'AI')
-		.replace(/Aws/g, 'AWS')
-		.replace(/Gcp/g, 'GCP')
-		.replace(/Ssh/g, 'SSH')
-		.replace(/Ftp/g, 'FTP')
-		.replace(/Csv/g, 'CSV');
-}
-
-/**
- * Reserved keywords that cannot be used as variable names
- */
-const RESERVED_KEYWORDS = new Set([
-	// JavaScript reserved words
-	'break',
-	'case',
-	'catch',
-	'class',
-	'const',
-	'continue',
-	'debugger',
-	'default',
-	'delete',
-	'do',
-	'else',
-	'export',
-	'extends',
-	'finally',
-	'for',
-	'function',
-	'if',
-	'import',
-	'in',
-	'instanceof',
-	'let',
-	'new',
-	'return',
-	'static',
-	'super',
-	'switch',
-	'this',
-	'throw',
-	'try',
-	'typeof',
-	'var',
-	'void',
-	'while',
-	'with',
-	'yield',
-	// JavaScript literals
-	'null',
-	'true',
-	'false',
-	'undefined',
-	// SDK functions
-	'workflow',
-	'trigger',
-	'node',
-	'merge',
-	'splitInBatches',
-	'sticky',
-	'languageModel',
-	'tool',
-	'memory',
-	'outputParser',
-	'textSplitter',
-	'embeddings',
-	'vectorStore',
-	'retriever',
-	'document',
-	// Dangerous globals (blocked by AST interpreter)
-	'eval',
-	'Function',
-	'require',
-	'process',
-	'global',
-	'globalThis',
-	'window',
-	'setTimeout',
-	'setInterval',
-	'setImmediate',
-	'clearTimeout',
-	'clearInterval',
-	'clearImmediate',
-	'module',
-	'exports',
-	'Buffer',
-	'Reflect',
-	'Proxy',
-]);
-
-/**
- * Check if a key needs to be quoted to be a valid JS identifier
- */
-function needsQuoting(key: string): boolean {
-	// Valid JS identifier: starts with letter, _, or $, followed by letters, digits, _, or $
-	return !/^[a-zA-Z_$][a-zA-Z0-9_$]*$/.test(key);
-}
-
-/**
- * Format an object key for code output
- */
-function formatKey(key: string): string {
-	return needsQuoting(key) ? `'${escapeString(key)}'` : key;
-}
-
-/**
  * Format a value for code output
  */
 function formatValue(value: unknown, ctx?: GenerationContext): string {
@@ -236,92 +110,10 @@ function formatValue(value: unknown, ctx?: GenerationContext): string {
 	if (typeof value === 'object') {
 		const entries = Object.entries(value as Record<string, unknown>);
 		if (entries.length === 0) return '{}';
-		const formatted = entries.map(([k, v]) => `${formatKey(k)}: ${formatValue(v, ctx)}`);
-		const result = formatted.join(', ');
-		// If result contains // comments (expression annotations) OR multi-line content, use multi-line format
-		const hasComments = result.includes('//');
-		const hasMultiline = formatted.some((entry) => entry.includes('\n'));
-		if (hasComments || hasMultiline) {
-			// Join with commas, ensuring each entry (except last) ends with a comma
-			const withCommas = formatted.map((entry, i) => {
-				if (i === formatted.length - 1) return entry; // Last entry, no comma
-
-				// For multi-line entries, check only the LAST line for comment/comma placement
-				// (nested content may have its own commas which shouldn't affect our decision)
-				const lastLineStart = entry.lastIndexOf('\n');
-				const lastLine = lastLineStart >= 0 ? entry.substring(lastLineStart) : entry;
-
-				// If the entry's last line has a comment, insert comma before it
-				if (lastLine.includes('  //') && !lastLine.includes(',  //')) {
-					return (
-						entry.substring(0, entry.length - lastLine.length + lastLineStart + 1) +
-						lastLine.replace('  //', ',  //')
-					);
-				}
-
-				// If last line already has comma before comment, no change needed
-				if (lastLine.includes(',  //')) {
-					return entry;
-				}
-
-				// Otherwise, add comma at the end
-				return entry + ',';
-			});
-			return `{\n    ${withCommas.join('\n    ')}\n  }`;
-		}
-		return `{ ${result} }`;
+		return `{ ${entries.map(([k, v]) => `${formatKey(k)}: ${formatValue(v, ctx)}`).join(', ')} }`;
 	}
 	return String(value);
 }
-
-/**
- * Check if node is a trigger type
- */
-function isTriggerType(type: string): boolean {
-	return type.toLowerCase().includes('trigger') || type === 'n8n-nodes-base.webhook';
-}
-
-/**
- * Map AI connection types to their config key names
- */
-const AI_CONNECTION_TO_CONFIG_KEY: Record<AiConnectionType, string> = {
-	ai_languageModel: 'model',
-	ai_memory: 'memory',
-	ai_tool: 'tools', // plural - can have multiple
-	ai_outputParser: 'outputParser',
-	ai_embedding: 'embedding',
-	ai_vectorStore: 'vectorStore',
-	ai_retriever: 'retriever',
-	ai_document: 'documentLoader',
-	ai_textSplitter: 'textSplitter',
-	ai_reranker: 'reranker',
-};
-
-/**
- * Map AI connection types to their builder function names
- */
-const AI_CONNECTION_TO_BUILDER: Record<AiConnectionType, string> = {
-	ai_languageModel: 'languageModel',
-	ai_memory: 'memory',
-	ai_tool: 'tool',
-	ai_outputParser: 'outputParser',
-	ai_embedding: 'embedding',
-	ai_vectorStore: 'vectorStore',
-	ai_retriever: 'retriever',
-	ai_document: 'documentLoader',
-	ai_textSplitter: 'textSplitter',
-	ai_reranker: 'reranker',
-};
-
-/**
- * AI connection types that are ALWAYS arrays (even with single item)
- */
-const AI_ALWAYS_ARRAY_TYPES = new Set<AiConnectionType>(['ai_tool']);
-
-/**
- * AI connection types that can be single or array (array only when multiple)
- */
-const AI_OPTIONAL_ARRAY_TYPES = new Set<AiConnectionType>(['ai_languageModel']);
 
 /**
  * Generate a subnode builder call (languageModel, tool, memory, etc.)
@@ -618,43 +410,7 @@ function generateNodeConfig(node: SemanticNode, ctx: GenerationContext): string 
 
 	// Always include config (required by parser), even if empty
 	if (configParts.length > 0) {
-		const configStr = configParts.join(', ');
-		// If config contains // comments (expression annotations) OR multi-line content, use multi-line format
-		const hasComments = configStr.includes('//');
-		const hasMultiline = configParts.some((entry) => entry.includes('\n'));
-		if (hasComments || hasMultiline) {
-			const configIndent = getIndent({ ...ctx, indent: ctx.indent + 2 });
-			// Join with commas, ensuring each entry (except last) ends with a comma
-			const withCommas = configParts.map((entry, i) => {
-				if (i === configParts.length - 1) return entry; // Last entry, no comma
-
-				// For multi-line entries, check only the LAST line for comment/comma placement
-				// (nested content may have its own commas which shouldn't affect our decision)
-				const lastLineStart = entry.lastIndexOf('\n');
-				const lastLine = lastLineStart >= 0 ? entry.substring(lastLineStart) : entry;
-
-				// If the entry's last line has a comment, insert comma before it
-				if (lastLine.includes('  //') && !lastLine.includes(',  //')) {
-					return (
-						entry.substring(0, entry.length - lastLine.length + lastLineStart + 1) +
-						lastLine.replace('  //', ',  //')
-					);
-				}
-
-				// If last line already has comma before comment, no change needed
-				if (lastLine.includes(',  //')) {
-					return entry;
-				}
-
-				// Otherwise, add comma at the end
-				return entry + ',';
-			});
-			parts.push(
-				`${innerIndent}config: {\n${withCommas.map((p) => `${configIndent}${p}`).join('\n')}\n${innerIndent}}`,
-			);
-		} else {
-			parts.push(`${innerIndent}config: { ${configStr} }`);
-		}
+		parts.push(`${innerIndent}config: { ${configParts.join(', ')} }`);
 	} else {
 		parts.push(`${innerIndent}config: {}`);
 	}
@@ -666,9 +422,6 @@ function generateNodeConfig(node: SemanticNode, ctx: GenerationContext): string 
 		const outputSample = schemaToOutputSample(schema);
 		if (outputSample && Object.keys(outputSample).length > 0) {
 			parts.push(`${innerIndent}output: [${formatValue(outputSample, ctx)}]`);
-		} else {
-			// Schema exists but is empty - show output: [{}]
-			parts.push(`${innerIndent}output: [{}]`);
 		}
 	}
 
@@ -686,13 +439,6 @@ function getVarRefOrInlineNode(node: SemanticNode, ctx: GenerationContext): stri
 	}
 	// Generate inline node() call for named syntax
 	return generateNodeCall(node, ctx);
-}
-
-/**
- * Check if node is a sticky note
- */
-function isStickyNote(type: string): boolean {
-	return type === 'n8n-nodes-base.stickyNote';
 }
 
 /**
@@ -725,13 +471,6 @@ function generateStickyCall(node: SemanticNode): string {
 
 	const optionsStr = options.length > 0 ? `, { ${options.join(', ')} }` : '';
 	return `sticky('${content}'${optionsStr})`;
-}
-
-/**
- * Check if node is a merge type
- */
-function isMergeType(type: string): boolean {
-	return type === 'n8n-nodes-base.merge';
 }
 
 /**
@@ -1000,13 +739,6 @@ function stripTrailingVarRefFromCode(code: string, varName: string): string | nu
 }
 
 /**
- * Escape special regex characters in a string
- */
-function escapeRegexChars(str: string): string {
-	return str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
-
-/**
  * Generate code for split in batches using fluent API syntax:
  * splitInBatches(sibVar).onEachBatch(eachCode.then(nextBatch(sibVar))).onDone(doneCode)
  */
@@ -1148,85 +880,23 @@ function generateComposite(node: CompositeNode, ctx: GenerationContext): string 
 }
 
 /**
- * Generate variable name from node name
- */
-function toVarName(nodeName: string): string {
-	let varName = nodeName
-		.replace(/[^a-zA-Z0-9]/g, '_')
-		.replace(/_+/g, '_')
-		.replace(/_$/g, '') // Only remove trailing underscore, not leading
-		.replace(/^([A-Z])/, (c) => c.toLowerCase());
-
-	// If starts with digit, prefix with underscore
-	if (/^\d/.test(varName)) {
-		varName = '_' + varName;
-	}
-
-	// Remove leading underscore only if followed by letter (not digit)
-	// This preserves _2nd... but removes _Foo...
-	if (/^_[a-zA-Z]/.test(varName)) {
-		varName = varName.slice(1);
-	}
-
-	// Avoid reserved keywords
-	if (RESERVED_KEYWORDS.has(varName)) {
-		varName = varName + '_node';
-	}
-
-	return varName;
-}
-
-/**
- * Get the variable name for a node, looking up in the context's mapping.
- * If the node name has been assigned a variable name, returns that.
- * Otherwise returns the base variable name (which may collide).
- */
-function getVarName(nodeName: string, ctx: GenerationContext): string {
-	if (ctx.nodeNameToVarName.has(nodeName)) {
-		return ctx.nodeNameToVarName.get(nodeName)!;
-	}
-	return toVarName(nodeName);
-}
-
-/**
- * Generate a unique variable name for a node, avoiding collisions.
- * Tracks used names and appends a counter if needed.
- */
-function getUniqueVarName(nodeName: string, ctx: GenerationContext): string {
-	// If we already assigned a name for this node, return it
-	if (ctx.nodeNameToVarName.has(nodeName)) {
-		return ctx.nodeNameToVarName.get(nodeName)!;
-	}
-
-	const baseVarName = toVarName(nodeName);
-	let varName = baseVarName;
-	let counter = 1;
-
-	// Keep incrementing counter until we find an unused name
-	while (ctx.usedVarNames.has(varName)) {
-		varName = `${baseVarName}${counter}`;
-		counter++;
-	}
-
-	// Record the mapping and mark as used
-	ctx.usedVarNames.add(varName);
-	ctx.nodeNameToVarName.set(nodeName, varName);
-
-	return varName;
-}
-
-/**
  * Generate JSDoc comment for a node based on execution context
  */
 function generateNodeJSDoc(nodeName: string, ctx: GenerationContext): string | null {
 	const jsdocParts: string[] = [];
 
-	// Add execution status if available (output schema is now in the output property)
+	// Add output schema if available
+	const schema = ctx.nodeSchemas?.get(nodeName);
+	if (schema) {
+		jsdocParts.push(generateSchemaJSDoc(nodeName, schema));
+	}
+
+	// Add execution status if available
 	const status = ctx.nodeExecutionStatus?.get(nodeName);
 	if (status?.status === 'error') {
-		jsdocParts.push(`@nodeExecutionStatus error - ${status.errorMessage}`);
+		jsdocParts.push(`@status error - ${status.errorMessage}`);
 	} else if (status?.status === 'success') {
-		jsdocParts.push('@nodeExecutionStatus success');
+		jsdocParts.push('@status success');
 	}
 
 	if (jsdocParts.length === 0) return null;

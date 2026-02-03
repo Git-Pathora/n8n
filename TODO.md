@@ -1,30 +1,42 @@
 # TODO (MVP)
 
 ## workflow-sdk
-- [ ] Better clarify/test how output data maps to expressions in types and referenced?
 
 ## agent
-- [ ] investigate failed syntax in prompt in this example packages/@n8n/ai-workflow-builder.ee/eval-results/sonnet-one-shot-all/example-005-05fd23ad. also packages/@n8n/ai-workflow-builder.ee/eval-results/sonnet-one-shot-all/example-007-ca13700c
+- [ ] clarify append merge mode. 1 item for each branch, returns 2 items.
+	- for combine, return 1 item
+- fix memory iteration why not showing when I refresh
 
 ## ready to release
-- [ ] security concerns of loading js from ~/.n8n/generated-types/
+- [ ] legal concerns around templates
+
 - [ ] Review PR (lots of AI generated code that I did not look at)
-- [ ] Remove logging from agent. lots of logging for debugging.
-- [ ] Add some tracking if code parsing or generation step fails in prod.
+- [ ] Remove logging from agent. also remove the generated log files.
+- [ ] Add sentry tracking if workflow code generation step fails in prod.
 - [ ] caching the requests. make sure system prompt + caching the type requests
 - [ ] Update telemetry and prompt viewer app to support the code and workflow generated
-- [ ] Parameters?: should not be optional in types if some key in there is not optional
 - [ ] fix up sticky sizing and positioning to cover nodes
+- [ ] add posthog tracking
 
 ## testing
-- [ ] unknown nodes
-- [ ] community nodes
+- [ ] success/error states, expression, execution data resolving etc.
 - [ ] handling of large workflows
 - [ ] context limits with many types of nodes
-- [ ] long conversations
+- [ ] long conversations and compaction
 - [ ] stickies
+- [ ] fromAi
+- [ ] execute and refine
+- [ ] unknown nodes
+- [ ] community nodes
+- [ ] test multi agent setup
+
 
 ## Nice to haves / tech debt
+- [ ] cleanup $.fromAi
+- [ ] remove ifNode
+- [ ] support 1_3 as version numbers in generating types
+- [ ] Parameters?: should not be optional in types if some key in there is not optional
+- [ ] clean up print prompt
 - [ ] why is agent node accepting arrays as models? fallback model? how to clarify this better?
 - [ ] test out prompt with/without sdk reference
 - [ ] fromAI expressions replace in json -> code

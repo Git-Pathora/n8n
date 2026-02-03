@@ -9,7 +9,18 @@ import type { PluginRegistry } from './registry';
 import type { ValidatorPlugin, CompositeHandlerPlugin, SerializerPlugin } from './types';
 
 // Import real validators
-import { agentValidator, httpRequestValidator } from './validators';
+import {
+	agentValidator,
+	chainLlmValidator,
+	dateMethodValidator,
+	expressionPathValidator,
+	expressionPrefixValidator,
+	fromAiValidator,
+	httpRequestValidator,
+	mergeNodeValidator,
+	setNodeValidator,
+	toolNodeValidator,
+} from './validators';
 
 // Import real composite handlers
 import { ifElseHandler, switchCaseHandler, mergeHandler } from './composite-handlers';
@@ -41,9 +52,24 @@ const disconnectedNodeValidator: ValidatorPlugin = {
  * All core validators to register
  */
 const coreValidators: ValidatorPlugin[] = [
-	disconnectedNodeValidator,
+	// Node-specific validators (high priority)
 	agentValidator,
+	chainLlmValidator,
 	httpRequestValidator,
+	toolNodeValidator,
+	fromAiValidator,
+
+	// Node-type validators (medium priority)
+	setNodeValidator,
+	mergeNodeValidator,
+
+	// Expression validators (lower priority)
+	expressionPrefixValidator,
+	dateMethodValidator,
+	expressionPathValidator, // Workflow-level validator
+
+	// Structural validators (lowest priority, still a stub)
+	disconnectedNodeValidator,
 ];
 
 /**

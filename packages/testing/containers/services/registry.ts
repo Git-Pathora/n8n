@@ -1,6 +1,7 @@
 import { cloudflared } from './cloudflared';
 import { gitea, createGiteaHelper } from './gitea';
 import { kafka, createKafkaHelper } from './kafka';
+import { kent, createKentHelper } from './kent';
 import { keycloak, createKeycloakHelper } from './keycloak';
 import { loadBalancer } from './load-balancer';
 import { localstack, createLocalStackHelper } from './localstack';
@@ -37,6 +38,7 @@ export const services: Record<ServiceName, Service<ServiceResult>> = {
 	kafka,
 	mysql: mysqlService,
 	localstack,
+	kent,
 };
 
 export const helperFactories: Partial<HelperFactories> = {
@@ -47,4 +49,5 @@ export const helperFactories: Partial<HelperFactories> = {
 	tracing: createTracingHelper,
 	kafka: createKafkaHelper,
 	localstack: createLocalStackHelper,
+	kent: createKentHelper,
 };

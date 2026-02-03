@@ -4,6 +4,7 @@ import type { TagEntity, WorkflowTagMapping } from '@n8n/db';
 import { Container } from '@n8n/di';
 import { generateKeyPairSync } from 'crypto';
 import { accessSync, constants as fsConstants, mkdirSync } from 'fs';
+import isEqual from 'lodash/isEqual';
 import type { ICredentialDataDecryptedObject } from 'n8n-workflow';
 import { jsonParse, UserError, type DataTableColumnType } from 'n8n-workflow';
 import { ok } from 'node:assert/strict';
@@ -30,17 +31,15 @@ import type { KeyPairType } from './types/key-pair-type';
 import type { RemoteResourceOwner, StatusResourceOwner } from './types/resource-owner';
 import type { SourceControlWorkflowVersionId } from './types/source-control-workflow-version-id';
 
+/**
+ * Checks if a string is an expression containing template syntax (={{ }}).
+ */
 export function stringContainsExpression(testString: string): boolean {
-	return /^=.*\{\{.*\}\}/.test(testString);
+	return /^=.*\{\{.+\}\}/.test(testString);
 }
 
 /**
- * Sanitizes credential data for source control export by:
- * - Keeping expression values (strings starting with '=' containing '{{ }}')
- * - Replacing plain string values with empty strings (to avoid committing secrets)
- * - Keeping number values
- * - Removing null values
- * - Recursively processing nested objects
+ * Sanitizes credential data for export: keeps expressions and numbers, removes plain text secrets.
  */
 export function sanitizeCredentialData(
 	data: ICredentialDataDecryptedObject,
@@ -59,9 +58,12 @@ export function sanitizeCredentialData(
 	return data;
 }
 
+function isPlainObject(value: unknown): value is ICredentialDataDecryptedObject {
+	return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
 /**
- * Compares two sanitized credential data objects to determine if they have changed.
- * Used by source control status detection to identify modified credentials.
+ * Compares two credential data objects using deep equality.
  */
 export function hasCredentialDataChanged(
 	data1: ICredentialDataDecryptedObject | undefined,
@@ -69,18 +71,12 @@ export function hasCredentialDataChanged(
 ): boolean {
 	if (!data1 && !data2) return false;
 	if (!data1 || !data2) return true;
-	return JSON.stringify(data1) !== JSON.stringify(data2);
+	return !isEqual(data1, data2);
 }
 
 /**
- * Merges credential data from remote (source control) into local (database) data.
- * - Expressions from remote overwrite local values (expressions are synced)
- * - Empty strings in remote are ignored (these were plain values, keep local)
- * - All other local values are preserved
- *
- * @param local - Decrypted credential data from the local database
- * @param remote - Sanitized credential data from the source control file
- * @returns Merged credential data
+ * Merges remote credential data into local data.
+ * Remote expressions overwrite local values; empty strings are ignored (preserves local secrets).
  */
 export function mergeCredentialData(
 	local: ICredentialDataDecryptedObject,
@@ -93,34 +89,18 @@ export function mergeCredentialData(
 
 		if (typeof remoteValue === 'string') {
 			if (stringContainsExpression(remoteValue)) {
-				// Expressions from the remote can be safely used to override local values
 				merged[key] = remoteValue;
 			}
-			// Empty string means it was a plain value - keep local
-		} else if (
-			typeof remoteValue === 'object' &&
-			remoteValue !== null &&
-			!Array.isArray(remoteValue)
-		) {
-			// Nested object - recursively merge
+			// Empty string = plain value on remote, keep local
+		} else if (isPlainObject(remoteValue)) {
 			const localValue = local[key];
-			const isLocalValueObject =
-				typeof localValue === 'object' && localValue !== null && !Array.isArray(localValue);
-
-			if (isLocalValueObject) {
-				// Type assertion is safe here because we've verified localValue is a non-null, non-array object
-				merged[key] = mergeCredentialData(
-					localValue as ICredentialDataDecryptedObject,
-					remoteValue as ICredentialDataDecryptedObject,
-				);
+			if (isPlainObject(localValue)) {
+				merged[key] = mergeCredentialData(localValue, remoteValue);
 			} else {
-				// Local doesn't have this as an object, check if remote has expressions inside
-				// Type assertion is safe because we've verified remoteValue is a non-null, non-array object
-				merged[key] = mergeCredentialData({}, remoteValue as ICredentialDataDecryptedObject);
+				merged[key] = mergeCredentialData({}, remoteValue);
 			}
 		}
-
-		// Numbers, booleans, and arrays from remote are ignored - keep local values
+		// Numbers, booleans, arrays from remote are ignored
 	}
 
 	return merged;

@@ -47,6 +47,16 @@ export class Chat implements INodeType {
 		defaults: {
 			name: 'Chat',
 		},
+		builderHint: {
+			message:
+				'Only works with Chat Trigger node (@n8n/n8n-nodes-langchain.chatTrigger) with responseMode set to "responseNodes"',
+			relatedNodes: [
+				{
+					nodeType: '@n8n/n8n-nodes-langchain.chatTrigger',
+					relationHint: 'Required trigger - set responseMode to "responseNodes"',
+				},
+			],
+		},
 		codex: {
 			categories: ['Core Nodes', 'HITL'],
 			subcategories: {

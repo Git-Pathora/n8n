@@ -675,6 +675,8 @@ export interface BuildCodeBuilderPromptOptions {
 	executionData?: IRunExecutionData['resultData'];
 	/** Expression values resolved from previous execution */
 	expressionValues?: Record<string, ExpressionValue[]>;
+	/** Pre-generated workflow code (used to ensure text editor and prompt have same content) */
+	preGeneratedCode?: string;
 }
 
 /**
@@ -721,17 +723,16 @@ export function buildCodeBuilderPrompt(
 
 	// 3. Current workflow context (with line numbers for text editor)
 	if (currentWorkflow) {
-		// Convert WorkflowJSON to SDK code with execution context for annotations
-		// When execution data is provided, the generated code includes:
-		// - @status success/@status error annotations on nodes
-		// - @example comments showing resolved expression values
-		// - Output data annotations from execution
-		const workflowCode = generateWorkflowCode({
-			workflow: currentWorkflow,
-			executionSchema: options?.executionSchema,
-			executionData: options?.executionData,
-			expressionValues: options?.expressionValues,
-		});
+		// Use pre-generated code if provided (ensures text editor and prompt match),
+		// otherwise generate with execution context
+		const workflowCode =
+			options?.preGeneratedCode ??
+			generateWorkflowCode({
+				workflow: currentWorkflow,
+				executionSchema: options?.executionSchema,
+				executionData: options?.executionData,
+				expressionValues: options?.expressionValues,
+			});
 
 		// Format as file with line numbers (matches view command output)
 		// Include SDK import so LLM sees the same code that's in the text editor

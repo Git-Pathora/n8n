@@ -371,6 +371,24 @@ ${'='.repeat(50)}
 				});
 			}
 
+			// Generate workflow code ONCE with full execution context
+			// This ensures both the system prompt and text editor reference identical content
+			let preGeneratedWorkflowCode: string | undefined;
+			if (currentWorkflow) {
+				preGeneratedWorkflowCode = generateWorkflowCode({
+					workflow: currentWorkflow,
+					executionSchema: payload.workflowContext?.executionSchema,
+					executionData: payload.workflowContext?.executionData,
+					expressionValues: payload.workflowContext?.expressionValues,
+				});
+				this.debugLog('CHAT', 'Pre-generated workflow code with execution context', {
+					codeLength: preGeneratedWorkflowCode.length,
+					hasExecutionSchema: !!payload.workflowContext?.executionSchema,
+					hasExecutionData: !!payload.workflowContext?.executionData,
+					hasExpressionValues: !!payload.workflowContext?.expressionValues,
+				});
+			}
+
 			// Check if text editor mode should be enabled
 			const textEditorEnabled = this.shouldEnableTextEditor();
 			this.debugLog('CHAT', 'Text editor mode', { textEditorEnabled });
@@ -380,6 +398,7 @@ ${'='.repeat(50)}
 				executionSchema: payload.workflowContext?.executionSchema,
 				executionData: payload.workflowContext?.executionData,
 				expressionValues: payload.workflowContext?.expressionValues,
+				preGeneratedCode: preGeneratedWorkflowCode,
 			});
 			this.debugLog('CHAT', 'Prompt built successfully', {
 				hasHistoryContext: !!historyContext,
@@ -450,12 +469,10 @@ ${'='.repeat(50)}
 					this.debugLog(`TEXT_EDITOR_HANDLER:${context}`, message, data);
 				});
 
-				// Always pre-populate with current workflow code (even for empty workflows)
-				// This ensures the LLM uses str_replace instead of create command
-				// Prepend SDK import so LLM sees available functions
-				if (currentWorkflow) {
-					const existingCode = generateWorkflowCode(currentWorkflow);
-					const codeWithImport = `${SDK_IMPORT_STATEMENT}\n\n${existingCode}`;
+				// Pre-populate with the SAME code that's in the system prompt
+				// This ensures str_replace commands match what the LLM sees
+				if (preGeneratedWorkflowCode) {
+					const codeWithImport = `${SDK_IMPORT_STATEMENT}\n\n${preGeneratedWorkflowCode}`;
 					textEditorHandler.setWorkflowCode(codeWithImport);
 					this.debugLog('CHAT', 'Pre-populated text editor with workflow code', {
 						codeLength: codeWithImport.length,

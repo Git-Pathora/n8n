@@ -11,8 +11,8 @@ Here's a visual representation of the architecture:
 │                        AI Agent Node                            │
 │                                                                 │
 │  ┌─────────────────────────────────────────────────────────────┐│
-│  │                     Inputs (Connections)                     ││
-│  │                                                              ││
+│  │                     Inputs (Connections)                    ││
+│  │                                                             ││
 │  │   ┌──────────┐  ┌──────────┐  ┌────────┐  ┌───────────────┐ ││
 │  │   │  Model   │  │  Memory  │  │ Tools  │  │Output Parser  │ ││
 │  │   │(required)│  │(optional)│  │(0..n)  │  │  (optional)   │ ││
@@ -23,11 +23,11 @@ Here's a visual representation of the architecture:
 │  ┌──────────────────────────────────────────────────────────────┐
 │  │                    execute() method                          │
 │  │                                                              │
-│  │  1. Build context (get model, memory, tools from inputs)    │
-│  │  2. Prepare prompt with chat history                        │
-│  │  3. Invoke LangChain agent                                  │
-│  │  4. If tools needed → return EngineRequest                  │
-│  │  5. If done → return final output                           │
+│  │  1. Build context (get model, memory, tools from inputs)     │
+│  │  2. Prepare prompt with chat history                         │
+│  │  3. Invoke LangChain agent                                   │
+│  │  4. If tools needed → return EngineRequest                   │
+│  │  5. If done → return final output                            │
 │  └──────────────────────────────────────────────────────────────┘
 │                                                                 │
 └─────────────────────────────────────────────────────────────────┘

@@ -305,7 +305,10 @@ function getDiscriminatorInfo(
 	}
 
 	// Check for resource/operation pattern
-	const resourceOps = extractResourceOperations(nodeType, version);
+	// Include description and builderHint for code-builder's detailed output
+	const resourceOps = extractResourceOperations(nodeType, version, undefined, {
+		fields: { description: true, builderHint: true },
+	});
 	if (resourceOps && resourceOps.resources.length > 0) {
 		const resources: DiscriminatorResourceInfo[] = resourceOps.resources
 			.filter((r: ResourceInfo) => r.value !== '__CUSTOM_API_CALL__')

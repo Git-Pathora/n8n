@@ -679,7 +679,10 @@ describe('resource-operation-extractor', () => {
 				},
 			]);
 
-			const result = extractResourceOperations(nodeType, 1);
+			// Pass fields option to include description and builderHint
+			const result = extractResourceOperations(nodeType, 1, undefined, {
+				fields: { description: true, builderHint: true },
+			});
 
 			expect(result).not.toBeNull();
 

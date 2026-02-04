@@ -34,6 +34,19 @@ export interface ResourceOperationInfo {
 }
 
 /**
+ * Options for controlling which fields are included in extraction
+ */
+export interface ExtractOptions {
+	/** Which optional fields to include in the output */
+	fields?: {
+		/** Include description field (default: false) */
+		description?: boolean;
+		/** Include builderHint field (default: false) */
+		builderHint?: boolean;
+	};
+}
+
+/**
  * Check if a property is visible for a specific node version by checking @version conditions.
  * We check only @version instead of using displayParameter because displayParameter
  * checks ALL displayOptions conditions (including resource), but we only want to filter
@@ -130,14 +143,22 @@ function findOperationProperties(
  * Only extracts options with string values - resource/operation values
  * are always strings in n8n. Non-string values (number/boolean) are
  * used for other option types like toggles.
+ *
+ * @param property - The node property to extract options from
+ * @param logger - Optional logger for debugging
+ * @param options - Options controlling which fields to include
  */
 function extractOptions(
 	property: INodeProperties,
 	logger?: Logger,
+	options?: ExtractOptions,
 ): Array<{ value: string; displayName: string; description?: string; builderHint?: string }> {
 	if (!property.options || !Array.isArray(property.options)) {
 		return [];
 	}
+
+	const includeDescription = options?.fields?.description ?? false;
+	const includeBuilderHint = options?.fields?.builderHint ?? false;
 
 	return property.options
 		.filter(
@@ -164,8 +185,8 @@ function extractOptions(
 		.map((opt) => ({
 			value: opt.value,
 			displayName: opt.name,
-			description: opt.description,
-			builderHint: opt.builderHint,
+			...(includeDescription && opt.description && { description: opt.description }),
+			...(includeBuilderHint && opt.builderHint && { builderHint: opt.builderHint }),
 		}));
 }
 
@@ -176,12 +197,14 @@ function extractOptions(
  * @param nodeType - The node type description
  * @param nodeVersion - The version of the node to extract info for
  * @param logger - Optional logger for debugging extraction issues
+ * @param options - Options controlling which fields to include (description, builderHint)
  * @returns Resource/operation info, or null if the node doesn't follow the resource/operation pattern
  */
 export function extractResourceOperations(
 	nodeType: INodeTypeDescription,
 	nodeVersion: number,
 	logger?: Logger,
+	options?: ExtractOptions,
 ): ResourceOperationInfo | null {
 	const properties = nodeType.properties;
 	if (!properties || properties.length === 0) {
@@ -200,7 +223,7 @@ export function extractResourceOperations(
 	}
 
 	// Extract resource options
-	const resourceOptions = extractOptions(resourceProperty, logger);
+	const resourceOptions = extractOptions(resourceProperty, logger, options);
 	if (resourceOptions.length === 0) {
 		logger?.warn('extractResourceOperations: Resource property found but no string options', {
 			nodeType: nodeType.name,
@@ -219,15 +242,15 @@ export function extractResourceOperations(
 		const seenValues = new Set<string>();
 
 		for (const opProp of operationProperties) {
-			const ops = extractOptions(opProp, logger);
+			const ops = extractOptions(opProp, logger, options);
 			for (const op of ops) {
 				if (!seenValues.has(op.value)) {
 					seenValues.add(op.value);
 					allOperations.push({
 						value: op.value,
 						displayName: op.displayName,
-						description: op.description,
-						builderHint: op.builderHint,
+						...(op.description && { description: op.description }),
+						...(op.builderHint && { builderHint: op.builderHint }),
 					});
 				}
 			}
@@ -236,8 +259,8 @@ export function extractResourceOperations(
 		return {
 			value: resource.value,
 			displayName: resource.displayName,
-			description: resource.description,
-			builderHint: resource.builderHint,
+			...(resource.description && { description: resource.description }),
+			...(resource.builderHint && { builderHint: resource.builderHint }),
 			operations: allOperations,
 		};
 	});

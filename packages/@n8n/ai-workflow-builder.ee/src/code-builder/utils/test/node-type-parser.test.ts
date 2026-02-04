@@ -1,4 +1,5 @@
 import type { INodeTypeDescription } from 'n8n-workflow';
+
 import { NodeTypeParser } from '../node-type-parser';
 
 // Mock node with resource/operation pattern (like Freshservice)

@@ -37,11 +37,6 @@ export interface EvaluationContext {
 	 * Populated from GenerationResult when available.
 	 */
 	generatedCode?: string;
-	/**
-	 * Errors encountered during generation (parse errors, type errors).
-	 * Populated from GenerationResult when available.
-	 */
-	generationErrors?: GenerationError[];
 }
 
 /** Context attached to an individual test case (prompt is provided separately). */
@@ -222,25 +217,9 @@ export interface ExampleResult {
 	workflow?: SimpleWorkflow;
 	/** Generated source code (e.g., TypeScript SDK code from coding agent) */
 	generatedCode?: string;
-	/** Errors encountered during generation (parse errors, type errors) */
-	generationErrors?: GenerationError[];
 	/** Captured debug logs from the generation process */
 	logs?: string;
 	error?: string;
-}
-
-/**
- * Details about errors encountered during code generation.
- */
-export interface GenerationError {
-	/** The error message */
-	message: string;
-	/** The code that caused the error (if available) */
-	code?: string;
-	/** Iteration number when the error occurred */
-	iteration: number;
-	/** Type of error: 'parse' for SDK parsing, 'typecheck' for TypeScript errors, 'validation' for graph validation */
-	type: 'parse' | 'typecheck' | 'validation';
 }
 
 /**
@@ -251,8 +230,6 @@ export interface GenerationResult {
 	workflow: SimpleWorkflow;
 	/** Source code that generated the workflow (e.g., TypeScript SDK code) */
 	generatedCode?: string;
-	/** Errors encountered during generation (parse errors, type errors) */
-	generationErrors?: GenerationError[];
 	/** Captured debug logs from the generation process */
 	logs?: string;
 }

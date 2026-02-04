@@ -23,7 +23,6 @@ import {
 	type LangsmithExampleFilters,
 	type LlmCallLimiter,
 	type GenerationResult,
-	type GenerationError,
 } from './harness-types.js';
 import { WorkflowGenerationError } from '../errors';
 import type { EvalLogger } from './logger';
@@ -181,16 +180,8 @@ function buildContext(args: {
 	testCaseContext?: TestCaseContext;
 	referenceWorkflows?: SimpleWorkflow[];
 	generatedCode?: string;
-	generationErrors?: GenerationError[];
 }): EvaluationContext {
-	const {
-		prompt,
-		globalContext,
-		testCaseContext,
-		referenceWorkflows,
-		generatedCode,
-		generationErrors,
-	} = args;
+	const { prompt, globalContext, testCaseContext, referenceWorkflows, generatedCode } = args;
 
 	return {
 		prompt,
@@ -198,7 +189,6 @@ function buildContext(args: {
 		...(testCaseContext ?? {}),
 		...(referenceWorkflows?.length ? { referenceWorkflows } : {}),
 		...(generatedCode ? { generatedCode } : {}),
-		...(generationErrors?.length ? { generationErrors } : {}),
 	};
 }
 
@@ -501,10 +491,9 @@ async function runLocalExample(args: {
 		}, globalContext?.llmCallLimiter);
 		const genDurationMs = Date.now() - genStartTime;
 
-		// Extract workflow, optional generated code, and generation metadata
+		// Extract workflow, optional generated code, and logs
 		const workflow = isGenerationResult(genResult) ? genResult.workflow : genResult;
 		const generatedCode = isGenerationResult(genResult) ? genResult.generatedCode : undefined;
-		const generationErrors = isGenerationResult(genResult) ? genResult.generationErrors : undefined;
 		const logs = isGenerationResult(genResult) ? genResult.logs : undefined;
 
 		lifecycle?.onWorkflowGenerated?.(workflow, genDurationMs);
@@ -518,7 +507,6 @@ async function runLocalExample(args: {
 			testCaseContext: testCase.context,
 			referenceWorkflows: testCase.referenceWorkflows,
 			generatedCode,
-			generationErrors,
 		});
 
 		// Run evaluators in parallel
@@ -551,7 +539,6 @@ async function runLocalExample(args: {
 					: undefined,
 			workflow,
 			generatedCode,
-			generationErrors,
 			logs,
 		};
 
@@ -1126,12 +1113,9 @@ async function runLangsmith(config: LangsmithRunConfig): Promise<RunSummary> {
 			});
 			const genDurationMs = Date.now() - genStart;
 
-			// Extract workflow, optional generated code, and generation metadata
+			// Extract workflow, optional generated code, and logs
 			const workflow = isGenerationResult(genResult) ? genResult.workflow : genResult;
 			const generatedCode = isGenerationResult(genResult) ? genResult.generatedCode : undefined;
-			const generationErrors = isGenerationResult(genResult)
-				? genResult.generationErrors
-				: undefined;
 			const logs = isGenerationResult(genResult) ? genResult.logs : undefined;
 
 			lifecycle?.onWorkflowGenerated?.(workflow, genDurationMs);
@@ -1145,7 +1129,6 @@ async function runLangsmith(config: LangsmithRunConfig): Promise<RunSummary> {
 				globalContext: effectiveGlobalContext,
 				testCaseContext: extracted,
 				generatedCode,
-				generationErrors,
 			});
 
 			// Run all evaluators in parallel
@@ -1193,7 +1176,6 @@ async function runLangsmith(config: LangsmithRunConfig): Promise<RunSummary> {
 						: undefined,
 				workflow,
 				generatedCode,
-				generationErrors,
 				logs,
 			};
 

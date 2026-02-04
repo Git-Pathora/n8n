@@ -13,7 +13,6 @@ import { EvaluationLogger } from '@/code-builder/utils/evaluation-logger.js';
 import type { CoordinationLogEntry } from '@/types/coordination';
 import type { SimpleWorkflow } from '@/types/workflow';
 import type { StreamChunk, WorkflowUpdateChunk } from '@/types/streaming';
-import type { GenerationError } from '../harness/harness-types.js';
 import type { BuilderFeatureFlags } from '@/workflow-builder-agent';
 
 import {
@@ -183,7 +182,6 @@ function createCodeWorkflowBuilderGenerator(
 
 		let workflow: SimpleWorkflow | null = null;
 		let generatedCode: string | undefined;
-		let generationErrors: GenerationError[] | undefined;
 
 		// Create an AbortController to properly cancel the agent on timeout or error.
 		// Without this, the agent continues running even after Promise.race rejects,
@@ -207,9 +205,6 @@ function createCodeWorkflowBuilderGenerator(
 					if (isWorkflowUpdateChunk(message)) {
 						workflow = JSON.parse(message.codeSnippet) as SimpleWorkflow;
 						generatedCode = message.sourceCode;
-						if (message.generationErrors) {
-							generationErrors = message.generationErrors;
-						}
 					}
 				}
 			}
@@ -226,7 +221,7 @@ function createCodeWorkflowBuilderGenerator(
 			throw new WorkflowGenerationError('CodeWorkflowBuilder did not produce a workflow', logs);
 		}
 
-		return { workflow, generatedCode, generationErrors, logs };
+		return { workflow, generatedCode, logs };
 	};
 }
 

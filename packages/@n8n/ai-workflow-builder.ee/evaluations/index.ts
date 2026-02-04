@@ -29,7 +29,6 @@ export {
 	type EvaluationLifecycle,
 	type LangsmithOptions,
 	type GenerationResult,
-	type GenerationError,
 } from './harness/harness-types';
 
 // Lifecycle

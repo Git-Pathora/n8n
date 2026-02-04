@@ -5,7 +5,10 @@ import {
 } from '@/features/ai/assistant/assistant.types';
 import { useAIAssistantHelpers } from '@/features/ai/assistant/composables/useAIAssistantHelpers';
 import { usePostHog } from '@/app/stores/posthog.store';
-import { AI_BUILDER_TEMPLATE_EXAMPLES_EXPERIMENT } from '@/app/constants/experiments';
+import {
+	AI_BUILDER_TEMPLATE_EXAMPLES_EXPERIMENT,
+	CODE_WORKFLOW_BUILDER_EXPERIMENT,
+} from '@/app/constants/experiments';
 import type { IRunExecutionData } from 'n8n-workflow';
 import type { IWorkflowDb } from '@/Interface';
 import { getWorkflowVersionsByIds } from '@n8n/rest-api-client/api/workflowHistory';
@@ -62,19 +65,26 @@ export async function createBuilderPayload(
 		}
 	}
 
-	if (options.nodesForSchema?.length) {
-		workflowContext.executionSchema = assistantHelpers.getNodesSchemas(
-			options.nodesForSchema,
-			true,
-		);
-	}
-
 	// Get feature flags from Posthog
+	const isCodeBuilderEnabled =
+		posthogStore.getVariant(CODE_WORKFLOW_BUILDER_EXPERIMENT.name) ===
+		CODE_WORKFLOW_BUILDER_EXPERIMENT.test;
+
 	const featureFlags: ChatRequest.BuilderFeatureFlags = {
 		templateExamples:
 			posthogStore.getVariant(AI_BUILDER_TEMPLATE_EXAMPLES_EXPERIMENT.name) ===
 			AI_BUILDER_TEMPLATE_EXAMPLES_EXPERIMENT.variant,
+		codeBuilder: isCodeBuilderEnabled,
 	};
+
+	if (options.nodesForSchema?.length) {
+		// Include schema values when code builder is enabled (excludeValues = false)
+		const excludeValues = !isCodeBuilderEnabled;
+		workflowContext.executionSchema = assistantHelpers.getNodesSchemas(
+			options.nodesForSchema,
+			excludeValues,
+		);
+	}
 
 	return {
 		role: 'user',

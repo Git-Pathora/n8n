@@ -150,6 +150,7 @@ describe('generate-output-schemas', () => {
 			];
 
 			const content = generateOutputSchemaJson(schemas);
+			// eslint-disable-next-line n8n-local-rules/no-uncaught-json-parse -- Testing generator output
 			const parsed = JSON.parse(content);
 
 			expect(parsed).toHaveLength(2);
@@ -170,6 +171,7 @@ describe('generate-output-schemas', () => {
 			];
 
 			const content = generateOutputSchemaJson(schemas);
+			// eslint-disable-next-line n8n-local-rules/no-uncaught-json-parse -- Testing generator output
 			const parsed = JSON.parse(content);
 
 			// Verify the structure matches what the resolver expects
@@ -178,6 +180,7 @@ describe('generate-output-schemas', () => {
 
 		it('handles empty schemas', () => {
 			const content = generateOutputSchemaJson([]);
+			// eslint-disable-next-line n8n-local-rules/no-uncaught-json-parse -- Testing generator output
 			const parsed = JSON.parse(content);
 
 			expect(parsed).toEqual([]);

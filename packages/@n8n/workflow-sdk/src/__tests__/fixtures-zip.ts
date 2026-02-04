@@ -44,6 +44,7 @@ export function needsExtraction(): boolean {
 	}
 
 	// Check if any workflow files are missing
+	// eslint-disable-next-line n8n-local-rules/no-uncaught-json-parse -- Manifest is controlled fixture file
 	const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf-8')) as Manifest;
 	for (const entry of manifest.workflows) {
 		if (!entry.success) continue;
@@ -92,6 +93,7 @@ export function validateAllWorkflowsExist(): void {
 		throw new Error(`Manifest not found: ${MANIFEST_PATH}. Run extraction first.`);
 	}
 
+	// eslint-disable-next-line n8n-local-rules/no-uncaught-json-parse -- Manifest is controlled fixture file
 	const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf-8')) as Manifest;
 	const missing: string[] = [];
 

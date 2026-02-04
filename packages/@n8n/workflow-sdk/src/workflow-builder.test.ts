@@ -492,6 +492,7 @@ describe('Workflow Builder', () => {
 		it('should serialize to JSON string', () => {
 			const wf = workflow('test-id', 'Test Workflow');
 			const str = wf.toString();
+			// eslint-disable-next-line n8n-local-rules/no-uncaught-json-parse -- Testing toString() output
 			const parsed = JSON.parse(str);
 			expect(parsed.name).toBe('Test Workflow');
 		});

@@ -42,6 +42,7 @@ function loadWorkflowsFromDir(dir: string, workflows: TestWorkflow[]): void {
 		return;
 	}
 
+	// eslint-disable-next-line n8n-local-rules/no-uncaught-json-parse -- Manifest is controlled fixture file
 	const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
 
 	for (const entry of manifest.workflows) {
@@ -50,6 +51,7 @@ function loadWorkflowsFromDir(dir: string, workflows: TestWorkflow[]): void {
 
 		const filePath = path.join(dir, `${entry.id}.json`);
 		if (fs.existsSync(filePath)) {
+			// eslint-disable-next-line n8n-local-rules/no-uncaught-json-parse -- Test fixture file
 			const json = JSON.parse(fs.readFileSync(filePath, 'utf-8')) as WorkflowJSON;
 			workflows.push({
 				id: String(entry.id),
@@ -1855,6 +1857,7 @@ return workflow('test-id', 'Test Workflow')
 
 			// Simulate what happens when code goes through JSON
 			const jsonEncoded = JSON.stringify(normalCode);
+			// eslint-disable-next-line n8n-local-rules/no-uncaught-json-parse -- Parsing test-controlled JSON.stringify output
 			const jsonDecoded = JSON.parse(jsonEncoded);
 
 			// This should work - the JSON parse/stringify preserves newlines correctly

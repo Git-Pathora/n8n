@@ -3609,7 +3609,14 @@ export async function loadNodeTypes(
 	packageName?: string,
 ): Promise<NodeTypeDescription[]> {
 	const content = await fs.promises.readFile(jsonPath, 'utf-8');
-	const nodes = JSON.parse(content) as NodeTypeDescription[];
+	let nodes: NodeTypeDescription[];
+	try {
+		nodes = JSON.parse(content) as NodeTypeDescription[];
+	} catch (error) {
+		throw new Error(
+			`Failed to parse node types from ${jsonPath}: ${error instanceof Error ? error.message : String(error)}`,
+		);
+	}
 
 	// If package name provided and node names don't have package prefix, add it
 	if (packageName) {

@@ -1810,6 +1810,7 @@ describe('code-generator', () => {
 				const fs = require('fs');
 				const path = require('path');
 				const jsonPath = path.join(__dirname, '../../test-fixtures/real-workflows/5755.json');
+				// eslint-disable-next-line n8n-local-rules/no-uncaught-json-parse -- Test fixture file
 				const json = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));
 
 				// Find the Animation Completed? node in original

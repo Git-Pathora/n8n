@@ -10,6 +10,8 @@ import { useNodeHelpers } from '@/app/composables/useNodeHelpers';
 import { useNodeTypesStore } from '@/app/stores/nodeTypes.store';
 import { injectWorkflowState } from '@/app/composables/useWorkflowState';
 import { getNodeTypeDisplayableCredentials } from '@/app/utils/nodes/nodeTransforms';
+import { useToast } from '@/app/composables/useToast';
+import { useI18n } from '@n8n/i18n';
 
 /**
  * Composable that manages workflow setup state for credential configuration.
@@ -23,6 +25,8 @@ export const useWorkflowSetupState = (nodes?: Ref<INodeUi[]>) => {
 	const nodeTypesStore = useNodeTypesStore();
 	const nodeHelpers = useNodeHelpers();
 	const workflowState = injectWorkflowState();
+	const toast = useToast();
+	const i18n = useI18n();
 
 	const sourceNodes = computed(() => nodes?.value ?? workflowsStore.allNodes);
 
@@ -106,6 +110,13 @@ export const useWorkflowSetupState = (nodes?: Ref<INodeUi[]>) => {
 		);
 	});
 
+	/**
+	 * Sets a credential for a node and auto-assigns it to other nodes in setup panel that need it.
+	 * @param nodeName
+	 * @param credentialType
+	 * @param credentialId
+	 * @returns
+	 */
 	const setCredential = (nodeName: string, credentialType: string, credentialId: string): void => {
 		const credential = credentialsStore.getCredentialById(credentialId);
 		if (!credential) return;
@@ -113,16 +124,55 @@ export const useWorkflowSetupState = (nodes?: Ref<INodeUi[]>) => {
 		const node = workflowsStore.getNodeByName(nodeName);
 		if (!node) return;
 
+		const credentialDetails = { id: credentialId, name: credential.name };
+
 		workflowState.updateNodeProperties({
 			name: nodeName,
 			properties: {
 				credentials: {
 					...node.credentials,
-					[credentialType]: { id: credentialId, name: credential.name },
+					[credentialType]: credentialDetails,
 				},
 			},
 		});
 		nodeHelpers.updateNodeCredentialIssuesByName(nodeName);
+
+		const otherNodesUpdated: string[] = [];
+
+		for (const state of nodeSetupStates.value) {
+			if (state.node.name === nodeName) continue;
+
+			const needsThisCredential = state.credentialRequirements.some(
+				(req) => req.credentialType === credentialType && !req.selectedCredentialId,
+			);
+
+			if (needsThisCredential) {
+				const targetNode = workflowsStore.getNodeByName(state.node.name);
+				if (targetNode) {
+					workflowState.updateNodeProperties({
+						name: state.node.name,
+						properties: {
+							credentials: {
+								...targetNode.credentials,
+								[credentialType]: credentialDetails,
+							},
+						},
+					});
+					otherNodesUpdated.push(state.node.name);
+				}
+			}
+		}
+
+		if (otherNodesUpdated.length > 0) {
+			nodeHelpers.updateNodesCredentialsIssues();
+			toast.showMessage({
+				title: i18n.baseText('nodeCredentials.showMessage.title'),
+				message: i18n.baseText('nodeCredentials.autoAssigned.message', {
+					interpolate: { count: String(otherNodesUpdated.length) },
+				}),
+				type: 'success',
+			});
+		}
 	};
 
 	const unsetCredential = (nodeName: string, credentialType: string): void => {

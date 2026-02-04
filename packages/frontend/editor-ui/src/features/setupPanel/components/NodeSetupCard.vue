@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from 'vue';
 import { useI18n } from '@n8n/i18n';
-import { N8nButton } from '@n8n/design-system';
+import { N8nButton, N8nIcon } from '@n8n/design-system';
 
 import NodeIcon from '@/app/components/NodeIcon.vue';
 import CredentialPicker from '@/features/credentials/components/CredentialPicker/CredentialPicker.vue';
@@ -46,7 +46,13 @@ const onTestClick = () => {
 <template>
 	<div :class="$style.card">
 		<div :class="$style.header">
-			<NodeIcon :node-type="nodeType" :size="24" />
+			<N8nIcon
+				v-if="state.isComplete"
+				icon="circle-check"
+				:class="$style.completeIcon"
+				size="medium"
+			/>
+			<NodeIcon v-else :node-type="nodeType" :size="24" />
 			<span :class="$style.nodeName">{{ nodeDisplayName }}</span>
 		</div>
 
@@ -96,6 +102,10 @@ const onTestClick = () => {
 	font-size: var(--font-size--sm);
 	font-weight: var(--font-weight--bold);
 	color: var(--color--text);
+}
+
+.completeIcon {
+	color: var(--color--success);
 }
 
 .content {

@@ -954,7 +954,7 @@ export interface WorkflowBuilderOptions {
 	/** Workflow settings */
 	settings?: WorkflowSettings;
 	/** Plugin registry to use (optional, defaults to global registry) */
-	registry?: import('../plugins/registry').PluginRegistry;
+	registry?: import('../workflow-builder/plugins/registry').PluginRegistry;
 }
 
 /**

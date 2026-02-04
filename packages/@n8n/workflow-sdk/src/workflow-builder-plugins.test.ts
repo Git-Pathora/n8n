@@ -10,16 +10,16 @@ import { workflow } from './workflow-builder';
 import { node, trigger, ifElse, switchCase } from './workflow-builder/node-builders/node-builder';
 import { splitInBatches } from './workflow-builder/control-flow-builders/split-in-batches';
 import type { NodeInstance } from './types/base';
-import { PluginRegistry } from './plugins/registry';
+import { PluginRegistry } from './workflow-builder/plugins/registry';
 import type {
 	ValidatorPlugin,
 	PluginContext,
 	SerializerPlugin,
 	CompositeHandlerPlugin,
 	MutablePluginContext,
-} from './plugins/types';
+} from './workflow-builder/plugins/types';
 import type { WorkflowJSON, IfElseComposite } from './types/base';
-import { jsonSerializer } from './plugins/serializers/json-serializer';
+import { jsonSerializer } from './workflow-builder/plugins/serializers/json-serializer';
 
 // Helper to create mock validators
 function createMockValidator(
@@ -430,7 +430,7 @@ describe('WorkflowBuilder plugin integration', () => {
 	describe('Phase 6.6.1: Unconditional composite handler dispatch', () => {
 		it('uses global pluginRegistry.findCompositeHandler when no registry is provided', () => {
 			// Import the global registry to spy on it
-			const { pluginRegistry } = require('./plugins/registry');
+			const { pluginRegistry } = require('./workflow-builder/plugins/registry');
 
 			// Spy on the global registry's findCompositeHandler method
 			const findCompositeHandlerSpy = jest.spyOn(pluginRegistry, 'findCompositeHandler');
@@ -464,7 +464,7 @@ describe('WorkflowBuilder plugin integration', () => {
 		});
 
 		it('uses global pluginRegistry.findCompositeHandler in then() when no registry is provided', () => {
-			const { pluginRegistry } = require('./plugins/registry');
+			const { pluginRegistry } = require('./workflow-builder/plugins/registry');
 			const findCompositeHandlerSpy = jest.spyOn(pluginRegistry, 'findCompositeHandler');
 
 			const startTrigger = trigger({
@@ -527,8 +527,8 @@ describe('WorkflowBuilder plugin integration', () => {
 
 		it('uses global plugin registry when no registry is provided', () => {
 			// Import the global registry to add a test validator
-			const { pluginRegistry } = require('./plugins/registry');
-			const { registerDefaultPlugins } = require('./plugins/defaults');
+			const { pluginRegistry } = require('./workflow-builder/plugins/registry');
+			const { registerDefaultPlugins } = require('./workflow-builder/plugins/defaults');
 
 			// Ensure default plugins are registered
 			registerDefaultPlugins(pluginRegistry);
@@ -565,7 +565,7 @@ describe('WorkflowBuilder plugin integration', () => {
 			// the inline check* methods are NOT called (they are replaced by plugins)
 
 			// Create a registry with the agent validator
-			const { agentValidator } = require('./plugins/validators/agent-validator');
+			const { agentValidator } = require('./workflow-builder/plugins/validators/agent-validator');
 			testRegistry.registerValidator(agentValidator);
 
 			// Create an agent node with issues that both inline and plugin would catch
@@ -606,8 +606,8 @@ describe('WorkflowBuilder plugin integration', () => {
 
 	describe('Phase 6.6.5: Verify plugin handlers are used for all composite types', () => {
 		it('ifElse builder is handled by global pluginRegistry handler', () => {
-			const { pluginRegistry } = require('./plugins/registry');
-			const { registerDefaultPlugins } = require('./plugins/defaults');
+			const { pluginRegistry } = require('./workflow-builder/plugins/registry');
+			const { registerDefaultPlugins } = require('./workflow-builder/plugins/defaults');
 			registerDefaultPlugins(pluginRegistry);
 
 			const findHandlerSpy = jest.spyOn(pluginRegistry, 'findCompositeHandler');
@@ -639,8 +639,8 @@ describe('WorkflowBuilder plugin integration', () => {
 		});
 
 		it('switchCase builder is handled by global pluginRegistry handler', () => {
-			const { pluginRegistry } = require('./plugins/registry');
-			const { registerDefaultPlugins } = require('./plugins/defaults');
+			const { pluginRegistry } = require('./workflow-builder/plugins/registry');
+			const { registerDefaultPlugins } = require('./workflow-builder/plugins/defaults');
 			registerDefaultPlugins(pluginRegistry);
 
 			const findHandlerSpy = jest.spyOn(pluginRegistry, 'findCompositeHandler');
@@ -674,8 +674,8 @@ describe('WorkflowBuilder plugin integration', () => {
 		});
 
 		it('splitInBatches builder is handled by global pluginRegistry handler', () => {
-			const { pluginRegistry } = require('./plugins/registry');
-			const { registerDefaultPlugins } = require('./plugins/defaults');
+			const { pluginRegistry } = require('./workflow-builder/plugins/registry');
+			const { registerDefaultPlugins } = require('./workflow-builder/plugins/defaults');
 			registerDefaultPlugins(pluginRegistry);
 
 			const findHandlerSpy = jest.spyOn(pluginRegistry, 'findCompositeHandler');
@@ -708,8 +708,8 @@ describe('WorkflowBuilder plugin integration', () => {
 
 	describe('Phase 9.2: getHeadNodeName() and resolveCompositeHeadName()', () => {
 		it('registry.resolveCompositeHeadName returns head node name for IfElseBuilder', () => {
-			const { pluginRegistry } = require('./plugins/registry');
-			const { registerDefaultPlugins } = require('./plugins/defaults');
+			const { pluginRegistry } = require('./workflow-builder/plugins/registry');
+			const { registerDefaultPlugins } = require('./workflow-builder/plugins/defaults');
 			registerDefaultPlugins(pluginRegistry);
 
 			const composite = ifElse({ version: 2, config: { name: 'My If', parameters: {} } }).onTrue!(
@@ -722,8 +722,8 @@ describe('WorkflowBuilder plugin integration', () => {
 		});
 
 		it('registry.resolveCompositeHeadName returns head node name for SwitchCaseBuilder', () => {
-			const { pluginRegistry } = require('./plugins/registry');
-			const { registerDefaultPlugins } = require('./plugins/defaults');
+			const { pluginRegistry } = require('./workflow-builder/plugins/registry');
+			const { registerDefaultPlugins } = require('./workflow-builder/plugins/defaults');
 			registerDefaultPlugins(pluginRegistry);
 
 			const composite = switchCase({
@@ -737,8 +737,8 @@ describe('WorkflowBuilder plugin integration', () => {
 		});
 
 		it('registry.resolveCompositeHeadName returns head node name for SplitInBatchesBuilder', () => {
-			const { pluginRegistry } = require('./plugins/registry');
-			const { registerDefaultPlugins } = require('./plugins/defaults');
+			const { pluginRegistry } = require('./workflow-builder/plugins/registry');
+			const { registerDefaultPlugins } = require('./workflow-builder/plugins/defaults');
 			registerDefaultPlugins(pluginRegistry);
 
 			const sib = splitInBatches({ version: 3, config: { name: 'My SIB' } });
@@ -749,8 +749,8 @@ describe('WorkflowBuilder plugin integration', () => {
 		});
 
 		it('registry.resolveCompositeHeadName applies nameMapping when provided', () => {
-			const { pluginRegistry } = require('./plugins/registry');
-			const { registerDefaultPlugins } = require('./plugins/defaults');
+			const { pluginRegistry } = require('./workflow-builder/plugins/registry');
+			const { registerDefaultPlugins } = require('./workflow-builder/plugins/defaults');
 			registerDefaultPlugins(pluginRegistry);
 
 			const composite = ifElse({ version: 2, config: { name: 'If', parameters: {} } }).onTrue!(
@@ -767,8 +767,8 @@ describe('WorkflowBuilder plugin integration', () => {
 		});
 
 		it('registry.resolveCompositeHeadName returns undefined for non-composites', () => {
-			const { pluginRegistry } = require('./plugins/registry');
-			const { registerDefaultPlugins } = require('./plugins/defaults');
+			const { pluginRegistry } = require('./workflow-builder/plugins/registry');
+			const { registerDefaultPlugins } = require('./workflow-builder/plugins/defaults');
 			registerDefaultPlugins(pluginRegistry);
 
 			const regularNode = node({
@@ -825,7 +825,7 @@ describe('WorkflowBuilder plugin integration', () => {
 		it('validateWorkflow directly detects disconnected nodes', () => {
 			const {
 				disconnectedNodeValidator,
-			} = require('./plugins/validators/disconnected-node-validator');
+			} = require('./workflow-builder/plugins/validators/disconnected-node-validator');
 
 			// Build a minimal PluginContext manually to test the validator directly
 			const triggerNode = trigger({
@@ -894,7 +894,7 @@ describe('WorkflowBuilder plugin integration', () => {
 		it('validateWorkflow respects allowDisconnectedNodes in context', () => {
 			const {
 				disconnectedNodeValidator,
-			} = require('./plugins/validators/disconnected-node-validator');
+			} = require('./workflow-builder/plugins/validators/disconnected-node-validator');
 
 			// Create a manual context with a disconnected node and allowDisconnectedNodes option
 			const nodesMap = new Map<
@@ -933,7 +933,7 @@ describe('WorkflowBuilder plugin integration', () => {
 		it('integration: workflow.validate() uses disconnectedNodeValidator plugin', () => {
 			const {
 				disconnectedNodeValidator,
-			} = require('./plugins/validators/disconnected-node-validator');
+			} = require('./workflow-builder/plugins/validators/disconnected-node-validator');
 			const customRegistry = new PluginRegistry();
 			customRegistry.registerValidator(disconnectedNodeValidator);
 
@@ -962,7 +962,7 @@ describe('WorkflowBuilder plugin integration', () => {
 		it('skips trigger nodes (they do not need incoming connections)', () => {
 			const {
 				disconnectedNodeValidator,
-			} = require('./plugins/validators/disconnected-node-validator');
+			} = require('./workflow-builder/plugins/validators/disconnected-node-validator');
 
 			const nodesMap = new Map<
 				string,
@@ -994,7 +994,7 @@ describe('WorkflowBuilder plugin integration', () => {
 		it('skips sticky notes (they do not participate in data flow)', () => {
 			const {
 				disconnectedNodeValidator,
-			} = require('./plugins/validators/disconnected-node-validator');
+			} = require('./workflow-builder/plugins/validators/disconnected-node-validator');
 
 			const nodesMap = new Map<
 				string,
@@ -1030,7 +1030,7 @@ describe('WorkflowBuilder plugin integration', () => {
 		it('skips subnodes connected via AI connections', () => {
 			const {
 				disconnectedNodeValidator,
-			} = require('./plugins/validators/disconnected-node-validator');
+			} = require('./workflow-builder/plugins/validators/disconnected-node-validator');
 
 			const nodesMap = new Map<
 				string,
@@ -1069,7 +1069,9 @@ describe('WorkflowBuilder plugin integration', () => {
 
 	describe('Phase 11.1: noNodesValidator plugin', () => {
 		it('validateWorkflow returns error when workflow has no nodes', () => {
-			const { noNodesValidator } = require('./plugins/validators/no-nodes-validator');
+			const {
+				noNodesValidator,
+			} = require('./workflow-builder/plugins/validators/no-nodes-validator');
 
 			// Empty nodes map
 			const ctx: PluginContext = {
@@ -1087,7 +1089,9 @@ describe('WorkflowBuilder plugin integration', () => {
 		});
 
 		it('validateWorkflow returns empty array when workflow has nodes', () => {
-			const { noNodesValidator } = require('./plugins/validators/no-nodes-validator');
+			const {
+				noNodesValidator,
+			} = require('./workflow-builder/plugins/validators/no-nodes-validator');
 
 			// Non-empty nodes map
 			const nodesMap = new Map();
@@ -1120,7 +1124,9 @@ describe('WorkflowBuilder plugin integration', () => {
 
 	describe('Phase 11.2: missingTriggerValidator plugin', () => {
 		it('validateWorkflow returns warning when no trigger node exists', () => {
-			const { missingTriggerValidator } = require('./plugins/validators/missing-trigger-validator');
+			const {
+				missingTriggerValidator,
+			} = require('./workflow-builder/plugins/validators/missing-trigger-validator');
 
 			// Nodes map with only non-trigger nodes
 			const nodesMap = new Map();
@@ -1144,7 +1150,9 @@ describe('WorkflowBuilder plugin integration', () => {
 		});
 
 		it('validateWorkflow returns empty array when trigger node exists', () => {
-			const { missingTriggerValidator } = require('./plugins/validators/missing-trigger-validator');
+			const {
+				missingTriggerValidator,
+			} = require('./workflow-builder/plugins/validators/missing-trigger-validator');
 
 			const nodesMap = new Map();
 			nodesMap.set('Start', {
@@ -1165,7 +1173,9 @@ describe('WorkflowBuilder plugin integration', () => {
 		});
 
 		it('validateWorkflow respects allowNoTrigger option', () => {
-			const { missingTriggerValidator } = require('./plugins/validators/missing-trigger-validator');
+			const {
+				missingTriggerValidator,
+			} = require('./workflow-builder/plugins/validators/missing-trigger-validator');
 
 			const nodesMap = new Map();
 			nodesMap.set('Set', {
@@ -1217,7 +1227,7 @@ describe('WorkflowBuilder plugin integration', () => {
 
 	describe('Phase 10.3: JSON serializer extraction', () => {
 		it('jsonSerializer.serialize produces basic workflow structure', () => {
-			const { jsonSerializer } = require('./plugins/serializers/json-serializer');
+			const { jsonSerializer } = require('./workflow-builder/plugins/serializers/json-serializer');
 
 			// Create a minimal SerializerContext
 			const ctx = {
@@ -1238,7 +1248,7 @@ describe('WorkflowBuilder plugin integration', () => {
 		});
 
 		it('workflow.toFormat("json") uses jsonSerializer when registered', () => {
-			const { jsonSerializer } = require('./plugins/serializers/json-serializer');
+			const { jsonSerializer } = require('./workflow-builder/plugins/serializers/json-serializer');
 			const customRegistry = new PluginRegistry();
 			customRegistry.registerSerializer(jsonSerializer);
 
@@ -1288,7 +1298,9 @@ describe('WorkflowBuilder plugin integration', () => {
 
 	describe('Phase 9.3: collectPinData() on composite handlers', () => {
 		it('ifElseHandler.collectPinData collects pin data from IF node and branches', () => {
-			const { ifElseHandler } = require('./plugins/composite-handlers/if-else-handler');
+			const {
+				ifElseHandler,
+			} = require('./workflow-builder/plugins/composite-handlers/if-else-handler');
 
 			const collectedNodes: string[] = [];
 			const collector = (node: NodeInstance<string, string, unknown>) => {
@@ -1320,7 +1332,9 @@ describe('WorkflowBuilder plugin integration', () => {
 		});
 
 		it('switchCaseHandler.collectPinData collects pin data from switch node and cases', () => {
-			const { switchCaseHandler } = require('./plugins/composite-handlers/switch-case-handler');
+			const {
+				switchCaseHandler,
+			} = require('./workflow-builder/plugins/composite-handlers/switch-case-handler');
 
 			const collectedNodes: string[] = [];
 			const collector = (node: NodeInstance<string, string, unknown>) => {
@@ -1353,7 +1367,7 @@ describe('WorkflowBuilder plugin integration', () => {
 		it('splitInBatchesHandler.collectPinData collects pin data from SIB node and targets', () => {
 			const {
 				splitInBatchesHandler,
-			} = require('./plugins/composite-handlers/split-in-batches-handler');
+			} = require('./workflow-builder/plugins/composite-handlers/split-in-batches-handler');
 
 			const collectedNodes: string[] = [];
 			const collector = (node: NodeInstance<string, string, unknown>) => {
@@ -1401,7 +1415,9 @@ describe('WorkflowBuilder plugin integration', () => {
 
 	describe('Phase 13: maxNodesValidator plugin', () => {
 		it('validateWorkflow returns empty array when no nodeTypesProvider', () => {
-			const { maxNodesValidator } = require('./plugins/validators/max-nodes-validator');
+			const {
+				maxNodesValidator,
+			} = require('./workflow-builder/plugins/validators/max-nodes-validator');
 
 			const nodesMap = new Map();
 			nodesMap.set('Set 1', {
@@ -1427,7 +1443,9 @@ describe('WorkflowBuilder plugin integration', () => {
 		});
 
 		it('validateWorkflow returns empty array when count <= maxNodes', () => {
-			const { maxNodesValidator } = require('./plugins/validators/max-nodes-validator');
+			const {
+				maxNodesValidator,
+			} = require('./workflow-builder/plugins/validators/max-nodes-validator');
 
 			const nodesMap = new Map();
 			nodesMap.set('Set 1', {
@@ -1455,7 +1473,9 @@ describe('WorkflowBuilder plugin integration', () => {
 		});
 
 		it('validateWorkflow returns error when count > maxNodes', () => {
-			const { maxNodesValidator } = require('./plugins/validators/max-nodes-validator');
+			const {
+				maxNodesValidator,
+			} = require('./workflow-builder/plugins/validators/max-nodes-validator');
 
 			const nodesMap = new Map();
 			nodesMap.set('Set 1', {
@@ -1496,7 +1516,9 @@ describe('WorkflowBuilder plugin integration', () => {
 		});
 
 		it('validateWorkflow skips types with no maxNodes defined', () => {
-			const { maxNodesValidator } = require('./plugins/validators/max-nodes-validator');
+			const {
+				maxNodesValidator,
+			} = require('./workflow-builder/plugins/validators/max-nodes-validator');
 
 			const nodesMap = new Map();
 			nodesMap.set('Set 1', {

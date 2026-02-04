@@ -37,9 +37,9 @@ import type {
 	WorkflowUpdateChunk,
 	SessionMessagesChunk,
 } from '../types/streaming';
-import type { EvaluationLogger } from './utils/evaluation-logger';
 import { NodeTypeParser } from './utils/node-type-parser';
 import type { ChatPayload } from '../workflow-builder-agent';
+import type { EvaluationLogger } from './utils/evaluation-logger';
 
 /**
  * Code Builder Agent
@@ -388,7 +388,7 @@ ${'='.repeat(50)}
 	private async *runAgenticLoop(params: {
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		llmWithTools: import('@langchain/core/runnables').Runnable<any, any, any>;
-		messages: import('@langchain/core/messages').BaseMessage[];
+		messages: Array<import('@langchain/core/messages').BaseMessage>;
 		textEditorEnabled: boolean;
 		currentWorkflow?: WorkflowJSON;
 		textEditorHandler?: import('./handlers/text-editor-handler').TextEditorHandler;

@@ -821,6 +821,322 @@ describe('WorkflowBuilder plugin integration', () => {
 		});
 	});
 
+	describe('Phase 10.2: disconnectedNodeValidator as full plugin', () => {
+		it('validateWorkflow directly detects disconnected nodes', () => {
+			const {
+				disconnectedNodeValidator,
+			} = require('../plugins/validators/disconnected-node-validator');
+
+			// Build a minimal PluginContext manually to test the validator directly
+			const triggerNode = trigger({
+				type: 'n8n-nodes-base.manualTrigger',
+				version: 1,
+				config: { name: 'Start' },
+			});
+			const connectedNode = node({
+				type: 'n8n-nodes-base.set',
+				version: 3.4,
+				config: { name: 'Connected', parameters: {} },
+			});
+			const disconnectedNode = node({
+				type: 'n8n-nodes-base.set',
+				version: 3.4,
+				config: { name: 'Disconnected', parameters: {} },
+			});
+
+			// Build workflow to verify the test setup is correct
+			workflow('test', 'Test').add(triggerNode.then(connectedNode)).add(disconnectedNode);
+
+			// Create a manual context to test the validator directly
+			// We need to create GraphNode objects that match what the validator expects
+			const nodesMap = new Map<
+				string,
+				{
+					instance: { name: string; type: string };
+					connections: Map<string, Map<number, Array<{ node: string }>>>;
+				}
+			>();
+
+			// Trigger node - no incoming connections needed
+			nodesMap.set('Start', {
+				instance: { name: 'Start', type: 'n8n-nodes-base.manualTrigger' },
+				connections: new Map([['main', new Map([[0, [{ node: 'Connected' }]]])]]),
+			});
+
+			// Connected node - has incoming connection from Start
+			nodesMap.set('Connected', {
+				instance: { name: 'Connected', type: 'n8n-nodes-base.set' },
+				connections: new Map(),
+			});
+
+			// Disconnected node - no incoming connections
+			nodesMap.set('Disconnected', {
+				instance: { name: 'Disconnected', type: 'n8n-nodes-base.set' },
+				connections: new Map(),
+			});
+
+			const ctx: PluginContext = {
+				nodes: nodesMap as unknown as ReadonlyMap<string, import('../types/base').GraphNode>,
+				workflowId: 'test',
+				workflowName: 'Test',
+				settings: {},
+			};
+
+			// Call validateWorkflow directly on the plugin
+			const issues = disconnectedNodeValidator.validateWorkflow!(ctx);
+
+			// Should detect the disconnected node
+			expect(issues.length).toBeGreaterThan(0);
+			expect(issues.some((i: { code: string }) => i.code === 'DISCONNECTED_NODE')).toBe(true);
+			expect(issues.some((i: { nodeName: string }) => i.nodeName === 'Disconnected')).toBe(true);
+		});
+
+		it('validateWorkflow respects allowDisconnectedNodes in context', () => {
+			const {
+				disconnectedNodeValidator,
+			} = require('../plugins/validators/disconnected-node-validator');
+
+			// Create a manual context with a disconnected node and allowDisconnectedNodes option
+			const nodesMap = new Map<
+				string,
+				{
+					instance: { name: string; type: string };
+					connections: Map<string, Map<number, Array<{ node: string }>>>;
+				}
+			>();
+
+			nodesMap.set('Start', {
+				instance: { name: 'Start', type: 'n8n-nodes-base.manualTrigger' },
+				connections: new Map(),
+			});
+
+			nodesMap.set('Disconnected', {
+				instance: { name: 'Disconnected', type: 'n8n-nodes-base.set' },
+				connections: new Map(),
+			});
+
+			const ctx: PluginContext & { validationOptions?: { allowDisconnectedNodes?: boolean } } = {
+				nodes: nodesMap as unknown as ReadonlyMap<string, import('../types/base').GraphNode>,
+				workflowId: 'test',
+				workflowName: 'Test',
+				settings: {},
+				validationOptions: { allowDisconnectedNodes: true },
+			};
+
+			// Call validateWorkflow directly on the plugin
+			const issues = disconnectedNodeValidator.validateWorkflow!(ctx);
+
+			// Should NOT detect disconnected node when allowDisconnectedNodes is true
+			expect(issues.some((i: { code: string }) => i.code === 'DISCONNECTED_NODE')).toBe(false);
+		});
+
+		it('integration: workflow.validate() uses disconnectedNodeValidator plugin', () => {
+			const {
+				disconnectedNodeValidator,
+			} = require('../plugins/validators/disconnected-node-validator');
+			const customRegistry = new PluginRegistry();
+			customRegistry.registerValidator(disconnectedNodeValidator);
+
+			// Create workflow with a disconnected node
+			const triggerNode = trigger({
+				type: 'n8n-nodes-base.manualTrigger',
+				version: 1,
+				config: { name: 'Start' },
+			});
+			const disconnectedNode = node({
+				type: 'n8n-nodes-base.set',
+				version: 3.4,
+				config: { name: 'Disconnected', parameters: {} },
+			});
+
+			const wf = workflow('test', 'Test', { registry: customRegistry })
+				.add(triggerNode)
+				.add(disconnectedNode);
+
+			const result = wf.validate();
+
+			// Should detect the disconnected node
+			expect(result.warnings.some((w) => w.code === 'DISCONNECTED_NODE')).toBe(true);
+		});
+
+		it('skips trigger nodes (they do not need incoming connections)', () => {
+			const {
+				disconnectedNodeValidator,
+			} = require('../plugins/validators/disconnected-node-validator');
+
+			const nodesMap = new Map<
+				string,
+				{
+					instance: { name: string; type: string };
+					connections: Map<string, Map<number, Array<{ node: string }>>>;
+				}
+			>();
+
+			// Only a trigger node
+			nodesMap.set('Start', {
+				instance: { name: 'Start', type: 'n8n-nodes-base.manualTrigger' },
+				connections: new Map(),
+			});
+
+			const ctx: PluginContext = {
+				nodes: nodesMap as unknown as ReadonlyMap<string, import('../types/base').GraphNode>,
+				workflowId: 'test',
+				workflowName: 'Test',
+				settings: {},
+			};
+
+			const issues = disconnectedNodeValidator.validateWorkflow!(ctx);
+
+			// Should NOT warn about trigger node being disconnected
+			expect(issues.some((i: { code: string }) => i.code === 'DISCONNECTED_NODE')).toBe(false);
+		});
+
+		it('skips sticky notes (they do not participate in data flow)', () => {
+			const {
+				disconnectedNodeValidator,
+			} = require('../plugins/validators/disconnected-node-validator');
+
+			const nodesMap = new Map<
+				string,
+				{
+					instance: { name: string; type: string };
+					connections: Map<string, Map<number, Array<{ node: string }>>>;
+				}
+			>();
+
+			nodesMap.set('Start', {
+				instance: { name: 'Start', type: 'n8n-nodes-base.manualTrigger' },
+				connections: new Map(),
+			});
+
+			nodesMap.set('Note', {
+				instance: { name: 'Note', type: 'n8n-nodes-base.stickyNote' },
+				connections: new Map(),
+			});
+
+			const ctx: PluginContext = {
+				nodes: nodesMap as unknown as ReadonlyMap<string, import('../types/base').GraphNode>,
+				workflowId: 'test',
+				workflowName: 'Test',
+				settings: {},
+			};
+
+			const issues = disconnectedNodeValidator.validateWorkflow!(ctx);
+
+			// Should NOT warn about sticky note being disconnected
+			expect(issues.some((i: { code: string }) => i.code === 'DISCONNECTED_NODE')).toBe(false);
+		});
+
+		it('skips subnodes connected via AI connections', () => {
+			const {
+				disconnectedNodeValidator,
+			} = require('../plugins/validators/disconnected-node-validator');
+
+			const nodesMap = new Map<
+				string,
+				{
+					instance: { name: string; type: string };
+					connections: Map<string, Map<number, Array<{ node: string }>>>;
+				}
+			>();
+
+			// Agent node
+			nodesMap.set('Agent', {
+				instance: { name: 'Agent', type: '@n8n/n8n-nodes-langchain.agent' },
+				connections: new Map(),
+			});
+
+			// Language model connected to agent via ai_languageModel
+			nodesMap.set('OpenAI', {
+				instance: { name: 'OpenAI', type: '@n8n/n8n-nodes-langchain.lmOpenAi' },
+				connections: new Map([['ai_languageModel', new Map([[0, [{ node: 'Agent' }]]])]]),
+			});
+
+			const ctx: PluginContext = {
+				nodes: nodesMap as unknown as ReadonlyMap<string, import('../types/base').GraphNode>,
+				workflowId: 'test',
+				workflowName: 'Test',
+				settings: {},
+			};
+
+			const issues = disconnectedNodeValidator.validateWorkflow!(ctx);
+
+			// Should NOT warn about subnodes connected via AI connections
+			// The OpenAI node is a subnode connected via ai_languageModel
+			expect(issues.some((i: { nodeName: string }) => i.nodeName === 'OpenAI')).toBe(false);
+		});
+	});
+
+	describe('Phase 10.3: JSON serializer extraction', () => {
+		it('jsonSerializer.serialize produces basic workflow structure', () => {
+			const { jsonSerializer } = require('../plugins/serializers/json-serializer');
+
+			// Create a minimal PluginContext
+			const ctx: PluginContext = {
+				nodes: new Map(),
+				workflowId: 'wf-123',
+				workflowName: 'Test Workflow',
+				settings: { timezone: 'UTC' },
+				pinData: { Node1: [{ item: 'data' }] },
+			};
+
+			const result = jsonSerializer.serialize(ctx);
+
+			expect(result.id).toBe('wf-123');
+			expect(result.name).toBe('Test Workflow');
+			expect(result.settings).toEqual({ timezone: 'UTC' });
+			expect(result.pinData).toEqual({ Node1: [{ item: 'data' }] });
+		});
+
+		it('workflow.toFormat("json") uses jsonSerializer when registered', () => {
+			const { jsonSerializer } = require('../plugins/serializers/json-serializer');
+			const customRegistry = new PluginRegistry();
+			customRegistry.registerSerializer(jsonSerializer);
+
+			const wf = workflow('wf-456', 'My Workflow', { registry: customRegistry }).add(
+				trigger({
+					type: 'n8n-nodes-base.manualTrigger',
+					version: 1,
+					config: { name: 'Start' },
+				}),
+			);
+
+			// toFormat delegates to the serializer
+			const result = wf.toFormat<WorkflowJSON>('json');
+
+			// Note: The current stub serializer only returns basic structure
+			// without nodes/connections
+			expect(result.id).toBe('wf-456');
+			expect(result.name).toBe('My Workflow');
+		});
+
+		it('workflow.toJSON() returns full serialization with nodes and connections', () => {
+			const triggerNode = trigger({
+				type: 'n8n-nodes-base.manualTrigger',
+				version: 1,
+				config: { name: 'Start' },
+			});
+			const setNode = node({
+				type: 'n8n-nodes-base.set',
+				version: 3.4,
+				config: { name: 'Set Data', parameters: { values: [] } },
+			});
+
+			const wf = workflow('wf-789', 'Full Test').add(triggerNode.then(setNode));
+
+			const json = wf.toJSON();
+
+			// toJSON should produce full serialization
+			expect(json.id).toBe('wf-789');
+			expect(json.name).toBe('Full Test');
+			expect(json.nodes).toHaveLength(2);
+			expect(json.nodes.map((n) => n.name)).toContain('Start');
+			expect(json.nodes.map((n) => n.name)).toContain('Set Data');
+			// Connections should be present
+			expect(json.connections['Start']).toBeDefined();
+		});
+	});
+
 	describe('Phase 9.3: collectPinData() on composite handlers', () => {
 		it('ifElseHandler.collectPinData collects pin data from IF node and branches', () => {
 			const { ifElseHandler } = require('../plugins/composite-handlers/if-else-handler');

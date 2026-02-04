@@ -38,8 +38,8 @@ import { calculateCost } from './utils/cost-calculator';
 export type { CodeBuilderAgentConfig } from './types';
 import { buildCodeBuilderPrompt, type HistoryContext } from './prompts';
 import { createCodeBuilderGetTool } from './tools/code-builder-get.tool';
-import { createCodeBuilderSearchTool } from '../tools/code-builder-search.tool';
-import { createGetSuggestedNodesTool } from '../tools/get-suggested-nodes.tool';
+import { createCodeBuilderSearchTool } from './tools/code-builder-search.tool';
+import { createGetSuggestedNodesTool } from './tools/get-suggested-nodes.tool';
 import { TextEditorHandler } from './handlers/text-editor-handler';
 import type {
 	StreamOutput,

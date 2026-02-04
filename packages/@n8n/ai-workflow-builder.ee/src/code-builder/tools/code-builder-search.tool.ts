@@ -15,9 +15,13 @@ import { inspect } from 'node:util';
 import { tool } from '@langchain/core/tools';
 import { z } from 'zod';
 import type { IRelatedNode } from 'n8n-workflow';
-import type { NodeTypeParser } from '../utils/node-type-parser';
-import { extractResourceOperations } from '../utils/resource-operation-extractor';
-import { extractModeDiscriminator, type ModeInfo } from './utils/discriminator-utils';
+import type { NodeTypeParser, ParsedNodeType } from '../../utils/node-type-parser';
+import {
+	extractResourceOperations,
+	type ResourceInfo,
+	type OperationInfo,
+} from '../../utils/resource-operation-extractor';
+import { extractModeDiscriminator, type ModeInfo } from '../utils/discriminator-utils';
 
 /**
  * Type guard to check if relatedNodes uses the new format with relationHint
@@ -304,14 +308,14 @@ function getDiscriminatorInfo(
 	const resourceOps = extractResourceOperations(nodeType, version);
 	if (resourceOps && resourceOps.resources.length > 0) {
 		const resources: DiscriminatorResourceInfo[] = resourceOps.resources
-			.filter((r) => r.value !== '__CUSTOM_API_CALL__')
-			.map((r) => ({
+			.filter((r: ResourceInfo) => r.value !== '__CUSTOM_API_CALL__')
+			.map((r: ResourceInfo) => ({
 				value: r.value,
 				description: r.description,
 				builderHint: r.builderHint,
 				operations: r.operations
-					.filter((op) => op.value !== '__CUSTOM_API_CALL__')
-					.map((op) => ({
+					.filter((op: OperationInfo) => op.value !== '__CUSTOM_API_CALL__')
+					.map((op: OperationInfo) => ({
 						value: op.value,
 						description: op.description,
 						builderHint: op.builderHint,
@@ -418,7 +422,7 @@ export function createCodeBuilderSearchTool(nodeTypeParser: NodeTypeParser) {
 				debugLog(`Search complete for "${query}"`, {
 					searchDurationMs: searchDuration,
 					resultCount: results.length,
-					results: results.map((node) => ({
+					results: results.map((node: ParsedNodeType) => ({
 						id: node.id,
 						displayName: node.displayName,
 						isTrigger: node.isTrigger,
@@ -429,7 +433,7 @@ export function createCodeBuilderSearchTool(nodeTypeParser: NodeTypeParser) {
 					allResults.push(`## "${query}"\nNo nodes found. Try a different search term.`);
 				} else {
 					// Track which node IDs have been shown to avoid duplicates
-					const shownNodeIds = new Set(results.map((node) => node.id));
+					const shownNodeIds = new Set<string>(results.map((node: ParsedNodeType) => node.id));
 
 					const allNodeLines: string[] = [];
 					let totalRelatedCount = 0;

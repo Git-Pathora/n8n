@@ -23,12 +23,7 @@ import {
 } from './validators';
 
 // Import real composite handlers
-import {
-	ifElseHandler,
-	switchCaseHandler,
-	mergeHandler,
-	splitInBatchesHandler,
-} from './composite-handlers';
+import { ifElseHandler, switchCaseHandler, splitInBatchesHandler } from './composite-handlers';
 
 // Import real serializers
 import { jsonSerializer } from './serializers';
@@ -83,7 +78,6 @@ const coreValidators: ValidatorPlugin[] = [
 const coreCompositeHandlers: CompositeHandlerPlugin[] = [
 	ifElseHandler,
 	switchCaseHandler,
-	mergeHandler,
 	splitInBatchesHandler,
 ];
 

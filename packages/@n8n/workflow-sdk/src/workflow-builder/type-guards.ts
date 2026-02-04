@@ -2,18 +2,7 @@
  * Type guard functions for workflow builder composites and builders
  */
 
-import type { MergeComposite, NodeInstance } from '../types/base';
-
-/**
- * Type guard to check if a MergeComposite uses the old named input syntax.
- * This is for backward compatibility with code using the old merge(node, { input0: ..., input1: ... }) syntax.
- * New code should use the merge() factory and .input(n) syntax instead.
- */
-export function isMergeNamedInputSyntax(
-	composite: MergeComposite<NodeInstance<string, string, unknown>[]>,
-): boolean {
-	return '_isNamedInputSyntax' in composite && composite._isNamedInputSyntax === true;
-}
+import type { NodeInstance } from '../types/base';
 
 /**
  * Check if value is a SplitInBatchesBuilder or a chain (DoneChain/EachChain) from one
@@ -88,14 +77,6 @@ export function isSwitchCaseComposite(value: unknown): boolean {
 export function isIfElseComposite(value: unknown): boolean {
 	if (value === null || typeof value !== 'object') return false;
 	return 'ifNode' in value && 'trueBranch' in value;
-}
-
-/**
- * Check if value is a MergeComposite
- */
-export function isMergeComposite(value: unknown): boolean {
-	if (value === null || typeof value !== 'object') return false;
-	return 'mergeNode' in value && 'branches' in value;
 }
 
 /**

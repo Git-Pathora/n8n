@@ -9,7 +9,7 @@
 import { workflow } from '../workflow-builder';
 import { node, trigger, ifElse, switchCase } from '../node-builder';
 import { splitInBatches } from '../split-in-batches';
-import type { MergeComposite, NodeInstance } from '../types/base';
+import type { NodeInstance } from '../types/base';
 import { PluginRegistry } from '../plugins/registry';
 import type {
 	ValidatorPlugin,
@@ -669,52 +669,6 @@ describe('WorkflowBuilder plugin integration', () => {
 			const json = wf.toJSON();
 			expect(json.nodes.map((n) => n.name)).toContain('Switch');
 			expect(json.nodes.map((n) => n.name)).toContain('Case 0');
-
-			findHandlerSpy.mockRestore();
-		});
-
-		it('merge composite is handled by global pluginRegistry handler', () => {
-			const { pluginRegistry } = require('../plugins/registry');
-			const { registerDefaultPlugins } = require('../plugins/defaults');
-			registerDefaultPlugins(pluginRegistry);
-
-			const findHandlerSpy = jest.spyOn(pluginRegistry, 'findCompositeHandler');
-
-			const mergeNodeInstance = node({
-				type: 'n8n-nodes-base.merge',
-				version: 3,
-				config: { name: 'Merge', parameters: {} },
-			});
-			const branch1 = node({
-				type: 'n8n-nodes-base.set',
-				version: 3.4,
-				config: { name: 'Branch 1', parameters: {} },
-			});
-			const branch2 = node({
-				type: 'n8n-nodes-base.set',
-				version: 3.4,
-				config: { name: 'Branch 2', parameters: {} },
-			});
-			// Create a MergeComposite directly (with required structure: mergeNode + branches)
-			const composite = {
-				mergeNode: mergeNodeInstance,
-				branches: [branch1, branch2],
-				mode: 'combine' as const,
-			} as MergeComposite<NodeInstance<string, string, unknown>[]>;
-
-			const wf = workflow('test', 'Test').add(
-				composite as unknown as NodeInstance<string, string, unknown>,
-			);
-
-			// Verify handler was found - merge handler should be called
-			const foundHandler = findHandlerSpy.mock.results.find((r) => r.value?.id === 'core:merge');
-			expect(foundHandler).toBeDefined();
-
-			// Verify workflow was built correctly
-			const json = wf.toJSON();
-			expect(json.nodes.map((n) => n.name)).toContain('Merge');
-			expect(json.nodes.map((n) => n.name)).toContain('Branch 1');
-			expect(json.nodes.map((n) => n.name)).toContain('Branch 2');
 
 			findHandlerSpy.mockRestore();
 		});

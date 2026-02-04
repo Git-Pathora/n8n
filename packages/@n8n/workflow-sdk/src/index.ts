@@ -36,10 +36,6 @@ export type {
 	InputContext,
 	ExecutionContext,
 	WorkflowContext,
-	// Merge types
-	MergeComposite,
-	MergeConfig,
-	MergeMode,
 	// IF else types
 	IfElseComposite,
 	// Switch case types

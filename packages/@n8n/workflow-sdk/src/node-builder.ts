@@ -11,7 +11,6 @@ import {
 	type NewCredentialValue,
 	type DeclaredConnection,
 	type NodeChain,
-	type MergeComposite,
 	type SwitchCaseComposite,
 	type IfElseComposite,
 	type SplitInBatchesBuilder,
@@ -44,19 +43,6 @@ export function isOutputSelector(value: unknown): value is OutputSelector<string
 		value !== null &&
 		'_isOutputSelector' in value &&
 		(value as OutputSelector<string, string, unknown>)._isOutputSelector === true
-	);
-}
-
-/**
- * Check if value is a MergeComposite
- */
-function isMergeComposite(value: unknown): value is MergeComposite {
-	return (
-		typeof value === 'object' &&
-		value !== null &&
-		'mergeNode' in value &&
-		'branches' in value &&
-		Array.isArray((value as MergeComposite).branches)
 	);
 }
 
@@ -130,9 +116,6 @@ function extractSplitInBatchesBuilder(value: unknown): SplitInBatchesBuilder<unk
  * Get the output node from a composite (the node that should receive connections)
  */
 function getCompositeOutputNode(value: unknown): NodeInstance<string, string, unknown> | null {
-	if (isMergeComposite(value)) {
-		return value.mergeNode;
-	}
 	if (isSwitchCaseComposite(value)) {
 		return value.switchNode;
 	}
@@ -1253,11 +1236,10 @@ export function newCredential(name: string): NewCredentialValue {
 
 /**
  * Create a NodeChain with additional nodes prepended to allNodes.
- * This is used by MergeComposite to ensure branch nodes are included
- * when .then() is called on a merge.
+ * This is used to ensure branch nodes are included when .then() is called.
  *
- * @param baseChain - The base chain created by mergeNode.then()
- * @param additionalNodes - Additional nodes to prepend to allNodes (e.g., merge branches)
+ * @param baseChain - The base chain
+ * @param additionalNodes - Additional nodes to prepend to allNodes
  * @returns A new chain with the additional nodes included
  */
 export function createChainWithAdditionalNodes<
@@ -1273,31 +1255,6 @@ export function createChainWithAdditionalNodes<
 
 	// Create a new chain with the additional nodes prepended
 	const allNodes = [...newNodes, ...baseChain.allNodes];
-
-	return new NodeChainImpl(baseChain.head, baseChain.tail, allNodes);
-}
-
-/**
- * Create a NodeChain that includes a MergeComposite in allNodes.
- * This is used by MergeComposite.then() to ensure the composite is processed
- * by addBranchToGraph which calls addMergeNodes to set up branch connections.
- *
- * @param baseChain - The base chain created by mergeNode.then()
- * @param mergeComposite - The MergeComposite to include in allNodes
- * @returns A new chain with the MergeComposite prepended to allNodes
- */
-export function createChainWithMergeComposite<
-	THead extends NodeInstance<string, string, unknown>,
-	TTail extends NodeInstance<string, string, unknown>,
->(baseChain: NodeChain<THead, TTail>, mergeComposite: MergeComposite): NodeChain<THead, TTail> {
-	// Include the MergeComposite at the front of allNodes
-	// The workflow-builder's addBranchToGraph will detect it via isMergeComposite
-	// and call addMergeNodes which properly sets up branch connections
-	// Note: The type cast is safe because addBranchToGraph handles MergeComposite in allNodes
-	const allNodes = [
-		mergeComposite as unknown as NodeInstance<string, string, unknown>,
-		...baseChain.allNodes,
-	];
 
 	return new NodeChainImpl(baseChain.head, baseChain.tail, allNodes);
 }

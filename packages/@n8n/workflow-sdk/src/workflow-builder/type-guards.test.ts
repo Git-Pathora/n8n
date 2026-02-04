@@ -1,49 +1,12 @@
 import { describe, it, expect } from '@jest/globals';
 import {
-	isMergeNamedInputSyntax,
 	isSplitInBatchesBuilder,
 	isSwitchCaseComposite,
 	isIfElseComposite,
-	isMergeComposite,
 	isNodeInstanceShape,
 } from './type-guards';
 
 describe('workflow-builder/type-guards', () => {
-	describe('isMergeNamedInputSyntax', () => {
-		it('returns true for composite with _isNamedInputSyntax', () => {
-			// Use type assertion to test with minimal mock object
-			const composite = {
-				mergeNode: {},
-				branches: [],
-				mode: 'combine',
-				then: () => {},
-				_isNamedInputSyntax: true,
-			} as unknown as Parameters<typeof isMergeNamedInputSyntax>[0];
-			expect(isMergeNamedInputSyntax(composite)).toBe(true);
-		});
-
-		it('returns false for composite without _isNamedInputSyntax', () => {
-			const composite = {
-				mergeNode: {},
-				branches: [],
-				mode: 'combine',
-				then: () => {},
-			} as unknown as Parameters<typeof isMergeNamedInputSyntax>[0];
-			expect(isMergeNamedInputSyntax(composite)).toBe(false);
-		});
-
-		it('returns false for composite with _isNamedInputSyntax false', () => {
-			const composite = {
-				mergeNode: {},
-				branches: [],
-				mode: 'combine',
-				then: () => {},
-				_isNamedInputSyntax: false,
-			} as unknown as Parameters<typeof isMergeNamedInputSyntax>[0];
-			expect(isMergeNamedInputSyntax(composite)).toBe(false);
-		});
-	});
-
 	describe('isSplitInBatchesBuilder', () => {
 		it('returns true for direct builder', () => {
 			const builder = {
@@ -114,25 +77,6 @@ describe('workflow-builder/type-guards', () => {
 
 		it('returns false for null', () => {
 			expect(isIfElseComposite(null)).toBe(false);
-		});
-	});
-
-	describe('isMergeComposite', () => {
-		it('returns true for object with mergeNode and branches', () => {
-			const composite = { mergeNode: {}, branches: [] };
-			expect(isMergeComposite(composite)).toBe(true);
-		});
-
-		it('returns false for object missing mergeNode', () => {
-			expect(isMergeComposite({ branches: [] })).toBe(false);
-		});
-
-		it('returns false for object missing branches', () => {
-			expect(isMergeComposite({ mergeNode: {} })).toBe(false);
-		});
-
-		it('returns false for null', () => {
-			expect(isMergeComposite(null)).toBe(false);
 		});
 	});
 

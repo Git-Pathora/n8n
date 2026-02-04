@@ -33,7 +33,7 @@ describe('Default Plugins', () => {
 		const handlerIds = handlers.map((h) => h.id);
 		expect(handlerIds).toContain('core:if-else');
 		expect(handlerIds).toContain('core:switch-case');
-		expect(handlerIds).toContain('core:merge');
+		expect(handlerIds).toContain('core:split-in-batches');
 	});
 
 	it('registerDefaultPlugins registers core serializers', () => {

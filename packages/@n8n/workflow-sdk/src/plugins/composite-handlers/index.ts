@@ -6,5 +6,4 @@
 
 export { ifElseHandler } from './if-else-handler';
 export { switchCaseHandler } from './switch-case-handler';
-export { mergeHandler } from './merge-handler';
 export { splitInBatchesHandler } from './split-in-batches-handler';

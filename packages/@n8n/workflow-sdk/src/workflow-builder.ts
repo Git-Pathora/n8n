@@ -6,7 +6,6 @@ import type {
 	NodeJSON,
 	NodeInstance,
 	TriggerInstance,
-	MergeComposite,
 	IfElseComposite,
 	SwitchCaseComposite,
 	ConnectionTarget,
@@ -41,12 +40,10 @@ import {
 } from './workflow-builder/string-utils';
 import { NODE_SPACING_X, DEFAULT_Y, START_X } from './workflow-builder/constants';
 import {
-	isMergeNamedInputSyntax,
 	isSplitInBatchesBuilder,
 	extractSplitInBatchesBuilder,
 	isSwitchCaseComposite,
 	isIfElseComposite,
-	isMergeComposite,
 } from './workflow-builder/type-guards';
 import { isTriggerNode } from './workflow-builder/validation-helpers';
 import type { IfElseBuilder, SwitchCaseBuilder } from './types/base';
@@ -209,14 +206,6 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 						pinData = this.collectPinDataFromNode(composite.falseBranch, pinData);
 					}
 				}
-			} else if (isMergeComposite(chainNode)) {
-				const composite = chainNode as unknown as MergeComposite<
-					NodeInstance<string, string, unknown>[]
-				>;
-				pinData = this.collectPinDataFromNode(composite.mergeNode, pinData);
-				for (const branch of composite.branches as NodeInstance<string, string, unknown>[]) {
-					pinData = this.collectPinDataFromNode(branch, pinData);
-				}
 			} else {
 				// Regular node
 				const nodePinData = chainNode.config?.pinData;
@@ -365,7 +354,7 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 	}
 
 	then<N extends NodeInstance<string, string, unknown>>(
-		nodeOrComposite: N | N[] | MergeComposite | IfElseComposite | SwitchCaseComposite | NodeChain,
+		nodeOrComposite: N | N[] | IfElseComposite | SwitchCaseComposite | NodeChain,
 	): WorkflowBuilder {
 		// Handle array of nodes (fan-out pattern)
 		if (Array.isArray(nodeOrComposite)) {
@@ -1228,7 +1217,7 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 
 	/**
 	 * Resolve the target node name from a connection target.
-	 * Handles NodeInstance, NodeChain, and composites (SwitchCaseComposite, IfElseComposite, MergeComposite).
+	 * Handles NodeInstance, NodeChain, and composites (SwitchCaseComposite, IfElseComposite).
 	 * Returns the map key (which may differ from instance.name for renamed duplicates).
 	 * @param nameMapping - Optional map from node ID to actual map key (used when nodes are renamed during addBranchToGraph)
 	 */
@@ -1273,11 +1262,6 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 			return getNodeName((target as IfElseComposite).ifNode);
 		}
 
-		// Check for MergeComposite
-		if (isMergeComposite(target)) {
-			return getNodeName((target as MergeComposite).mergeNode);
-		}
-
 		// Check for IfElseBuilder (fluent API)
 		if (isIfElseBuilder(target)) {
 			return getNodeName((target as IfElseBuilder<unknown>).ifNode);
@@ -1318,7 +1302,6 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 			// Skip if target is a composite or builder (already handled elsewhere)
 			if (isSwitchCaseComposite(target)) continue;
 			if (isIfElseComposite(target)) continue;
-			if (isMergeComposite(target)) continue;
 			if (isSplitInBatchesBuilder(target)) continue;
 			if (isIfElseBuilder(target)) continue;
 			if (isSwitchCaseBuilder(target)) continue;
@@ -1368,7 +1351,6 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 			// Skip if target is a composite or builder (already handled elsewhere)
 			if (isSwitchCaseComposite(target)) continue;
 			if (isIfElseComposite(target)) continue;
-			if (isMergeComposite(target)) continue;
 			if (isSplitInBatchesBuilder(target)) continue;
 			if (isIfElseBuilder(target)) continue;
 			if (isSwitchCaseBuilder(target)) continue;
@@ -1774,14 +1756,6 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 		// Add the head node and connect from current workflow position
 		const headNodeName = this.addBranchToGraph(newNodes, chain);
 
-		// Check if the first element in allNodes is a merge composite with named input syntax
-		// If so, we need to fan out to the input heads instead of connecting to the merge node directly
-		const firstNode = chain.allNodes[0];
-		const firstNodeAsMerge = isMergeComposite(firstNode)
-			? (firstNode as unknown as MergeComposite<NodeInstance<string, string, unknown>[]>)
-			: null;
-		const hasMergeNamedInputs = firstNodeAsMerge && isMergeNamedInputSyntax(firstNodeAsMerge);
-
 		// Connect from current workflow node to the head of the chain
 		if (this._currentNode) {
 			const currentGraphNode = newNodes.get(this._currentNode);
@@ -1789,19 +1763,8 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 				const mainConns = currentGraphNode.connections.get('main') || new Map();
 				const outputConnections = mainConns.get(this._currentOutput) || [];
 
-				if (hasMergeNamedInputs && firstNodeAsMerge) {
-					// Fan out to all input heads for named input merge syntax
-					for (const headNode of firstNodeAsMerge.branches) {
-						const inputHeadName = isNodeChain(headNode) ? headNode.head.name : headNode.name;
-						// Avoid duplicates
-						if (!outputConnections.some((c: ConnectionTarget) => c.node === inputHeadName)) {
-							outputConnections.push({ node: inputHeadName, type: 'main', index: 0 });
-						}
-					}
-				} else {
-					// Standard behavior: connect to chain head
-					outputConnections.push({ node: headNodeName, type: 'main', index: 0 });
-				}
+				// Standard behavior: connect to chain head
+				outputConnections.push({ node: headNodeName, type: 'main', index: 0 });
 
 				mainConns.set(this._currentOutput, outputConnections);
 				currentGraphNode.connections.set('main', mainConns);
@@ -1856,7 +1819,6 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 					(!('name' in chainNode) &&
 						!isSwitchCaseComposite(chainNode) &&
 						!isIfElseComposite(chainNode) &&
-						!isMergeComposite(chainNode) &&
 						!isSplitInBatchesBuilder(chainNode) &&
 						!isIfElseBuilder(chainNode) &&
 						!isSwitchCaseBuilder(chainNode))
@@ -1888,7 +1850,6 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 					}
 
 					// Get the actual node instance that might have connections
-					// For MergeComposite, we need to check the mergeNode inside it
 					// For SplitInBatchesBuilder, skip - connections to SIB are handled differently
 					let nodeToCheck: NodeInstance<string, string, unknown> | null = null;
 					let nodeName: string | null = null;
@@ -1896,12 +1857,6 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 					if (isSplitInBatchesBuilder(chainNode)) {
 						// SplitInBatchesBuilder doesn't have getConnections - skip
 						continue;
-					} else if (isMergeComposite(chainNode)) {
-						const composite = chainNode as unknown as MergeComposite<
-							NodeInstance<string, string, unknown>[]
-						>;
-						nodeToCheck = composite.mergeNode;
-						nodeName = composite.mergeNode.name;
 					} else if (typeof chainNode.getConnections === 'function') {
 						nodeToCheck = chainNode;
 						nodeName = chainNode.name;

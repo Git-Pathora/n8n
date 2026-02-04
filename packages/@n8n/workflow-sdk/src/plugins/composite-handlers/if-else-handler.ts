@@ -10,7 +10,6 @@ import type {
 	ConnectionTarget,
 	NodeInstance,
 	IfElseBuilder,
-	MergeComposite,
 	SwitchCaseComposite,
 	NodeChain,
 	SwitchCaseBuilder,
@@ -18,9 +17,7 @@ import type {
 import { isNodeChain } from '../../types/base';
 import {
 	isIfElseComposite,
-	isMergeComposite,
 	isSwitchCaseComposite,
-	isMergeNamedInputSyntax,
 	isSplitInBatchesBuilder,
 	extractSplitInBatchesBuilder,
 } from '../../workflow-builder/type-guards';
@@ -52,10 +49,6 @@ function getTargetNodeName(target: unknown): string | undefined {
 		return (target as SwitchCaseComposite).switchNode.name;
 	}
 
-	if (isMergeComposite(target)) {
-		return (target as MergeComposite<NodeInstance<string, string, unknown>[]>).mergeNode.name;
-	}
-
 	// Handle IfElseBuilder (fluent API)
 	if (isIfElseBuilder(target)) {
 		return (target as IfElseBuilder<unknown>).ifNode.name;
@@ -77,33 +70,6 @@ function getTargetNodeName(target: unknown): string | undefined {
 		return (target as NodeInstance<string, string, unknown>).name;
 	}
 
-	return undefined;
-}
-
-/**
- * Get the input index for a source node in a merge's named inputs.
- * Returns undefined if the target is not a merge with named inputs or if the source is not found.
- */
-function getMergeInputIndexForSource(
-	sourceNode: NodeInstance<string, string, unknown>,
-	mergeTarget: unknown,
-): number | undefined {
-	if (!isMergeComposite(mergeTarget)) return undefined;
-	const mergeComposite = mergeTarget as MergeComposite<NodeInstance<string, string, unknown>[]>;
-	if (!isMergeNamedInputSyntax(mergeComposite)) return undefined;
-
-	const namedMerge = mergeComposite as MergeComposite<NodeInstance<string, string, unknown>[]> & {
-		inputMapping: Map<number, NodeInstance<string, string, unknown>[]>;
-	};
-
-	// Find which input index this source node is mapped to
-	for (const [inputIndex, tailNodes] of namedMerge.inputMapping) {
-		for (const tailNode of tailNodes) {
-			if (tailNode === sourceNode || tailNode.name === sourceNode.name) {
-				return inputIndex;
-			}
-		}
-	}
 	return undefined;
 }
 
@@ -163,7 +129,7 @@ function processBranchForComposite(
 function processBranchForBuilder(
 	branch: unknown,
 	outputIndex: number,
-	ifNode: NodeInstance<string, string, unknown>,
+	_ifNode: NodeInstance<string, string, unknown>,
 	ifMainConns: Map<number, ConnectionTarget[]>,
 ): void {
 	if (branch === null || branch === undefined) {
@@ -175,9 +141,7 @@ function processBranchForBuilder(
 		for (const t of branch) {
 			const targetName = getTargetNodeName(t);
 			if (targetName) {
-				// For merge targets, use the input index from the merge's named inputs if available
-				const targetInputIndex = getMergeInputIndexForSource(ifNode, t) ?? 0;
-				targets.push({ node: targetName, type: 'main', index: targetInputIndex });
+				targets.push({ node: targetName, type: 'main', index: 0 });
 			}
 		}
 		if (targets.length > 0) {
@@ -186,9 +150,7 @@ function processBranchForBuilder(
 	} else {
 		const targetName = getTargetNodeName(branch);
 		if (targetName) {
-			// For merge targets, use the input index from the merge's named inputs if available
-			const targetInputIndex = getMergeInputIndexForSource(ifNode, branch) ?? 0;
-			ifMainConns.set(outputIndex, [{ node: targetName, type: 'main', index: targetInputIndex }]);
+			ifMainConns.set(outputIndex, [{ node: targetName, type: 'main', index: 0 }]);
 		}
 	}
 }

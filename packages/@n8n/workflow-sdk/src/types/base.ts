@@ -92,15 +92,6 @@ export interface PlaceholderValue {
 export type OnError = 'stopWorkflow' | 'continueRegularOutput' | 'continueErrorOutput';
 
 // =============================================================================
-// Merge Mode
-// =============================================================================
-
-/**
- * Merge mode options
- */
-export type MergeMode = 'append' | 'combine' | 'multiplex' | 'chooseBranch';
-
-// =============================================================================
 // Workflow Settings (with extensibility)
 // =============================================================================
 
@@ -637,33 +628,6 @@ export interface RerankerInstance<
 // =============================================================================
 
 /**
- * Merge configuration
- */
-export interface MergeConfig {
-	mode?: MergeMode;
-	parameters?: IDataObject;
-	version?: number | string;
-	name?: string;
-	id?: string;
-}
-
-/**
- * Merge composite representing parallel branches merging into one node
- */
-export interface MergeComposite<TBranches extends unknown[] = unknown[]> {
-	readonly mergeNode: NodeInstance<'n8n-nodes-base.merge', string, unknown>;
-	readonly branches: TBranches;
-	readonly mode: MergeMode;
-	/**
-	 * Chain a target node after the merge
-	 */
-	then<T extends NodeInstance<string, string, unknown>>(
-		target: T | T[],
-		outputIndex?: number,
-	): NodeChain<NodeInstance<'n8n-nodes-base.merge', string, unknown>, T>;
-}
-
-/**
  * Configuration for IF else
  */
 export interface IfElseConfig {
@@ -927,7 +891,6 @@ export interface WorkflowBuilder {
 	>(node: N): WorkflowBuilder;
 
 	then<N extends NodeInstance<string, string, unknown>>(node: N): WorkflowBuilder;
-	then<M extends MergeComposite>(merge: M): WorkflowBuilder;
 	then(ifElse: IfElseComposite): WorkflowBuilder;
 	then(switchCase: SwitchCaseComposite): WorkflowBuilder;
 	then<T>(splitInBatches: SplitInBatchesBuilder<T>): WorkflowBuilder;
@@ -1080,11 +1043,6 @@ export type StickyFn = (
 export type PlaceholderFn = (hint: string) => PlaceholderValue;
 
 export type NewCredentialFn = (name: string) => NewCredentialValue;
-
-export type MergeFn = <TBranches extends NodeInstance<string, string, unknown>[]>(
-	branches: TBranches,
-	config?: MergeConfig,
-) => MergeComposite<TBranches>;
 
 export type IfElseFn = (
 	branches: [

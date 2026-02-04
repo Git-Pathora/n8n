@@ -9,8 +9,6 @@ import type {
 	SubnodeConfig,
 	IDataObject,
 	NodeChain,
-	CredentialReference,
-	NewCredentialValue,
 	GeneratePinDataOptions,
 	WorkflowBuilderOptions,
 } from './types/base';
@@ -30,6 +28,7 @@ import { isNodeChain } from './types/base';
 import { isInputTarget, cloneNodeWithId } from './node-builder';
 import { generateDeterministicNodeId } from './workflow-builder/string-utils';
 import { shouldGeneratePinData } from './workflow-builder/pin-data-utils';
+import { parseWorkflowJSON } from './workflow-builder/workflow-import';
 
 /**
  * Internal workflow builder implementation
@@ -1417,150 +1416,15 @@ function createWorkflow(
  * Import workflow from n8n JSON format
  */
 function fromJSON(json: WorkflowJSON): WorkflowBuilder {
-	const nodes = new Map<string, GraphNode>();
-	// Map from connection name (how nodes reference each other) to map key
-	const nameToKey = new Map<string, string>();
-
-	// Create node instances from JSON
-	let unnamedCounter = 0;
-	for (const n8nNode of json.nodes) {
-		const version = `v${n8nNode.typeVersion}`;
-
-		// Preserve original credentials exactly - don't transform
-		// Some workflows have empty placeholder credentials like {}
-		const credentials = n8nNode.credentials
-			? (JSON.parse(JSON.stringify(n8nNode.credentials)) as Record<
-					string,
-					CredentialReference | NewCredentialValue
-				>)
-			: undefined;
-
-		// Create a minimal node instance
-		// For nodes without a name (like sticky notes), use the id as the internal name
-		// but preserve the original name (or lack thereof) for export
-		const nodeName = n8nNode.name ?? n8nNode.id;
-		const instance: NodeInstance<string, string, unknown> = {
-			type: n8nNode.type,
-			version,
-			id: n8nNode.id,
-			name: nodeName,
-			config: {
-				name: nodeName, // Include name in config for consistency
-				parameters: n8nNode.parameters as IDataObject,
-				credentials,
-				// Store original name to preserve it in toJSON (undefined for sticky notes without name)
-				// Using spread to add internal property without polluting the type
-				...({ _originalName: n8nNode.name } as Record<string, unknown>),
-				position: n8nNode.position,
-				disabled: n8nNode.disabled,
-				notes: n8nNode.notes,
-				notesInFlow: n8nNode.notesInFlow,
-				executeOnce: n8nNode.executeOnce,
-				retryOnFail: n8nNode.retryOnFail,
-				alwaysOutputData: n8nNode.alwaysOutputData,
-				onError: n8nNode.onError,
-			},
-			update: function (config) {
-				return {
-					...this,
-					config: { ...this.config, ...config },
-				};
-			},
-			then: function () {
-				throw new Error(
-					'Nodes from fromJSON() do not support then() - use workflow builder methods',
-				);
-			},
-			to: function () {
-				throw new Error('Nodes from fromJSON() do not support to() - use workflow builder methods');
-			},
-			input: function () {
-				throw new Error(
-					'Nodes from fromJSON() do not support input() - use workflow builder methods',
-				);
-			},
-			output: function () {
-				throw new Error(
-					'Nodes from fromJSON() do not support output() - use workflow builder methods',
-				);
-			},
-			onError: function () {
-				throw new Error(
-					'Nodes from fromJSON() do not support onError() - use workflow builder methods',
-				);
-			},
-			getConnections: function () {
-				return [];
-			},
-		};
-
-		// Initialize connections map with all connection types
-		const connectionsMap = new Map<string, Map<number, ConnectionTarget[]>>();
-
-		// Use a unique key for the map (ID if available, otherwise generate one)
-		// Connections reference nodes by name, so we also build a name->key mapping
-		const mapKey = n8nNode.id || `__unnamed_${unnamedCounter++}`;
-		// Always add to nameToKey since we now have a valid nodeName
-		nameToKey.set(nodeName, mapKey);
-
-		nodes.set(mapKey, {
-			instance,
-			connections: connectionsMap,
-		});
-	}
-
-	// Rebuild connections - handle all connection types
-	if (json.connections) {
-		for (const [sourceName, nodeConns] of Object.entries(json.connections)) {
-			// Find the node by its name using the nameToKey mapping
-			const mapKey = nameToKey.get(sourceName);
-			const graphNode = mapKey ? nodes.get(mapKey) : undefined;
-			if (!graphNode) continue;
-
-			// Iterate over all connection types (main, ai_tool, ai_memory, etc.)
-			for (const [connType, outputs] of Object.entries(nodeConns)) {
-				if (!outputs || !Array.isArray(outputs)) continue;
-
-				const typeMap =
-					graphNode.connections.get(connType) || new Map<number, ConnectionTarget[]>();
-
-				// Store all outputs including empty ones to preserve array structure
-				for (let outputIndex = 0; outputIndex < outputs.length; outputIndex++) {
-					const targets = outputs[outputIndex];
-					if (targets && targets.length > 0) {
-						typeMap.set(
-							outputIndex,
-							targets.map((conn: { node: string; type: string; index: number }) => ({
-								node: conn.node,
-								type: conn.type,
-								index: conn.index,
-							})),
-						);
-					} else {
-						// Store empty array to preserve output index
-						typeMap.set(outputIndex, []);
-					}
-				}
-
-				graphNode.connections.set(connType, typeMap);
-			}
-		}
-	}
-
-	// Find the last node in the chain for currentNode
-	let lastNode: string | null = null;
-	for (const name of nodes.keys()) {
-		lastNode = name;
-	}
-
+	const parsed = parseWorkflowJSON(json);
 	return new WorkflowBuilderImpl(
-		json.id ?? '',
-		json.name,
-		json.settings,
-		nodes,
-		lastNode,
-		json.pinData,
-		json.meta,
+		parsed.id,
+		parsed.name,
+		parsed.settings,
+		parsed.nodes,
+		parsed.lastNode,
+		parsed.pinData,
+		parsed.meta,
 	);
 }
 

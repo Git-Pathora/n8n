@@ -595,6 +595,7 @@ class SDKInterpreter {
 			case '&&':
 				return left ? this.evaluate(node.right) : left;
 			case '||':
+				// eslint-disable-next-line @typescript-eslint/prefer-nullish-coalescing -- Implementing JS || semantics
 				return left ? left : this.evaluate(node.right);
 			case '??':
 				return left ?? this.evaluate(node.right);

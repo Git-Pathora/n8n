@@ -88,9 +88,9 @@ export const ifElseHandler: CompositeHandlerPlugin<IfElseInput> = {
 			const existingIfNode = ctx.nodes.get(builder.ifNode.name);
 			if (existingIfNode) {
 				// Merge ifMainConns into existing connections
-				const existingMainConns = existingIfNode.connections.get('main') || new Map();
+				const existingMainConns = existingIfNode.connections.get('main') ?? new Map();
 				for (const [outputIndex, targets] of ifMainConns) {
-					const existingTargets = existingMainConns.get(outputIndex) || [];
+					const existingTargets = existingMainConns.get(outputIndex) ?? [];
 					// Add new targets that don't already exist
 					for (const target of targets) {
 						const alreadyExists = existingTargets.some(

@@ -98,9 +98,9 @@ export const switchCaseHandler: CompositeHandlerPlugin<SwitchCaseInput> = {
 			const existingNode = ctx.nodes.get(builder.switchNode.name);
 			if (existingNode) {
 				// Merge switchMainConns into existing connections
-				const existingMainConns = existingNode.connections.get('main') || new Map();
+				const existingMainConns = existingNode.connections.get('main') ?? new Map();
 				for (const [outputIndex, targets] of switchMainConns) {
-					const existingTargets = existingMainConns.get(outputIndex) || [];
+					const existingTargets = existingMainConns.get(outputIndex) ?? [];
 					// Add new targets that don't already exist
 					for (const target of targets) {
 						const alreadyExists = existingTargets.some(

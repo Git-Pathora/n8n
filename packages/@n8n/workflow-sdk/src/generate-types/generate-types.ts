@@ -1203,11 +1203,13 @@ export function extractDiscriminatorCombinations(
 		// Skip if this discriminator has displayOptions (it's conditionally shown)
 		// Exception: @version displayOptions are fine since version filtering is handled separately
 		if (discProp?.displayOptions) {
+			/* eslint-disable @typescript-eslint/prefer-nullish-coalescing -- Logical OR for boolean combination */
 			const hasNonVersionDisplayOptions =
 				(discProp.displayOptions.show &&
 					Object.keys(discProp.displayOptions.show).some((k) => k !== '@version')) ||
 				(discProp.displayOptions.hide &&
 					Object.keys(discProp.displayOptions.hide).some((k) => k !== '@version'));
+			/* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
 			if (hasNonVersionDisplayOptions) {
 				continue;
 			}
@@ -1617,10 +1619,12 @@ export function generatePropertyLine(
 
 	// JSDoc - generate if description, displayOptions, hint, builderHint, or non-trivial default exists
 	// This ensures LLMs can see dependency information even for properties without descriptions
+	/* eslint-disable @typescript-eslint/prefer-nullish-coalescing -- Logical OR for boolean combination */
 	const hasDisplayOptions =
 		prop.displayOptions &&
 		((prop.displayOptions.show && Object.keys(prop.displayOptions.show).length > 0) ||
 			(prop.displayOptions.hide && Object.keys(prop.displayOptions.hide).length > 0));
+	/* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
 	if (prop.description || hasDisplayOptions || prop.hint || prop.builderHint) {
 		lines.push(generatePropertyJSDoc(prop, discriminatorContext));
 	}

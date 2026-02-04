@@ -548,8 +548,8 @@ describe('code-generator', () => {
 
 				// Should use variable reference in .onError() calls, not inline node
 				// Count how many times the variable name appears vs how many times the full node() call appears
-				const varRefCount = (code.match(/\.onError\(error_Handler\)/g) || []).length;
-				const inlineCount = (code.match(/\.onError\(node\(\{/g) || []).length;
+				const varRefCount = (code.match(/\.onError\(error_Handler\)/g) ?? []).length;
+				const inlineCount = (code.match(/\.onError\(node\(\{/g) ?? []).length;
 
 				// All .onError() calls should use the variable reference
 				expect(varRefCount).toBe(2); // Both Node A and Node B
@@ -1068,7 +1068,7 @@ describe('code-generator', () => {
 
 				// The languageModel call should NOT appear inline in the node config
 				// (only as a variable declaration)
-				const inlineModelCount = (code.match(/model: languageModel\(/g) || []).length;
+				const inlineModelCount = (code.match(/model: languageModel\(/g) ?? []).length;
 				expect(inlineModelCount).toBe(0);
 			});
 
@@ -1143,7 +1143,7 @@ describe('code-generator', () => {
 				expect(code).toMatch(/tools: \[code_Tool, calculator\]|tools: \[calculator, code_Tool\]/);
 
 				// No inline tool() calls in subnodes config
-				const inlineToolCount = (code.match(/tools: \[tool\(/g) || []).length;
+				const inlineToolCount = (code.match(/tools: \[tool\(/g) ?? []).length;
 				expect(inlineToolCount).toBe(0);
 			});
 
@@ -1193,7 +1193,7 @@ describe('code-generator', () => {
 				expect(code).toContain('memory: buffer_Memory');
 
 				// No inline memory() call
-				const inlineMemoryCount = (code.match(/memory: memory\(/g) || []).length;
+				const inlineMemoryCount = (code.match(/memory: memory\(/g) ?? []).length;
 				expect(inlineMemoryCount).toBe(0);
 			});
 
@@ -1454,7 +1454,7 @@ describe('code-generator', () => {
 				expect(code).toMatch(/const \w+ = languageModel\(/);
 				expect(code).toMatch(/const \w+ = tool\(/);
 				// Should have 2 tool variable declarations
-				expect((code.match(/const \w+ = tool\(/g) || []).length).toBe(2);
+				expect((code.match(/const \w+ = tool\(/g) ?? []).length).toBe(2);
 			});
 
 			it('generates memory() call for memory subnodes', () => {

@@ -143,7 +143,7 @@ function serializeNodeConnections(
 		const outputArray: Array<Array<{ node: string; type: string; index: number }>> = [];
 
 		for (let i = 0; i <= maxOutput; i++) {
-			const targets = outputMap.get(i) || [];
+			const targets = outputMap.get(i) ?? [];
 			outputArray[i] = targets.map((target) => ({
 				node: target.node,
 				type: target.type,

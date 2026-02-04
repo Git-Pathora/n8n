@@ -110,7 +110,7 @@ export function parseWorkflowJSON(json: WorkflowJSON): ParsedWorkflow {
 				if (!outputs || !Array.isArray(outputs)) continue;
 
 				const typeMap =
-					graphNode.connections.get(connType) || new Map<number, ConnectionTarget[]>();
+					graphNode.connections.get(connType) ?? new Map<number, ConnectionTarget[]>();
 
 				for (let outputIndex = 0; outputIndex < outputs.length; outputIndex++) {
 					const targets = outputs[outputIndex];

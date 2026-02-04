@@ -100,7 +100,7 @@ describe('Real Workflow Round-Trip', () => {
 			for (const [nodeName, nodeConns] of Object.entries(conns)) {
 				const nonEmptyTypes: Record<string, unknown> = {};
 				for (const [connType, outputs] of Object.entries(nodeConns as Record<string, unknown[]>)) {
-					const nonEmptyOutputs = (outputs || []).filter(
+					const nonEmptyOutputs = (outputs ?? []).filter(
 						(arr: unknown) => Array.isArray(arr) && arr.length > 0,
 					);
 					if (nonEmptyOutputs.length > 0) {
@@ -126,7 +126,7 @@ describe('Real Workflow Round-Trip', () => {
 
 					const idCounts = new Map<string, number>();
 					for (const node of json.nodes) {
-						idCounts.set(node.id, (idCounts.get(node.id) || 0) + 1);
+						idCounts.set(node.id, (idCounts.get(node.id) ?? 0) + 1);
 					}
 					const hasDuplicateIds = [...idCounts.values()].some((count) => count > 1);
 

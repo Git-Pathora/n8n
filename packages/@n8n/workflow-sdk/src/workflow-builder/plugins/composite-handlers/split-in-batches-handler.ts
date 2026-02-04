@@ -107,9 +107,11 @@ export const splitInBatchesHandler: CompositeHandlerPlugin<SplitInBatchesBuilder
 			}
 
 			// Check if this is fluent API (has _doneBatches/_eachBatches)
+			/* eslint-disable @typescript-eslint/prefer-nullish-coalescing -- Logical OR for boolean combination */
 			const hasFluentApi =
 				(input._doneBatches && input._doneBatches.length > 0) ||
 				(input._eachBatches && input._eachBatches.length > 0);
+			/* eslint-enable @typescript-eslint/prefer-nullish-coalescing */
 
 			if (hasFluentApi) {
 				return processFluentApi(input, ctx);

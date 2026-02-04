@@ -375,30 +375,29 @@ function generateNodeConfig(node: SemanticNode, ctx: GenerationContext): string 
 	// Always include config (required by parser), even if empty
 	if (configParts.length > 0) {
 		const configStr = configParts.join(', ');
-		// If config contains // comments (expression annotations) OR multi-line content, use multi-line format
-		const hasComments = configStr.includes('//');
+		// If config contains @example comments (expression annotations) OR multi-line content, use multi-line format
+		// Note: Only match '// @example' specifically, not any '//' (which could be inside string values like jsCode)
+		const hasExpressionAnnotations = configStr.includes('// @example');
 		const hasMultiline = configParts.some((entry) => entry.includes('\n'));
-		if (hasComments || hasMultiline) {
+		if (hasExpressionAnnotations || hasMultiline) {
 			const configIndent = getIndent({ ...ctx, indent: ctx.indent + 2 });
 			// Join with commas, ensuring each entry (except last) ends with a comma
+			// Note: formatValue already handles commas for nested objects with @example comments,
+			// so we only need to add commas at the config entry level
 			const withCommas = configParts.map((entry, i) => {
 				if (i === configParts.length - 1) return entry; // Last entry, no comma
 
-				// For multi-line entries, check only the LAST line for comment/comma placement
-				// (nested content may have its own commas which shouldn't affect our decision)
+				// For multi-line entries, check the LAST line to determine comma placement
 				const lastLineStart = entry.lastIndexOf('\n');
 				const lastLine = lastLineStart >= 0 ? entry.substring(lastLineStart) : entry;
 
-				// If the entry's last line has a comment, insert comma before it
-				if (lastLine.includes('  //') && !lastLine.includes(',  //')) {
-					return (
-						entry.substring(0, entry.length - lastLine.length + lastLineStart + 1) +
-						lastLine.replace('  //', ',  //')
-					);
+				// If last line already has comma (from formatValue's multi-line handling), no change needed
+				if (lastLine.trimEnd().endsWith(',')) {
+					return entry;
 				}
 
-				// If last line already has comma before comment, no change needed
-				if (lastLine.includes(',  //')) {
+				// If last line has a comma before @example comment, no change needed
+				if (lastLine.includes(',  // @example')) {
 					return entry;
 				}
 

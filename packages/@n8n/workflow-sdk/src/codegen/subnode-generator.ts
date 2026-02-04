@@ -46,10 +46,32 @@ function getVarName(nodeName: string, ctx: SubnodeGenerationContext): string {
  */
 export interface FormatValueContext {
 	expressionAnnotations?: Map<string, string>;
+	/** Current indentation level for multi-line formatting */
+	indent?: number;
 }
 
 /**
- * Format a value for code output
+ * Check if a value or any nested value contains an expression annotation
+ */
+function containsExpressionAnnotation(value: unknown, ctx?: FormatValueContext): boolean {
+	if (!ctx?.expressionAnnotations || ctx.expressionAnnotations.size === 0) return false;
+
+	if (typeof value === 'string') {
+		return ctx.expressionAnnotations.has(value);
+	}
+	if (Array.isArray(value)) {
+		return value.some((v) => containsExpressionAnnotation(v, ctx));
+	}
+	if (typeof value === 'object' && value !== null) {
+		return Object.values(value).some((v) => containsExpressionAnnotation(v, ctx));
+	}
+	return false;
+}
+
+/**
+ * Format a value for code output.
+ * When expression annotations are present in an object, uses multi-line formatting
+ * to ensure // @example comments don't break JavaScript syntax.
  */
 export function formatValue(value: unknown, ctx?: FormatValueContext): string {
 	if (value === null) return 'null';
@@ -71,12 +93,63 @@ export function formatValue(value: unknown, ctx?: FormatValueContext): string {
 	}
 	if (typeof value === 'number' || typeof value === 'boolean') return String(value);
 	if (Array.isArray(value)) {
-		return `[${value.map((v) => formatValue(v, ctx)).join(', ')}]`;
+		const innerCtx = ctx ? { ...ctx, indent: (ctx.indent ?? 0) + 1 } : ctx;
+		const formattedElements = value.map((v) => formatValue(v, innerCtx));
+		// Check if any element contains annotation - if so, use multi-line
+		if (containsExpressionAnnotation(value, ctx)) {
+			const baseIndent = '  '.repeat(ctx?.indent ?? 0);
+			const elementIndent = '  '.repeat((ctx?.indent ?? 0) + 1);
+			return `[\n${formattedElements.map((e) => `${elementIndent}${e}`).join(',\n')}\n${baseIndent}]`;
+		}
+		return `[${formattedElements.join(', ')}]`;
 	}
 	if (typeof value === 'object') {
 		const entries = Object.entries(value as Record<string, unknown>);
 		if (entries.length === 0) return '{}';
-		return `{ ${entries.map(([k, v]) => `${formatKey(k)}: ${formatValue(v, ctx)}`).join(', ')} }`;
+
+		const innerCtx = ctx ? { ...ctx, indent: (ctx.indent ?? 0) + 1 } : ctx;
+		const formattedEntries = entries.map(([k, v]) => ({
+			key: formatKey(k),
+			value: formatValue(v, innerCtx),
+		}));
+
+		// Check if object contains any expression annotations - if so, use multi-line format
+		if (containsExpressionAnnotation(value, ctx)) {
+			const baseIndent = '  '.repeat(ctx?.indent ?? 0);
+			const propIndent = '  '.repeat((ctx?.indent ?? 0) + 1);
+			const lines = formattedEntries.map((e, i) => {
+				const isLast = i === formattedEntries.length - 1;
+				const propLine = `${propIndent}${e.key}: ${e.value}`;
+
+				if (isLast) {
+					return propLine;
+				}
+
+				// Check if the LAST LINE of propLine needs a comma
+				// (for multi-line values, only the last line matters for comma placement)
+				const lastNewline = propLine.lastIndexOf('\n');
+				const lastLine = lastNewline >= 0 ? propLine.substring(lastNewline + 1) : propLine;
+
+				// If last line already ends with comma (from nested formatting), no change needed
+				if (lastLine.trimEnd().endsWith(',')) {
+					return propLine;
+				}
+
+				// If last line has // @example comment without comma before it, add comma
+				if (lastLine.includes('  // @example') && !lastLine.includes(',  // @example')) {
+					// Replace only in the LAST LINE, not throughout the string
+					const beforeLastLine = lastNewline >= 0 ? propLine.substring(0, lastNewline + 1) : '';
+					const fixedLastLine = lastLine.replace('  // @example', ',  // @example');
+					return beforeLastLine + fixedLastLine;
+				}
+
+				// Otherwise add comma at end
+				return `${propLine},`;
+			});
+			return `{\n${lines.join('\n')}\n${baseIndent}}`;
+		}
+
+		return `{ ${formattedEntries.map((e) => `${e.key}: ${e.value}`).join(', ')} }`;
 	}
 	return String(value);
 }

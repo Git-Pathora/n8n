@@ -279,6 +279,7 @@ export class ToolDispatchHandler {
 
 		try {
 			const toolStartTime = Date.now();
+			// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
 			const result = await tool.invoke(toolCall.args);
 			const toolDuration = Date.now() - toolStartTime;
 

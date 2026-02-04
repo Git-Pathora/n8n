@@ -8,6 +8,8 @@
  * discovery and code generation in a single, context-preserving agent.
  */
 
+import type { BaseMessage } from '@langchain/core/messages';
+import type { Runnable } from '@langchain/core/runnables';
 import type { StructuredToolInterface } from '@langchain/core/tools';
 import type { Logger } from '@n8n/backend-common';
 import type { WorkflowJSON } from '@n8n/workflow-sdk';
@@ -16,30 +18,32 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { inspect } from 'node:util';
 
-import { MAX_AGENT_ITERATIONS, MAX_VALIDATE_ATTEMPTS } from './constants';
-import { AgentIterationHandler } from './handlers/agent-iteration-handler';
-import { AutoFinalizeHandler } from './handlers/auto-finalize-handler';
-import { ChatSetupHandler } from './handlers/chat-setup-handler';
-import { FinalResponseHandler } from './handlers/final-response-handler';
-import { ParseValidateHandler } from './handlers/parse-validate-handler';
-import { ToolDispatchHandler } from './handlers/tool-dispatch-handler';
-import { ValidateToolHandler } from './handlers/validate-tool-handler';
-import { WarningTracker } from './state/warning-tracker';
-import type { CodeBuilderAgentConfig } from './types';
-export type { CodeBuilderAgentConfig } from './types';
-import type { HistoryContext } from './prompts';
-import { createCodeBuilderGetTool } from './tools/code-builder-get.tool';
-import { createCodeBuilderSearchTool } from './tools/code-builder-search.tool';
-import { createGetSuggestedNodesTool } from './tools/get-suggested-nodes.tool';
 import type {
 	StreamOutput,
 	AgentMessageChunk,
 	WorkflowUpdateChunk,
 	SessionMessagesChunk,
 } from '../types/streaming';
-import { NodeTypeParser } from './utils/node-type-parser';
 import type { ChatPayload } from '../workflow-builder-agent';
+import { MAX_AGENT_ITERATIONS, MAX_VALIDATE_ATTEMPTS } from './constants';
+import { AgentIterationHandler } from './handlers/agent-iteration-handler';
+import { AutoFinalizeHandler } from './handlers/auto-finalize-handler';
+import { ChatSetupHandler } from './handlers/chat-setup-handler';
+import { FinalResponseHandler } from './handlers/final-response-handler';
+import { ParseValidateHandler } from './handlers/parse-validate-handler';
+import type { TextEditorHandler } from './handlers/text-editor-handler';
+import type { TextEditorToolHandler } from './handlers/text-editor-tool-handler';
+import { ToolDispatchHandler } from './handlers/tool-dispatch-handler';
+import { ValidateToolHandler } from './handlers/validate-tool-handler';
+import type { HistoryContext } from './prompts';
+import { WarningTracker } from './state/warning-tracker';
+import { createCodeBuilderGetTool } from './tools/code-builder-get.tool';
+import { createCodeBuilderSearchTool } from './tools/code-builder-search.tool';
+import { createGetSuggestedNodesTool } from './tools/get-suggested-nodes.tool';
+import type { CodeBuilderAgentConfig } from './types';
+export type { CodeBuilderAgentConfig } from './types';
 import type { EvaluationLogger } from './utils/evaluation-logger';
+import { NodeTypeParser } from './utils/node-type-parser';
 
 /**
  * Code Builder Agent
@@ -385,14 +389,15 @@ ${'='.repeat(50)}
 	/**
 	 * Run the agentic loop that invokes LLM and processes tool calls
 	 */
+	// eslint-disable-next-line complexity
 	private async *runAgenticLoop(params: {
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		llmWithTools: import('@langchain/core/runnables').Runnable<any, any, any>;
-		messages: Array<import('@langchain/core/messages').BaseMessage>;
+		llmWithTools: Runnable<any, any, any>;
+		messages: BaseMessage[];
 		textEditorEnabled: boolean;
 		currentWorkflow?: WorkflowJSON;
-		textEditorHandler?: import('./handlers/text-editor-handler').TextEditorHandler;
-		textEditorToolHandler?: import('./handlers/text-editor-tool-handler').TextEditorToolHandler;
+		textEditorHandler?: TextEditorHandler;
+		textEditorToolHandler?: TextEditorToolHandler;
 		abortSignal?: AbortSignal;
 	}): AsyncGenerator<
 		StreamOutput,
@@ -432,12 +437,14 @@ ${'='.repeat(50)}
 			iteration++;
 
 			// Invoke LLM and stream response
+			/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 			const llmResult = yield* this.iterationHandler.invokeLlm({
 				llmWithTools,
 				messages,
 				abortSignal,
 				iteration,
 			});
+			/* eslint-enable @typescript-eslint/no-unsafe-assignment */
 
 			const response = llmResult.response;
 

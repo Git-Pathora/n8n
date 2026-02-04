@@ -8,7 +8,8 @@
  */
 
 import type { CompositeHandlerPlugin, MutablePluginContext } from '../types';
-import type { NodeInstance, ConnectionTarget } from '../../types/base';
+import type { NodeInstance, ConnectionTarget, NodeChain } from '../../types/base';
+import { isNodeChain } from '../../types/base';
 
 /**
  * A batch of nodes - either a single node or an array of nodes for fan-out
@@ -163,100 +164,78 @@ function processNamedSyntax(input: SplitInBatchesBuilderShape, ctx: MutablePlugi
 
 /**
  * Process fluent API: splitInBatches(config).onDone(...).onEachBatch(...)
+ *
+ * The fluent API can store targets in:
+ * - _doneTarget/_eachTarget: the full chain/composite (preferred when available)
+ * - _doneBatches/_eachBatches: the head nodes only (fallback when targets not set)
+ *
+ * We prefer _doneTarget/_eachTarget to ensure chain connections are properly
+ * established via addBranchToGraph. Fall back to _doneBatches/_eachBatches
+ * for backward compatibility with older patterns.
  */
 function processFluentApi(input: SplitInBatchesBuilderShape, ctx: MutablePluginContext): string {
 	const sibMainConns = new Map<number, ConnectionTarget[]>();
+	let lastEachNode: string | null = null;
 
-	// Process done chain batches (output 0)
-	let prevDoneNode: string | null = null;
-	for (const batch of input._doneBatches ?? []) {
-		if (Array.isArray(batch)) {
-			// Fan-out: all nodes in the array connect to the same source
-			for (const doneNode of batch) {
-				const firstNodeName = ctx.addBranchToGraph(doneNode);
-				if (prevDoneNode === null) {
-					// First batch connects to SIB output 0
-					const output0 = sibMainConns.get(0) ?? [];
-					sibMainConns.set(0, [...output0, { node: firstNodeName, type: 'main', index: 0 }]);
-				} else {
-					// Subsequent batches connect to previous node
-					const prevGraphNode = ctx.nodes.get(prevDoneNode);
-					if (prevGraphNode) {
-						const prevMainConns = prevGraphNode.connections.get('main') ?? new Map();
-						const existingConns = prevMainConns.get(0) ?? [];
-						prevMainConns.set(0, [
-							...existingConns,
-							{ node: firstNodeName, type: 'main', index: 0 },
-						]);
-						prevGraphNode.connections.set('main', prevMainConns);
-					}
-				}
+	// Process done target (output 0)
+	// First try _doneTarget (full chain), then fall back to _doneBatches (head nodes)
+	if (input._doneTarget !== null && input._doneTarget !== undefined) {
+		const doneTarget = input._doneTarget;
+		if (Array.isArray(doneTarget)) {
+			// Fan-out: multiple targets from done output
+			const targets: ConnectionTarget[] = [];
+			for (const target of doneTarget) {
+				const targetHead = ctx.addBranchToGraph(target);
+				targets.push({ node: targetHead, type: 'main', index: 0 });
 			}
+			sibMainConns.set(0, targets);
 		} else {
-			const doneNode = batch;
-			const firstNodeName = ctx.addBranchToGraph(doneNode);
-			if (prevDoneNode === null) {
-				// First batch connects to SIB output 0
-				const output0 = sibMainConns.get(0) ?? [];
-				sibMainConns.set(0, [...output0, { node: firstNodeName, type: 'main', index: 0 }]);
-			} else {
-				// Subsequent batches connect to previous node
-				const prevGraphNode = ctx.nodes.get(prevDoneNode);
-				if (prevGraphNode) {
-					const prevMainConns = prevGraphNode.connections.get('main') ?? new Map();
-					const existingConns = prevMainConns.get(0) ?? [];
-					prevMainConns.set(0, [...existingConns, { node: firstNodeName, type: 'main', index: 0 }]);
-					prevGraphNode.connections.set('main', prevMainConns);
-				}
-			}
-			prevDoneNode = firstNodeName;
+			const targetHead = ctx.addBranchToGraph(doneTarget);
+			sibMainConns.set(0, [{ node: targetHead, type: 'main', index: 0 }]);
+		}
+	} else if (input._doneBatches && input._doneBatches.length > 0) {
+		// Fall back to _doneBatches for fluent API
+		const { targets } = processBatches(input._doneBatches, ctx);
+		if (targets.length > 0) {
+			sibMainConns.set(0, targets);
 		}
 	}
 
-	// Process each chain batches (output 1)
-	let prevEachNode: string | null = null;
-	for (const batch of input._eachBatches ?? []) {
-		if (Array.isArray(batch)) {
-			// Fan-out: all nodes in the array connect to the same source
-			for (const eachNode of batch) {
-				const firstNodeName = ctx.addBranchToGraph(eachNode);
-				if (prevEachNode === null) {
-					// First batch connects to SIB output 1
-					const output1 = sibMainConns.get(1) ?? [];
-					sibMainConns.set(1, [...output1, { node: firstNodeName, type: 'main', index: 0 }]);
+	// Process each target (output 1)
+	// First try _eachTarget (full chain), then fall back to _eachBatches (head nodes)
+	if (input._eachTarget !== null && input._eachTarget !== undefined) {
+		const eachTarget = input._eachTarget;
+		if (Array.isArray(eachTarget)) {
+			// Fan-out: multiple targets from each output
+			const targets: ConnectionTarget[] = [];
+			for (const target of eachTarget) {
+				const targetHead = ctx.addBranchToGraph(target);
+				targets.push({ node: targetHead, type: 'main', index: 0 });
+				// Track the last node for loop connection
+				if (isNodeChain(target)) {
+					lastEachNode = (target as NodeChain).tail?.name ?? targetHead;
 				} else {
-					// Subsequent batches connect to previous node
-					const prevGraphNode = ctx.nodes.get(prevEachNode);
-					if (prevGraphNode) {
-						const prevMainConns = prevGraphNode.connections.get('main') ?? new Map();
-						const existingConns = prevMainConns.get(0) ?? [];
-						prevMainConns.set(0, [
-							...existingConns,
-							{ node: firstNodeName, type: 'main', index: 0 },
-						]);
-						prevGraphNode.connections.set('main', prevMainConns);
-					}
+					lastEachNode = targetHead;
 				}
 			}
+			sibMainConns.set(1, targets);
 		} else {
-			const eachNode = batch;
-			const firstNodeName = ctx.addBranchToGraph(eachNode);
-			if (prevEachNode === null) {
-				// First batch connects to SIB output 1
-				const output1 = sibMainConns.get(1) ?? [];
-				sibMainConns.set(1, [...output1, { node: firstNodeName, type: 'main', index: 0 }]);
+			const targetHead = ctx.addBranchToGraph(eachTarget);
+			sibMainConns.set(1, [{ node: targetHead, type: 'main', index: 0 }]);
+			// Track the last node for loop connection
+			if (isNodeChain(eachTarget)) {
+				lastEachNode = (eachTarget as NodeChain).tail?.name ?? targetHead;
 			} else {
-				// Subsequent batches connect to previous node
-				const prevGraphNode = ctx.nodes.get(prevEachNode);
-				if (prevGraphNode) {
-					const prevMainConns = prevGraphNode.connections.get('main') ?? new Map();
-					const existingConns = prevMainConns.get(0) ?? [];
-					prevMainConns.set(0, [...existingConns, { node: firstNodeName, type: 'main', index: 0 }]);
-					prevGraphNode.connections.set('main', prevMainConns);
-				}
+				lastEachNode = targetHead;
 			}
-			prevEachNode = firstNodeName;
 		}
+	} else if (input._eachBatches && input._eachBatches.length > 0) {
+		// Fall back to _eachBatches for fluent API
+		const { targets, lastNode } = processBatches(input._eachBatches, ctx);
+		if (targets.length > 0) {
+			sibMainConns.set(1, targets);
+		}
+		lastEachNode = lastNode;
 	}
 
 	// Add the SIB node with connections
@@ -268,8 +247,8 @@ function processFluentApi(input: SplitInBatchesBuilderShape, ctx: MutablePluginC
 	});
 
 	// Add loop connection from last each node back to split in batches if hasLoop is true
-	if (input._hasLoop && prevEachNode) {
-		const lastEachGraphNode = ctx.nodes.get(prevEachNode);
+	if (input._hasLoop && lastEachNode) {
+		const lastEachGraphNode = ctx.nodes.get(lastEachNode);
 		if (lastEachGraphNode) {
 			const lastEachMainConns = lastEachGraphNode.connections.get('main') ?? new Map();
 			const existingConns = lastEachMainConns.get(0) ?? [];
@@ -282,4 +261,70 @@ function processFluentApi(input: SplitInBatchesBuilderShape, ctx: MutablePluginC
 	}
 
 	return input.sibNode.name;
+}
+
+/**
+ * Process batches from fluent API (_doneBatches or _eachBatches).
+ * Batches are processed sequentially, with each batch connecting to the next.
+ * A batch can be a single node or an array of nodes (fan-out).
+ *
+ * Returns the targets for the first batch (to connect from SIB) and the last node name
+ * (for potential loop connection).
+ */
+function processBatches(
+	batches: NodeBatch[],
+	ctx: MutablePluginContext,
+): { targets: ConnectionTarget[]; lastNode: string | null } {
+	const targets: ConnectionTarget[] = [];
+	let lastNode: string | null = null;
+	let previousBatchNodes: string[] = [];
+
+	for (let i = 0; i < batches.length; i++) {
+		const batch = batches[i];
+		const currentBatchNodes: string[] = [];
+
+		if (Array.isArray(batch)) {
+			// Fan-out: multiple nodes in this batch
+			for (const node of batch) {
+				const nodeName = ctx.addBranchToGraph(node);
+				currentBatchNodes.push(nodeName);
+				if (i === 0) {
+					targets.push({ node: nodeName, type: 'main', index: 0 });
+				}
+			}
+		} else {
+			// Single node in this batch
+			const nodeName = ctx.addBranchToGraph(batch);
+			currentBatchNodes.push(nodeName);
+			if (i === 0) {
+				targets.push({ node: nodeName, type: 'main', index: 0 });
+			}
+		}
+
+		// Connect previous batch nodes to current batch nodes
+		if (previousBatchNodes.length > 0 && currentBatchNodes.length > 0) {
+			for (const prevNode of previousBatchNodes) {
+				const prevGraphNode = ctx.nodes.get(prevNode);
+				if (prevGraphNode) {
+					const prevMainConns = prevGraphNode.connections.get('main') ?? new Map();
+					const existingConns = prevMainConns.get(0) ?? [];
+					const newConns = currentBatchNodes.map((n) => ({
+						node: n,
+						type: 'main' as const,
+						index: 0,
+					}));
+					prevMainConns.set(0, [...existingConns, ...newConns]);
+					prevGraphNode.connections.set('main', prevMainConns);
+				}
+			}
+		}
+
+		previousBatchNodes = currentBatchNodes;
+		// Track the last node (for loop connection)
+		if (currentBatchNodes.length > 0) {
+			lastNode = currentBatchNodes[currentBatchNodes.length - 1];
+		}
+	}
+
+	return { targets, lastNode };
 }

@@ -113,6 +113,23 @@ export interface MutablePluginContext extends Omit<PluginContext, 'nodes'> {
 	 * @returns The name of the head node of the branch
 	 */
 	addBranchToGraph(branch: unknown): string;
+
+	/**
+	 * Map from node ID to actual map key for renamed nodes.
+	 * When a workflow has duplicate node names (e.g., two nodes named "Process"),
+	 * the builder auto-renames them ("Process" → "Process 1").
+	 * This mapping tracks these renames: nodeId → actualMapKey.
+	 * Plugin handlers should use this when resolving node references.
+	 */
+	nameMapping?: Map<string, string>;
+
+	/**
+	 * Track a node rename in the nameMapping.
+	 * Call this when addNodeWithSubnodes returns a different key than node.name.
+	 * @param nodeId The node's unique ID
+	 * @param actualKey The actual key the node was stored under in the nodes map
+	 */
+	trackRename?(nodeId: string, actualKey: string): void;
 }
 
 // =============================================================================

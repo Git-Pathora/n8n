@@ -54,18 +54,35 @@ export const mergeHandler: CompositeHandlerPlugin<
 			}
 
 			// Connect tail nodes to merge at their specified input indices
+			// Skip connections that already exist (e.g., created by IF/Switch builders with correct output index)
 			for (const [inputIndex, tailNodes] of namedMerge.inputMapping) {
 				for (const tailNode of tailNodes) {
 					const actualKey = nodeActualKeys.get(tailNode) ?? tailNode.name;
 					const tailGraphNode = ctx.nodes.get(actualKey);
 					if (tailGraphNode) {
 						const tailMainConns = tailGraphNode.connections.get('main') || new Map();
-						const existingConns = tailMainConns.get(0) || [];
-						tailMainConns.set(0, [
-							...existingConns,
-							{ node: input.mergeNode.name, type: 'main', index: inputIndex },
-						]);
-						tailGraphNode.connections.set('main', tailMainConns);
+						// Check all output indices for an existing connection to this merge at this input
+						let connectionExists = false;
+						for (const [, conns] of tailMainConns) {
+							if (
+								conns.some(
+									(c: ConnectionTarget) =>
+										c.node === input.mergeNode.name && c.index === inputIndex,
+								)
+							) {
+								connectionExists = true;
+								break;
+							}
+						}
+						if (!connectionExists) {
+							// No existing connection found, create one at output 0
+							const existingConns = tailMainConns.get(0) || [];
+							tailMainConns.set(0, [
+								...existingConns,
+								{ node: input.mergeNode.name, type: 'main', index: inputIndex },
+							]);
+							tailGraphNode.connections.set('main', tailMainConns);
+						}
 					}
 				}
 			}

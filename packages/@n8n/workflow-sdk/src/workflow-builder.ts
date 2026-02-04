@@ -53,12 +53,6 @@ import { isTriggerNode } from './workflow-builder/validation-helpers';
 import type { IfElseBuilder, SwitchCaseBuilder } from './types/base';
 
 /**
- * Track SIB builders currently being processed to prevent infinite recursion.
- * This is used when onEachBatch chain loops back to the same SIB builder.
- */
-const processingSibBuilders = new WeakSet<object>();
-
-/**
  * Internal workflow builder implementation
  */
 class WorkflowBuilderImpl implements WorkflowBuilder {
@@ -117,19 +111,39 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 	/**
 	 * Create a MutablePluginContext for composite handlers.
 	 * This provides helper methods that allow plugins to add nodes to the graph.
+	 * @param nodes The mutable nodes map
+	 * @param nameMapping Optional map to track node ID → actual map key for renamed nodes
 	 */
-	private createMutablePluginContext(nodes: Map<string, GraphNode>): MutablePluginContext {
+	private createMutablePluginContext(
+		nodes: Map<string, GraphNode>,
+		nameMapping?: Map<string, string>,
+	): MutablePluginContext {
+		const effectiveNameMapping = nameMapping ?? new Map<string, string>();
+
 		return {
 			nodes,
 			workflowId: this.id,
 			workflowName: this.name,
 			settings: this._settings,
 			pinData: this._pinData,
+			nameMapping: effectiveNameMapping,
 			addNodeWithSubnodes: (node: NodeInstance<string, string, unknown>) => {
-				return this.addNodeWithSubnodes(nodes, node);
+				const actualKey = this.addNodeWithSubnodes(nodes, node);
+				// Auto-track renames when node is stored under a different key
+				if (actualKey && actualKey !== node.name) {
+					effectiveNameMapping.set(node.id, actualKey);
+				}
+				return actualKey;
 			},
 			addBranchToGraph: (branch: unknown) => {
-				return this.addBranchToGraph(nodes, branch as NodeInstance<string, string, unknown>);
+				return this.addBranchToGraph(
+					nodes,
+					branch as NodeInstance<string, string, unknown>,
+					effectiveNameMapping,
+				);
+			},
+			trackRename: (nodeId: string, actualKey: string) => {
+				effectiveNameMapping.set(nodeId, actualKey);
 			},
 		};
 	}
@@ -302,27 +316,10 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 
 			// Add all nodes from the chain, handling composites that may have been chained
 			for (const chainNode of node.allNodes) {
-				// Check for builders FIRST (before composites) - builders have similar properties
-				if (isIfElseBuilder(chainNode)) {
-					this.addIfElseBuilderNodes(newNodes, chainNode as unknown as IfElseBuilder<unknown>);
-				} else if (isSwitchCaseBuilder(chainNode)) {
-					this.addSwitchCaseBuilderNodes(
-						newNodes,
-						chainNode as unknown as SwitchCaseBuilder<unknown>,
-					);
-				} else if (isSwitchCaseComposite(chainNode)) {
-					this.addSwitchCaseNodes(newNodes, chainNode as unknown as SwitchCaseComposite);
-				} else if (isIfElseComposite(chainNode)) {
-					this.addIfElseNodes(newNodes, chainNode as unknown as IfElseComposite);
-				} else if (isMergeComposite(chainNode)) {
-					this.addMergeNodes(
-						newNodes,
-						chainNode as unknown as MergeComposite<NodeInstance<string, string, unknown>[]>,
-					);
-				} else if (isSplitInBatchesBuilder(chainNode)) {
-					// Handle SplitInBatchesBuilder nested in chain (via node.then(splitInBatches(...)))
-					this.addSplitInBatchesChainNodes(newNodes, chainNode, nameMapping);
-				} else {
+				// Try plugin dispatch for composites - nameMapping is propagated through context
+				const pluginResult = this.tryPluginDispatch(newNodes, chainNode, nameMapping);
+				if (pluginResult === undefined) {
+					// Not a composite - add as regular node
 					const actualKey = this.addNodeWithSubnodes(newNodes, chainNode);
 					// Track the actual key if it was renamed
 					if (actualKey && actualKey !== chainNode.name) {
@@ -1479,95 +1476,34 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 	}
 
 	/**
-	 * Add nodes from a SwitchCaseComposite to the nodes map
-	 */
-	private addSwitchCaseNodes(nodes: Map<string, GraphNode>, composite: SwitchCaseComposite): void {
-		// Build the switch node connections to its cases
-		const switchMainConns = new Map<number, ConnectionTarget[]>();
-
-		// Add all case nodes and build connections from switch to each case
-		// Use addBranchToGraph to handle NodeChain cases (nodes with .then() chains)
-		// Skip null cases (unconnected outputs)
-		// Handle arrays for fan-out (one output to multiple parallel nodes)
-		composite.cases.forEach((caseNode, index) => {
-			if (caseNode === null) {
-				return; // Skip null cases - no connection for this output
-			}
-
-			// Check if caseNode is an array (fan-out pattern)
-			if (Array.isArray(caseNode)) {
-				// Fan-out: multiple parallel targets from this case
-				const targets: ConnectionTarget[] = [];
-				for (const branchNode of caseNode) {
-					if (branchNode === null) continue;
-					const branchHead = this.addBranchToGraph(nodes, branchNode);
-					targets.push({ node: branchHead, type: 'main', index: 0 });
-				}
-				if (targets.length > 0) {
-					switchMainConns.set(index, targets);
-				}
-			} else {
-				const caseHeadName = this.addBranchToGraph(nodes, caseNode);
-				switchMainConns.set(index, [{ node: caseHeadName, type: 'main', index: 0 }]);
-			}
-		});
-
-		// Add the switch node with connections to cases
-		const switchConns = new Map<string, Map<number, ConnectionTarget[]>>();
-		switchConns.set('main', switchMainConns);
-		nodes.set(composite.switchNode.name, {
-			instance: composite.switchNode,
-			connections: switchConns,
-		});
-	}
-
-	/**
-	 * Extract the main node name from a composite for deduplication checks.
-	 * Returns undefined if not a recognized composite type.
-	 */
-	private getCompositeMainNodeName(target: unknown): string | undefined {
-		if (isIfElseBuilder(target)) {
-			return (target as IfElseBuilder<unknown>).ifNode.name;
-		}
-		if (isSwitchCaseBuilder(target)) {
-			return (target as SwitchCaseBuilder<unknown>).switchNode.name;
-		}
-		if (isIfElseComposite(target)) {
-			return (target as IfElseComposite).ifNode.name;
-		}
-		if (isSwitchCaseComposite(target)) {
-			return (target as SwitchCaseComposite).switchNode.name;
-		}
-		if (isMergeComposite(target)) {
-			return (target as MergeComposite<NodeInstance<string, string, unknown>[]>).mergeNode.name;
-		}
-		if (isSplitInBatchesBuilder(target)) {
-			const builder = extractSplitInBatchesBuilder(target);
-			return builder?.sibNode.name;
-		}
-		return undefined;
-	}
-
-	/**
 	 * Try to dispatch a composite to a plugin handler.
 	 * Returns the head node name if a handler processed it, undefined otherwise.
 	 *
 	 * This is used to replace inline composite handling methods with plugin-based dispatch.
 	 * The method checks for duplicate processing using the main node name and delegates
 	 * to the appropriate plugin handler if one is registered.
+	 *
+	 * @param nodes The mutable nodes map
+	 * @param target The target to dispatch (composite, builder, or node)
+	 * @param nameMapping Optional map to track node ID → actual map key for renamed nodes
 	 */
-	private tryPluginDispatch(nodes: Map<string, GraphNode>, target: unknown): string | undefined {
-		// Check for duplicate processing using the main node name
-		const mainNodeName = this.getCompositeMainNodeName(target);
-		if (mainNodeName && nodes.has(mainNodeName)) {
-			return mainNodeName; // Already processed
-		}
+	private tryPluginDispatch(
+		nodes: Map<string, GraphNode>,
+		target: unknown,
+		nameMapping?: Map<string, string>,
+	): string | undefined {
+		// NOTE: We intentionally don't skip if the main node already exists.
+		// Handlers like ifElseHandler are designed to MERGE connections when the node exists.
+		// This is important for patterns like:
+		//   .add(is_Approved.then(merge1.input(1)))  // Adds IF node first
+		//   .add(merge_node.then(set_Default_True_2.then(is_Approved.onTrue(x_Post.then(x_Result)))))
+		// The second line needs to add the onTrue() branch even though the IF node already exists.
 
 		// Try plugin dispatch
 		const registry = this._registry ?? pluginRegistry;
 		const handler = registry.findCompositeHandler(target);
 		if (handler) {
-			const ctx = this.createMutablePluginContext(nodes);
+			const ctx = this.createMutablePluginContext(nodes, nameMapping);
 			return handler.addNodes(target, ctx);
 		}
 
@@ -1591,15 +1527,10 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 		}
 
 		// Try plugin dispatch for composites
+		// NOTE: We don't skip if the main node already exists - handlers merge connections appropriately
 		const registry = this._registry ?? pluginRegistry;
 		const handler = registry.findCompositeHandler(target);
 		if (handler) {
-			// Check for duplicate processing using the main node name
-			const mainNodeName = this.getCompositeMainNodeName(target);
-			if (mainNodeName && nodes.has(mainNodeName)) {
-				return; // Already processed, skip to prevent duplicates
-			}
-
 			// Use plugin handler to add nodes
 			const ctx = this.createMutablePluginContext(nodes);
 			handler.addNodes(target, ctx);
@@ -1617,53 +1548,6 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 			this.addBranchToGraph(nodes, target as NodeInstance<string, string, unknown>);
 			return;
 		}
-	}
-
-	/**
-	 * Add nodes from an IfElseComposite to the nodes map
-	 * Supports array branches for fan-out patterns (one output to multiple parallel nodes)
-	 */
-	private addIfElseNodes(nodes: Map<string, GraphNode>, composite: IfElseComposite): void {
-		// Build the IF node connections to its branches
-		const ifMainConns = new Map<number, ConnectionTarget[]>();
-
-		// Add branch nodes (may be NodeChain, single node, or array of nodes for fan-out)
-		if (composite.trueBranch) {
-			if (Array.isArray(composite.trueBranch)) {
-				// Fan-out: multiple parallel targets from trueBranch
-				const targets: ConnectionTarget[] = [];
-				for (const branchNode of composite.trueBranch) {
-					const branchHead = this.addBranchToGraph(nodes, branchNode);
-					targets.push({ node: branchHead, type: 'main', index: 0 });
-				}
-				ifMainConns.set(0, targets);
-			} else {
-				const trueBranchHead = this.addBranchToGraph(nodes, composite.trueBranch);
-				ifMainConns.set(0, [{ node: trueBranchHead, type: 'main', index: 0 }]);
-			}
-		}
-		if (composite.falseBranch) {
-			if (Array.isArray(composite.falseBranch)) {
-				// Fan-out: multiple parallel targets from falseBranch
-				const targets: ConnectionTarget[] = [];
-				for (const branchNode of composite.falseBranch) {
-					const branchHead = this.addBranchToGraph(nodes, branchNode);
-					targets.push({ node: branchHead, type: 'main', index: 0 });
-				}
-				ifMainConns.set(1, targets);
-			} else {
-				const falseBranchHead = this.addBranchToGraph(nodes, composite.falseBranch);
-				ifMainConns.set(1, [{ node: falseBranchHead, type: 'main', index: 0 }]);
-			}
-		}
-
-		// Add the IF node with connections to branches
-		const ifConns = new Map<string, Map<number, ConnectionTarget[]>>();
-		ifConns.set('main', ifMainConns);
-		nodes.set(composite.ifNode.name, {
-			instance: composite.ifNode,
-			connections: ifConns,
-		});
 	}
 
 	/**
@@ -1691,209 +1575,6 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 			}
 		}
 		return undefined;
-	}
-
-	/**
-	 * Add nodes from an IfElseBuilder (fluent API) to the nodes map
-	 */
-	private addIfElseBuilderNodes(
-		nodes: Map<string, GraphNode>,
-		builder: IfElseBuilder<unknown>,
-	): void {
-		// Build the IF node connections to its branches
-		const ifMainConns = new Map<number, ConnectionTarget[]>();
-
-		// IMPORTANT: Build IF connections BEFORE adding branch nodes
-		// This ensures that when addMergeNodes runs, it can detect existing IF→Merge connections
-		// and skip creating duplicates at the wrong output index
-
-		// Connect IF to true branch (output 0)
-		// Always create this connection - the IF builder knows the correct output index
-		// (Merge nodes will skip duplicates when they process their named inputs)
-		if (builder.trueBranch !== null && builder.trueBranch !== undefined) {
-			const target = builder.trueBranch;
-			if (Array.isArray(target)) {
-				const targets: ConnectionTarget[] = [];
-				for (const t of target) {
-					const targetName = this.getTargetNodeName(t);
-					if (targetName) {
-						// For merge targets, use the input index from the merge's named inputs if available
-						const targetInputIndex = this.getMergeInputIndexForSource(builder.ifNode, t) ?? 0;
-						targets.push({ node: targetName, type: 'main', index: targetInputIndex });
-					}
-				}
-				if (targets.length > 0) {
-					ifMainConns.set(0, targets);
-				}
-			} else {
-				const targetName = this.getTargetNodeName(target);
-				if (targetName) {
-					// For merge targets, use the input index from the merge's named inputs if available
-					const targetInputIndex = this.getMergeInputIndexForSource(builder.ifNode, target) ?? 0;
-					ifMainConns.set(0, [{ node: targetName, type: 'main', index: targetInputIndex }]);
-				}
-			}
-		}
-
-		// Connect IF to false branch (output 1)
-		// Always create this connection - the IF builder knows the correct output index
-		if (builder.falseBranch !== null && builder.falseBranch !== undefined) {
-			const target = builder.falseBranch;
-			if (Array.isArray(target)) {
-				const targets: ConnectionTarget[] = [];
-				for (const t of target) {
-					const targetName = this.getTargetNodeName(t);
-					if (targetName) {
-						// For merge targets, use the input index from the merge's named inputs if available
-						const targetInputIndex = this.getMergeInputIndexForSource(builder.ifNode, t) ?? 0;
-						targets.push({ node: targetName, type: 'main', index: targetInputIndex });
-					}
-				}
-				if (targets.length > 0) {
-					ifMainConns.set(1, targets);
-				}
-			} else {
-				const targetName = this.getTargetNodeName(target);
-				if (targetName) {
-					// For merge targets, use the input index from the merge's named inputs if available
-					const targetInputIndex = this.getMergeInputIndexForSource(builder.ifNode, target) ?? 0;
-					ifMainConns.set(1, [{ node: targetName, type: 'main', index: targetInputIndex }]);
-				}
-			}
-		}
-
-		// Add the IF node with connections to branches
-		// If the node already exists (e.g., added by addMergeNodes via addBranchToGraph),
-		// merge the connections rather than overwriting
-		const existingIfNode = nodes.get(builder.ifNode.name);
-		if (existingIfNode) {
-			// Merge ifMainConns into existing connections
-			const existingMainConns = existingIfNode.connections.get('main') || new Map();
-			for (const [outputIndex, targets] of ifMainConns) {
-				const existingTargets = existingMainConns.get(outputIndex) || [];
-				// Add new targets that don't already exist
-				for (const target of targets) {
-					const alreadyExists = existingTargets.some(
-						(t: ConnectionTarget) => t.node === target.node && t.index === target.index,
-					);
-					if (!alreadyExists) {
-						existingTargets.push(target);
-					}
-				}
-				existingMainConns.set(outputIndex, existingTargets);
-			}
-			existingIfNode.connections.set('main', existingMainConns);
-		} else {
-			// Node doesn't exist, add it fresh
-			const ifConns = new Map<string, Map<number, ConnectionTarget[]>>();
-			ifConns.set('main', ifMainConns);
-			nodes.set(builder.ifNode.name, {
-				instance: builder.ifNode,
-				connections: ifConns,
-			});
-		}
-
-		// NOW add branch nodes - this must happen AFTER IF node is added with its connections
-		// so that addMergeNodes can detect existing IF→Merge connections and skip duplicates
-		this.addBranchTargetNodes(nodes, builder.trueBranch);
-		this.addBranchTargetNodes(nodes, builder.falseBranch);
-	}
-
-	/**
-	 * Add nodes from a SwitchCaseBuilder (fluent API) to the nodes map
-	 */
-	private addSwitchCaseBuilderNodes(
-		nodes: Map<string, GraphNode>,
-		builder: SwitchCaseBuilder<unknown>,
-	): void {
-		// Build the Switch node connections to its cases
-		const switchMainConns = new Map<number, ConnectionTarget[]>();
-
-		// IMPORTANT: Build Switch connections BEFORE adding case nodes
-		// This ensures that when addMergeNodes runs, it can detect existing Switch→Merge connections
-		// and skip creating duplicates at the wrong output index
-
-		// Connect switch to each case at the correct output index
-		// Always create connections - the Switch builder knows the correct output index
-		// (Merge nodes will skip duplicates when they process their named inputs)
-		for (const [caseIndex, target] of builder.caseMapping) {
-			if (target === null) continue; // Skip null cases
-
-			if (Array.isArray(target)) {
-				// Fan-out: multiple targets from one case
-				const targets: ConnectionTarget[] = [];
-				for (const t of target) {
-					const targetName = this.getTargetNodeName(t);
-					if (targetName) {
-						// For merge targets, use the input index from the merge's named inputs if available
-						const targetInputIndex = this.getMergeInputIndexForSource(builder.switchNode, t) ?? 0;
-						targets.push({ node: targetName, type: 'main', index: targetInputIndex });
-					}
-				}
-				if (targets.length > 0) {
-					switchMainConns.set(caseIndex, targets);
-				}
-			} else {
-				// Single target
-				const targetName = this.getTargetNodeName(target);
-				if (targetName) {
-					// For merge targets, use the input index from the merge's named inputs if available
-					const targetInputIndex =
-						this.getMergeInputIndexForSource(builder.switchNode, target) ?? 0;
-					switchMainConns.set(caseIndex, [
-						{ node: targetName, type: 'main', index: targetInputIndex },
-					]);
-				}
-			}
-		}
-
-		// Add the Switch node with connections to cases
-		// If the node already exists (e.g., added by addMergeNodes via addBranchToGraph),
-		// merge the connections rather than overwriting
-		const existingNode = nodes.get(builder.switchNode.name);
-		if (existingNode) {
-			// Merge switchMainConns into existing connections
-			const existingMainConns = existingNode.connections.get('main') || new Map();
-			for (const [outputIndex, targets] of switchMainConns) {
-				const existingTargets = existingMainConns.get(outputIndex) || [];
-				// Add new targets that don't already exist
-				for (const target of targets) {
-					const alreadyExists = existingTargets.some(
-						(t: ConnectionTarget) => t.node === target.node && t.index === target.index,
-					);
-					if (!alreadyExists) {
-						existingTargets.push(target);
-					}
-				}
-				existingMainConns.set(outputIndex, existingTargets);
-			}
-			existingNode.connections.set('main', existingMainConns);
-		} else {
-			// Node doesn't exist, add it fresh
-			const switchConns = new Map<string, Map<number, ConnectionTarget[]>>();
-			switchConns.set('main', switchMainConns);
-			nodes.set(builder.switchNode.name, {
-				instance: builder.switchNode,
-				connections: switchConns,
-			});
-		}
-
-		// NOW add case nodes - this must happen AFTER Switch node is added with its connections
-		// so that addMergeNodes can detect existing Switch→Merge connections and skip duplicates
-		for (const [, target] of builder.caseMapping) {
-			this.addBranchTargetNodes(nodes, target);
-		}
-
-		// Add nodes from source chain if present (e.g., trigger.to(switch).onCase(...))
-		const builderImpl = builder as {
-			sourceChain?: NodeChain<
-				NodeInstance<string, string, unknown>,
-				NodeInstance<string, string, unknown>
-			>;
-		};
-		if (builderImpl.sourceChain) {
-			this.addBranchToGraph(nodes, builderImpl.sourceChain);
-		}
 	}
 
 	/**
@@ -2016,220 +1697,6 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 				graphNode.connections.set('main', mainConns);
 			}
 		});
-	}
-
-	/**
-	 * Add nodes from a SplitInBatches chain (EachChainImpl/DoneChainImpl) to the nodes map
-	 * This handles the case where splitInBatches() is chained via node.then(splitInBatches()...)
-	 * @param nameMapping - Optional map from node ID to actual map key (used when nodes are renamed)
-	 */
-	private addSplitInBatchesChainNodes(
-		nodes: Map<string, GraphNode>,
-		sibChain: unknown,
-		nameMapping?: Map<string, string>,
-	): void {
-		const builder = extractSplitInBatchesBuilder(sibChain);
-
-		// Check if we're already processing this builder (prevents infinite recursion)
-		// This happens when onEachBatch chain loops back to the same SIB builder
-		if (processingSibBuilders.has(builder)) {
-			return;
-		}
-		processingSibBuilders.add(builder);
-
-		// Add the split in batches node
-		const sibConns = new Map<string, Map<number, ConnectionTarget[]>>();
-		sibConns.set('main', new Map());
-		nodes.set(builder.sibNode.name, {
-			instance: builder.sibNode,
-			connections: sibConns,
-		});
-
-		const sibGraphNode = nodes.get(builder.sibNode.name)!;
-		const sibMainConns = sibGraphNode.connections.get('main') || new Map();
-
-		// Create nameMapping if not passed (tracks node ID -> actual map key for renamed nodes)
-		const effectiveNameMapping = nameMapping ?? new Map<string, string>();
-
-		// Check if this is named syntax (has _doneTarget/_eachTarget)
-		// Named syntax uses full branch targets instead of batches
-		const hasNamedSyntax = '_doneTarget' in builder || '_eachTarget' in builder;
-
-		if (hasNamedSyntax) {
-			try {
-				// Named syntax: splitInBatches(sibNode, { done: ..., each: ... })
-				// Process done target (output 0)
-				if (builder._doneTarget !== null && builder._doneTarget !== undefined) {
-					const doneTarget = builder._doneTarget;
-					// Handle array (fan-out) targets
-					if (Array.isArray(doneTarget)) {
-						for (const target of doneTarget) {
-							const firstNodeName = this.addBranchToGraph(
-								nodes,
-								target as NodeInstance<string, string, unknown>,
-								effectiveNameMapping,
-							);
-							const output0 = sibMainConns.get(0) || [];
-							sibMainConns.set(0, [...output0, { node: firstNodeName, type: 'main', index: 0 }]);
-						}
-					} else {
-						const firstNodeName = this.addBranchToGraph(
-							nodes,
-							doneTarget as NodeInstance<string, string, unknown>,
-							effectiveNameMapping,
-						);
-						const output0 = sibMainConns.get(0) || [];
-						sibMainConns.set(0, [...output0, { node: firstNodeName, type: 'main', index: 0 }]);
-					}
-				}
-
-				// Process each target (output 1)
-				if (builder._eachTarget !== null && builder._eachTarget !== undefined) {
-					const eachTarget = builder._eachTarget;
-					// Handle array (fan-out) targets
-					if (Array.isArray(eachTarget)) {
-						for (const target of eachTarget) {
-							const firstNodeName = this.addBranchToGraph(
-								nodes,
-								target as NodeInstance<string, string, unknown>,
-								effectiveNameMapping,
-							);
-							const output1 = sibMainConns.get(1) || [];
-							sibMainConns.set(1, [...output1, { node: firstNodeName, type: 'main', index: 0 }]);
-						}
-					} else {
-						const firstNodeName = this.addBranchToGraph(
-							nodes,
-							eachTarget as NodeInstance<string, string, unknown>,
-							effectiveNameMapping,
-						);
-						const output1 = sibMainConns.get(1) || [];
-						sibMainConns.set(1, [...output1, { node: firstNodeName, type: 'main', index: 0 }]);
-					}
-				}
-
-				sibGraphNode.connections.set('main', sibMainConns);
-				// Note: Named syntax doesn't use _hasLoop - loops are expressed in the target chain itself
-			} finally {
-				processingSibBuilders.delete(builder);
-			}
-			return;
-		}
-
-		// Fluent API: splitInBatches(sibNode).onDone(...).onEachBatch(...)
-		try {
-			// Process done chain batches (output 0)
-			let prevDoneNode: string | null = null;
-			for (const batch of builder._doneBatches) {
-				if (Array.isArray(batch)) {
-					// Fan-out: all nodes in the array connect to the same source
-					for (const doneNode of batch) {
-						const firstNodeName = this.addBranchToGraph(nodes, doneNode, effectiveNameMapping);
-						if (prevDoneNode === null) {
-							const output0 = sibMainConns.get(0) || [];
-							sibMainConns.set(0, [...output0, { node: firstNodeName, type: 'main', index: 0 }]);
-						} else {
-							const prevGraphNode = nodes.get(prevDoneNode);
-							if (prevGraphNode) {
-								const prevMainConns = prevGraphNode.connections.get('main') || new Map();
-								const existingConns = prevMainConns.get(0) || [];
-								prevMainConns.set(0, [
-									...existingConns,
-									{ node: firstNodeName, type: 'main', index: 0 },
-								]);
-								prevGraphNode.connections.set('main', prevMainConns);
-							}
-						}
-					}
-				} else {
-					const doneNode = batch;
-					const firstNodeName = this.addBranchToGraph(nodes, doneNode, effectiveNameMapping);
-					if (prevDoneNode === null) {
-						const output0 = sibMainConns.get(0) || [];
-						sibMainConns.set(0, [...output0, { node: firstNodeName, type: 'main', index: 0 }]);
-					} else {
-						const prevGraphNode = nodes.get(prevDoneNode);
-						if (prevGraphNode) {
-							const prevMainConns = prevGraphNode.connections.get('main') || new Map();
-							const existingConns = prevMainConns.get(0) || [];
-							prevMainConns.set(0, [
-								...existingConns,
-								{ node: firstNodeName, type: 'main', index: 0 },
-							]);
-							prevGraphNode.connections.set('main', prevMainConns);
-						}
-					}
-					prevDoneNode = isNodeChain(doneNode)
-						? (doneNode.tail?.name ?? firstNodeName)
-						: firstNodeName;
-				}
-			}
-
-			// Process each chain batches (output 1)
-			let prevEachNode: string | null = null;
-			for (const batch of builder._eachBatches) {
-				if (Array.isArray(batch)) {
-					// Fan-out: all nodes in the array connect to the same source
-					for (const eachNode of batch) {
-						const firstNodeName = this.addBranchToGraph(nodes, eachNode, effectiveNameMapping);
-						if (prevEachNode === null) {
-							const output1 = sibMainConns.get(1) || [];
-							sibMainConns.set(1, [...output1, { node: firstNodeName, type: 'main', index: 0 }]);
-						} else {
-							const prevGraphNode = nodes.get(prevEachNode);
-							if (prevGraphNode) {
-								const prevMainConns = prevGraphNode.connections.get('main') || new Map();
-								const existingConns = prevMainConns.get(0) || [];
-								prevMainConns.set(0, [
-									...existingConns,
-									{ node: firstNodeName, type: 'main', index: 0 },
-								]);
-								prevGraphNode.connections.set('main', prevMainConns);
-							}
-						}
-					}
-				} else {
-					const eachNode = batch;
-					const firstNodeName = this.addBranchToGraph(nodes, eachNode, effectiveNameMapping);
-					if (prevEachNode === null) {
-						const output1 = sibMainConns.get(1) || [];
-						sibMainConns.set(1, [...output1, { node: firstNodeName, type: 'main', index: 0 }]);
-					} else {
-						const prevGraphNode = nodes.get(prevEachNode);
-						if (prevGraphNode) {
-							const prevMainConns = prevGraphNode.connections.get('main') || new Map();
-							const existingConns = prevMainConns.get(0) || [];
-							prevMainConns.set(0, [
-								...existingConns,
-								{ node: firstNodeName, type: 'main', index: 0 },
-							]);
-							prevGraphNode.connections.set('main', prevMainConns);
-						}
-					}
-					prevEachNode = isNodeChain(eachNode)
-						? (eachNode.tail?.name ?? firstNodeName)
-						: firstNodeName;
-				}
-			}
-
-			sibGraphNode.connections.set('main', sibMainConns);
-
-			// Add loop connection from last each node back to split in batches if hasLoop is true
-			if (builder._hasLoop && prevEachNode) {
-				const lastEachGraphNode = nodes.get(prevEachNode);
-				if (lastEachGraphNode) {
-					const lastEachMainConns = lastEachGraphNode.connections.get('main') || new Map();
-					const existingConns = lastEachMainConns.get(0) || [];
-					lastEachMainConns.set(0, [
-						...existingConns,
-						{ node: builder.sibNode.name, type: 'main', index: 0 },
-					]);
-					lastEachGraphNode.connections.set('main', lastEachMainConns);
-				}
-			}
-		} finally {
-			processingSibBuilders.delete(builder);
-		}
 	}
 
 	/**
@@ -2761,7 +2228,7 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 		const effectiveNameMapping = nameMapping ?? new Map<string, string>();
 
 		// Try plugin dispatch first - handles all composite types
-		const pluginResult = this.tryPluginDispatch(nodes, branch);
+		const pluginResult = this.tryPluginDispatch(nodes, branch, effectiveNameMapping);
 		if (pluginResult !== undefined) {
 			return pluginResult;
 		}
@@ -2790,7 +2257,7 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 				}
 
 				// Try plugin dispatch for composites
-				const chainPluginResult = this.tryPluginDispatch(nodes, chainNode);
+				const chainPluginResult = this.tryPluginDispatch(nodes, chainNode, effectiveNameMapping);
 				if (chainPluginResult === undefined) {
 					// Not a composite - add as regular node
 					const actualKey = this.addNodeWithSubnodes(nodes, chainNode);
@@ -2846,7 +2313,11 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 									if (targetChainNode === null) continue;
 
 									// Try plugin dispatch for composites
-									const targetPluginResult = this.tryPluginDispatch(nodes, targetChainNode);
+									const targetPluginResult = this.tryPluginDispatch(
+										nodes,
+										targetChainNode,
+										effectiveNameMapping,
+									);
 									if (targetPluginResult === undefined && !nodes.has(targetChainNode.name)) {
 										// Not a composite and not already present - add as regular node
 										this.addNodeWithSubnodes(nodes, targetChainNode);

@@ -10,9 +10,21 @@ import type {
 	ConnectionTarget,
 	NodeInstance,
 	SwitchCaseBuilder,
+	MergeComposite,
+	IfElseComposite,
+	NodeChain,
+	IfElseBuilder,
 } from '../../types/base';
-import { isSwitchCaseComposite } from '../../workflow-builder/type-guards';
-import { isSwitchCaseBuilder } from '../../node-builder';
+import { isNodeChain } from '../../types/base';
+import {
+	isSwitchCaseComposite,
+	isMergeComposite,
+	isIfElseComposite,
+	isMergeNamedInputSyntax,
+	isSplitInBatchesBuilder,
+	extractSplitInBatchesBuilder,
+} from '../../workflow-builder/type-guards';
+import { isSwitchCaseBuilder, isIfElseBuilder } from '../../node-builder';
 
 /**
  * Type representing either Composite or Builder format
@@ -20,9 +32,104 @@ import { isSwitchCaseBuilder } from '../../node-builder';
 type SwitchCaseInput = SwitchCaseComposite | SwitchCaseBuilder<unknown>;
 
 /**
- * Helper to process a single case node (handles arrays for fan-out)
+ * Get the head node name from a target (which could be a node, chain, or composite)
+ * This is used to compute connection target names BEFORE adding nodes.
  */
-function processCaseNode(
+function getTargetNodeName(target: unknown): string | undefined {
+	if (target === null || target === undefined) return undefined;
+
+	// Handle NodeChain
+	if (isNodeChain(target)) {
+		return (target as NodeChain).head.name;
+	}
+
+	// Handle composites
+	if (isIfElseComposite(target)) {
+		return (target as IfElseComposite).ifNode.name;
+	}
+
+	if (isSwitchCaseComposite(target)) {
+		return (target as SwitchCaseComposite).switchNode.name;
+	}
+
+	if (isMergeComposite(target)) {
+		return (target as MergeComposite<NodeInstance<string, string, unknown>[]>).mergeNode.name;
+	}
+
+	// Handle IfElseBuilder (fluent API)
+	if (isIfElseBuilder(target)) {
+		return (target as IfElseBuilder<unknown>).ifNode.name;
+	}
+
+	// Handle SwitchCaseBuilder (fluent API)
+	if (isSwitchCaseBuilder(target)) {
+		return (target as SwitchCaseBuilder<unknown>).switchNode.name;
+	}
+
+	// Handle SplitInBatchesBuilder (including EachChain/DoneChain)
+	if (isSplitInBatchesBuilder(target)) {
+		const builder = extractSplitInBatchesBuilder(target);
+		return builder.sibNode.name;
+	}
+
+	// Regular NodeInstance
+	if (typeof (target as NodeInstance<string, string, unknown>).name === 'string') {
+		return (target as NodeInstance<string, string, unknown>).name;
+	}
+
+	return undefined;
+}
+
+/**
+ * Get the input index for a source node in a merge's named inputs.
+ * Returns undefined if the target is not a merge with named inputs or if the source is not found.
+ */
+function getMergeInputIndexForSource(
+	sourceNode: NodeInstance<string, string, unknown>,
+	mergeTarget: unknown,
+): number | undefined {
+	if (!isMergeComposite(mergeTarget)) return undefined;
+	const mergeComposite = mergeTarget as MergeComposite<NodeInstance<string, string, unknown>[]>;
+	if (!isMergeNamedInputSyntax(mergeComposite)) return undefined;
+
+	const namedMerge = mergeComposite as MergeComposite<NodeInstance<string, string, unknown>[]> & {
+		inputMapping: Map<number, NodeInstance<string, string, unknown>[]>;
+	};
+
+	// Find which input index this source node is mapped to
+	for (const [inputIndex, tailNodes] of namedMerge.inputMapping) {
+		for (const tailNode of tailNodes) {
+			if (tailNode === sourceNode || tailNode.name === sourceNode.name) {
+				return inputIndex;
+			}
+		}
+	}
+	return undefined;
+}
+
+/**
+ * Add nodes from a branch target to the nodes map, recursively handling nested composites.
+ * This is used for SwitchCaseBuilder to add case nodes AFTER setting up Switch connections.
+ */
+function addBranchTargetNodes(target: unknown, ctx: MutablePluginContext): void {
+	if (target === null || target === undefined) return;
+
+	// Handle array (fan-out) - process each target
+	if (Array.isArray(target)) {
+		for (const t of target) {
+			addBranchTargetNodes(t, ctx);
+		}
+		return;
+	}
+
+	// Add the branch using the context's addBranchToGraph method
+	ctx.addBranchToGraph(target);
+}
+
+/**
+ * Helper to process a single case node for Composite format (add nodes first)
+ */
+function processCaseNodeForComposite(
 	caseNode: unknown,
 	index: number,
 	ctx: MutablePluginContext,
@@ -51,6 +158,44 @@ function processCaseNode(
 }
 
 /**
+ * Process a case for SwitchCaseBuilder - compute target names BEFORE adding nodes
+ */
+function processCaseForBuilder(
+	target: unknown,
+	caseIndex: number,
+	switchNode: NodeInstance<string, string, unknown>,
+	switchMainConns: Map<number, ConnectionTarget[]>,
+): void {
+	if (target === null || target === undefined) {
+		return;
+	}
+
+	if (Array.isArray(target)) {
+		// Fan-out: multiple targets from one case
+		const targets: ConnectionTarget[] = [];
+		for (const t of target) {
+			const targetName = getTargetNodeName(t);
+			if (targetName) {
+				// For merge targets, use the input index from the merge's named inputs if available
+				const targetInputIndex = getMergeInputIndexForSource(switchNode, t) ?? 0;
+				targets.push({ node: targetName, type: 'main', index: targetInputIndex });
+			}
+		}
+		if (targets.length > 0) {
+			switchMainConns.set(caseIndex, targets);
+		}
+	} else {
+		// Single target
+		const targetName = getTargetNodeName(target);
+		if (targetName) {
+			// For merge targets, use the input index from the merge's named inputs if available
+			const targetInputIndex = getMergeInputIndexForSource(switchNode, target) ?? 0;
+			switchMainConns.set(caseIndex, [{ node: targetName, type: 'main', index: targetInputIndex }]);
+		}
+	}
+}
+
+/**
  * Handler for Switch/Case composite structures.
  *
  * Recognizes SwitchCaseComposite and SwitchCaseBuilder patterns and adds the
@@ -75,16 +220,63 @@ export const switchCaseHandler: CompositeHandlerPlugin<SwitchCaseInput> = {
 		// Build the switch node connections to its cases
 		const switchMainConns = new Map<number, ConnectionTarget[]>();
 
-		// Handle both SwitchCaseComposite (cases array) and SwitchCaseBuilder (caseMapping Map)
+		// Handle SwitchCaseBuilder differently - need to set up connections BEFORE adding case nodes
 		if ('caseMapping' in input && input.caseMapping instanceof Map) {
-			// SwitchCaseBuilder format: uses Map<number, CaseTarget>
-			for (const [index, caseNode] of input.caseMapping) {
-				processCaseNode(caseNode, index, ctx, switchMainConns);
+			const builder = input as SwitchCaseBuilder<unknown>;
+
+			// IMPORTANT: Build Switch connections BEFORE adding case nodes
+			// This ensures that when merge handlers run, they can detect existing Switch→Merge connections
+			// and skip creating duplicates at the wrong output index
+
+			// Connect switch to each case at the correct output index
+			for (const [caseIndex, target] of builder.caseMapping) {
+				processCaseForBuilder(target, caseIndex, builder.switchNode, switchMainConns);
 			}
-		} else if ('cases' in input && Array.isArray(input.cases)) {
-			// SwitchCaseComposite format: uses array where index is output index
+
+			// Add the Switch node with connections to cases
+			// If the node already exists (e.g., added by merge handler via addBranchToGraph),
+			// merge the connections rather than overwriting
+			const existingNode = ctx.nodes.get(builder.switchNode.name);
+			if (existingNode) {
+				// Merge switchMainConns into existing connections
+				const existingMainConns = existingNode.connections.get('main') || new Map();
+				for (const [outputIndex, targets] of switchMainConns) {
+					const existingTargets = existingMainConns.get(outputIndex) || [];
+					// Add new targets that don't already exist
+					for (const target of targets) {
+						const alreadyExists = existingTargets.some(
+							(t: ConnectionTarget) => t.node === target.node && t.index === target.index,
+						);
+						if (!alreadyExists) {
+							existingTargets.push(target);
+						}
+					}
+					existingMainConns.set(outputIndex, existingTargets);
+				}
+				existingNode.connections.set('main', existingMainConns);
+			} else {
+				// Node doesn't exist, add it fresh
+				const switchConns = new Map<string, Map<number, ConnectionTarget[]>>();
+				switchConns.set('main', switchMainConns);
+				ctx.nodes.set(builder.switchNode.name, {
+					instance: builder.switchNode,
+					connections: switchConns,
+				});
+			}
+
+			// NOW add case nodes - this must happen AFTER Switch node is added with its connections
+			// so that merge handlers can detect existing Switch→Merge connections and skip duplicates
+			for (const [, target] of builder.caseMapping) {
+				addBranchTargetNodes(target, ctx);
+			}
+
+			return builder.switchNode.name;
+		}
+
+		// SwitchCaseComposite: add cases first, then use results for connections
+		if ('cases' in input && Array.isArray(input.cases)) {
 			input.cases.forEach((caseNode, index) => {
-				processCaseNode(caseNode, index, ctx, switchMainConns);
+				processCaseNodeForComposite(caseNode, index, ctx, switchMainConns);
 			});
 		}
 
@@ -96,7 +288,6 @@ export const switchCaseHandler: CompositeHandlerPlugin<SwitchCaseInput> = {
 			connections: switchConns,
 		});
 
-		// Return the switch node name as the head of this composite
 		return input.switchNode.name;
 	},
 };

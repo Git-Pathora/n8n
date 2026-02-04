@@ -265,5 +265,45 @@ describe('IF Else fluent API', () => {
 			const builder = ifNode.onTrue!(trueBranch).onFalse(falseBranch);
 			expect(isIfElseBuilder(builder)).toBe(true);
 		});
+
+		it('should support chain passed to onTrue with internal connections', () => {
+			const t = trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: {} });
+			const ifNode = node({
+				type: 'n8n-nodes-base.if',
+				version: 2.2,
+				config: { name: 'My IF' },
+			}) as IfNode;
+			const nodeA = node({
+				type: 'n8n-nodes-base.noOp',
+				version: 1,
+				config: { name: 'Node A' },
+			});
+			const nodeB = node({
+				type: 'n8n-nodes-base.noOp',
+				version: 1,
+				config: { name: 'Node B' },
+			});
+
+			// Create chain: nodeA.then(nodeB)
+			const chain = nodeA.then(nodeB);
+
+			// Fluent syntax with chain in onTrue
+			const wf = workflow('test-id', 'Test').add(t).then(ifNode.onTrue!(chain));
+
+			const json = wf.toJSON();
+
+			// Should have: trigger, if, nodeA, nodeB
+			expect(json.nodes).toHaveLength(4);
+
+			// IF should connect to chain head (Node A)
+			const ifConns = json.connections['My IF'];
+			expect(ifConns).toBeDefined();
+			expect(ifConns.main[0]![0]!.node).toBe('Node A');
+
+			// Chain internal connection: Node A -> Node B
+			const nodeAConns = json.connections['Node A'];
+			expect(nodeAConns).toBeDefined();
+			expect(nodeAConns.main[0]![0]!.node).toBe('Node B');
+		});
 	});
 });

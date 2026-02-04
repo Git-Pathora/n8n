@@ -36,11 +36,11 @@ import { WarningTracker } from './state/warning-tracker';
 import type { CodeBuilderAgentConfig } from './types';
 import { calculateCost } from './utils/cost-calculator';
 export type { CodeBuilderAgentConfig } from './types';
-import { buildCodeBuilderPrompt, type HistoryContext } from '../prompts/code-builder';
-import { createCodeBuilderGetTool } from '../tools/code-builder-get.tool';
+import { buildCodeBuilderPrompt, type HistoryContext } from './prompts';
+import { createCodeBuilderGetTool } from './tools/code-builder-get.tool';
 import { createCodeBuilderSearchTool } from '../tools/code-builder-search.tool';
 import { createGetSuggestedNodesTool } from '../tools/get-suggested-nodes.tool';
-import { TextEditorHandler } from '../tools/text-editor-handler';
+import { TextEditorHandler } from './handlers/text-editor-handler';
 import type {
 	StreamOutput,
 	AgentMessageChunk,

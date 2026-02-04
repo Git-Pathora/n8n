@@ -53,7 +53,7 @@ export { compactPromptTemplate } from './chains/compact.prompt';
 export { workflowNamingPromptTemplate } from './chains/workflow-name.prompt';
 
 // Code builder prompts
-export { buildCodeBuilderPrompt } from './code-builder';
+export { buildCodeBuilderPrompt } from '../code-builder/prompts';
 
 // Parameter updater prompts
 export {

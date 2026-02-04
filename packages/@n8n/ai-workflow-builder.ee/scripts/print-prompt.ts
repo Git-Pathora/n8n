@@ -10,7 +10,7 @@
 import { writeFileSync } from 'fs';
 import { join } from 'path';
 
-import { buildCodeBuilderPrompt } from '../src/prompts/code-builder';
+import { buildCodeBuilderPrompt } from '../src/code-builder/prompts';
 
 /**
  * Unescape curly brackets from LangChain template format

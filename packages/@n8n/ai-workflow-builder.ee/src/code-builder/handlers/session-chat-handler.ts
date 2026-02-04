@@ -10,7 +10,7 @@ import type { MemorySaver } from '@langchain/langgraph';
 import type { Logger } from '@n8n/backend-common';
 
 import type { StreamOutput } from '../../types/streaming';
-import type { HistoryContext } from '../../prompts/code-builder';
+import type { HistoryContext } from '../prompts';
 import type { ChatPayload } from '../../workflow-builder-agent';
 import {
 	loadCodeBuilderSession,

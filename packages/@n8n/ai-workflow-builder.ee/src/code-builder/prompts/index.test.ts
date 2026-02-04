@@ -1,6 +1,6 @@
 import type { WorkflowJSON } from '@n8n/workflow-sdk';
 
-import { buildCodeBuilderPrompt } from './index';
+import { buildCodeBuilderPrompt } from '../../code-builder/prompts/index';
 
 describe('buildCodeBuilderPrompt', () => {
 	describe('preGeneratedCode option', () => {

@@ -13,7 +13,7 @@ import type { IRunExecutionData, NodeExecutionSchema } from 'n8n-workflow';
 import type { ExpressionValue } from '../../workflow-builder-agent';
 
 import { escapeCurlyBrackets, SDK_API_CONTENT_ESCAPED } from './sdk-api';
-import { formatCodeWithLineNumbers } from '../../tools/text-editor-handler';
+import { formatCodeWithLineNumbers } from '../handlers/text-editor-handler';
 import { SDK_IMPORT_STATEMENT } from '../../utils/extract-code';
 
 /**

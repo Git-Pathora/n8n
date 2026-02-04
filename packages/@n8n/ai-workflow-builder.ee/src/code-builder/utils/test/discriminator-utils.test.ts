@@ -1,5 +1,5 @@
 import { NodeConnectionTypes, type INodeTypeDescription } from 'n8n-workflow';
-import { extractModeDiscriminator } from '../discriminator-utils';
+import { extractModeDiscriminator } from '../utils/discriminator-utils';
 
 // Mock vector store node with mode discriminator that includes outputConnectionType
 const mockVectorStoreNode: INodeTypeDescription = {

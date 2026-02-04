@@ -310,7 +310,7 @@ class TriggerInstanceImpl<TType extends string, TVersion extends string, TOutput
 	extends NodeInstanceImpl<TType, TVersion, TOutput>
 	implements TriggerInstance<TType, TVersion, TOutput>
 {
-	readonly isTrigger: true = true;
+	readonly isTrigger = true as const;
 }
 
 /**
@@ -323,7 +323,7 @@ class NodeChainImpl<
 	TTail extends NodeInstance<string, string, unknown>,
 > implements NodeChain<THead, TTail>
 {
-	readonly _isChain: true = true;
+	readonly _isChain = true as const;
 	readonly head: THead;
 	readonly tail: TTail;
 	readonly allNodes: Array<NodeInstance<string, string, unknown>>;
@@ -508,7 +508,7 @@ class NodeChainImpl<
 class OutputSelectorImpl<TType extends string, TVersion extends string, TOutput = unknown>
 	implements OutputSelector<TType, TVersion, TOutput>
 {
-	readonly _isOutputSelector: true = true;
+	readonly _isOutputSelector = true as const;
 	readonly node: NodeInstance<TType, TVersion, TOutput>;
 	readonly outputIndex: number;
 
@@ -626,7 +626,7 @@ export function isSwitchCaseBuilder(value: unknown): value is SwitchCaseBuilder<
  * Provides fluent .onTrue()/.onFalse() methods for IF node branching.
  */
 class IfElseBuilderImpl<TOutput = unknown> implements IfElseBuilder<TOutput> {
-	readonly _isIfElseBuilder: true = true;
+	readonly _isIfElseBuilder = true as const;
 	readonly ifNode: NodeInstance<'n8n-nodes-base.if', string, TOutput>;
 	trueBranch: IfElseTarget = null;
 	falseBranch: IfElseTarget = null;
@@ -679,7 +679,7 @@ class IfElseBuilderImpl<TOutput = unknown> implements IfElseBuilder<TOutput> {
  * Provides fluent .onCase() method for Switch node branching.
  */
 class SwitchCaseBuilderImpl<TOutput = unknown> implements SwitchCaseBuilder<TOutput> {
-	readonly _isSwitchCaseBuilder: true = true;
+	readonly _isSwitchCaseBuilder = true as const;
 	readonly switchNode: NodeInstance<'n8n-nodes-base.switch', string, TOutput>;
 	readonly caseMapping: Map<number, SwitchCaseTarget> = new Map();
 	/** All nodes from all cases (for workflow-builder) */
@@ -1058,7 +1058,7 @@ export function sticky(
  * Placeholder implementation
  */
 class PlaceholderImpl implements PlaceholderValue {
-	readonly __placeholder: true = true;
+	readonly __placeholder = true as const;
 	readonly hint: string;
 
 	constructor(hint: string) {
@@ -1101,7 +1101,7 @@ export function placeholder(hint: string): PlaceholderValue {
  * Will be implemented to create actual credentials later.
  */
 class NewCredentialImpl implements NewCredentialValue {
-	readonly __newCredential: true = true;
+	readonly __newCredential = true as const;
 	readonly name: string;
 
 	constructor(name: string) {

@@ -199,6 +199,7 @@ export class AiWorkflowBuilderService {
 				? new LangChainTracer({ client: tracingClient, projectName: 'n8n-workflow-builder' })
 				: undefined,
 			instanceUrl: this.instanceUrl,
+			featureFlags,
 			runMetadata: {
 				n8nVersion: this.n8nVersion,
 				featureFlags: featureFlags ?? {},

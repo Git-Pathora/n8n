@@ -1,9 +1,9 @@
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { BaseMessage } from '@langchain/core/messages';
-import { AIMessage, HumanMessage, ToolMessage } from '@langchain/core/messages';
-import { ChatPromptTemplate } from '@langchain/core/prompts';
-import type { Runnable, RunnableConfig } from '@langchain/core/runnables';
-import type { StructuredTool } from '@langchain/core/tools';
+import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
+import type { RunnableConfig } from '@langchain/core/runnables';
+import type { ReactAgent } from 'langchain';
+import { createAgent } from 'langchain';
 
 import {
 	buildResponderPrompt,
@@ -29,22 +29,6 @@ import {
 } from '../utils/coordination-log';
 import { extractDataTableInfo } from '../utils/data-table-helpers';
 
-function createSystemPrompt(enableIntrospection: boolean): ChatPromptTemplate {
-	return ChatPromptTemplate.fromMessages([
-		[
-			'system',
-			[
-				{
-					type: 'text',
-					text: buildResponderPrompt({ enableIntrospection }),
-					cache_control: { type: 'ephemeral' },
-				},
-			],
-		],
-		['placeholder', '{messages}'],
-	]);
-}
-
 export interface ResponderAgentConfig {
 	llm: BaseChatModel;
 	/** Enable introspection tool for diagnostic data collection. */
@@ -68,12 +52,6 @@ export interface ResponderContext {
 }
 
 /**
- * Responder Agent
- *
- * Synthesizes final user-facing responses from workflow building context.
- * Handles conversational queries and explanations.
- */
-/**
  * Result from ResponderAgent.invoke
  */
 export interface ResponderResult {
@@ -81,116 +59,144 @@ export interface ResponderResult {
 	introspectionEvents: IntrospectionEvent[];
 }
 
-export class ResponderAgent {
-	private readonly tool: StructuredTool | undefined;
+/**
+ * Expected result type from agent.invoke
+ */
+interface AgentInvokeResult {
+	messages: BaseMessage[];
+}
 
-	private readonly llmWithTools: Runnable;
+/**
+ * Type guard for agent invoke result
+ */
+function isValidAgentResult(value: unknown): value is AgentInvokeResult {
+	if (typeof value !== 'object' || value === null) {
+		return false;
+	}
+	const obj = value as Record<string, unknown>;
+	return Array.isArray(obj.messages);
+}
 
-	private readonly systemPrompt: ChatPromptTemplate;
+/**
+ * Context for building the internal context message
+ */
+interface BuildContextInput {
+	coordinationLog: CoordinationLogEntry[];
+	discoveryContext: DiscoveryContext | null | undefined;
+	workflowJSON: SimpleWorkflow;
+	previousSummary?: string;
+}
 
-	constructor(config: ResponderAgentConfig) {
-		const enableIntrospection = config.enableIntrospection === true;
+/**
+ * Build internal context message from coordination log and state
+ */
+function buildContextMessage(context: BuildContextInput): HumanMessage | null {
+	const contextParts: string[] = [];
 
-		// Create system prompt with conditional introspection section
-		this.systemPrompt = createSystemPrompt(enableIntrospection);
+	// Previous conversation summary (from compaction)
+	if (context.previousSummary) {
+		contextParts.push(`**Previous Conversation Summary:**\n${context.previousSummary}`);
+	}
 
-		// Conditionally create and bind the introspect tool
-		if (enableIntrospection) {
-			const introspectTool = createIntrospectTool();
-			this.tool = introspectTool.tool;
+	// Check for state management actions (compact/clear)
+	const stateManagementEntry = context.coordinationLog.find((e) => e.phase === 'state_management');
+	if (stateManagementEntry) {
+		contextParts.push(`**State Management:** ${stateManagementEntry.summary}`);
+	}
 
-			if (typeof config.llm.bindTools === 'function') {
-				this.llmWithTools = config.llm.bindTools([this.tool]);
-			} else {
-				// Fallback for LLMs that don't support tools
-				this.llmWithTools = config.llm;
-			}
+	// Check for errors - provide context-aware guidance (AI-1812)
+	// Skip errors that have been cleared (AI-1812)
+	const errorEntry = getErrorEntry(context.coordinationLog);
+	const errorsCleared = hasRecursionErrorsCleared(context.coordinationLog);
+
+	if (errorEntry && !errorsCleared) {
+		const hasWorkflow = context.workflowJSON.nodes.length > 0;
+		const errorMessage = errorEntry.summary.toLowerCase();
+		const isRecursionError =
+			errorMessage.includes('recursion') ||
+			errorMessage.includes('maximum number of steps') ||
+			errorMessage.includes('iteration limit');
+
+		contextParts.push(
+			`**Error:** An error occurred in the ${errorEntry.phase} phase: ${errorEntry.summary}`,
+		);
+
+		// AI-1812: Provide better guidance based on workflow state and error type
+		if (isRecursionError && hasWorkflow) {
+			// Recursion error but workflow was created
+			const guidance = buildRecursionErrorWithWorkflowGuidance(context.workflowJSON.nodes.length);
+			contextParts.push(...guidance);
+		} else if (isRecursionError && !hasWorkflow) {
+			// Recursion error and no workflow created
+			const guidance = buildRecursionErrorNoWorkflowGuidance();
+			contextParts.push(...guidance);
 		} else {
-			this.tool = undefined;
-			this.llmWithTools = config.llm;
+			// Other errors (not recursion-related)
+			contextParts.push(buildGeneralErrorGuidance());
 		}
 	}
 
-	/**
-	 * Build internal context message from coordination log and state
-	 */
-	private buildContextMessage(context: ResponderContext): HumanMessage | null {
-		const contextParts: string[] = [];
-
-		// Previous conversation summary (from compaction)
-		if (context.previousSummary) {
-			contextParts.push(`**Previous Conversation Summary:**\n${context.previousSummary}`);
-		}
-
-		// Check for state management actions (compact/clear)
-		const stateManagementEntry = context.coordinationLog.find(
-			(e) => e.phase === 'state_management',
+	// Discovery context
+	if (context.discoveryContext?.nodesFound.length) {
+		contextParts.push(
+			`**Discovery:** Found ${context.discoveryContext.nodesFound.length} relevant nodes`,
 		);
-		if (stateManagementEntry) {
-			contextParts.push(`**State Management:** ${stateManagementEntry.summary}`);
-		}
+	}
 
-		// Check for errors - provide context-aware guidance (AI-1812)
-		// Skip errors that have been cleared (AI-1812)
-		const errorEntry = getErrorEntry(context.coordinationLog);
-		const errorsCleared = hasRecursionErrorsCleared(context.coordinationLog);
+	// Builder output (handles both node creation and parameter configuration)
+	const builderOutput = getBuilderOutput(context.coordinationLog);
+	if (builderOutput) {
+		contextParts.push(`**Builder:** ${builderOutput}`);
+	} else if (context.workflowJSON.nodes.length) {
+		contextParts.push(`**Workflow:** ${context.workflowJSON.nodes.length} nodes created`);
+	}
 
-		if (errorEntry && !errorsCleared) {
-			const hasWorkflow = context.workflowJSON.nodes.length > 0;
-			const errorMessage = errorEntry.summary.toLowerCase();
-			const isRecursionError =
-				errorMessage.includes('recursion') ||
-				errorMessage.includes('maximum number of steps') ||
-				errorMessage.includes('iteration limit');
+	// Data Table creation guidance
+	// If the workflow contains Data Table nodes, inform user they need to create tables manually
+	const dataTableInfo = extractDataTableInfo(context.workflowJSON);
+	if (dataTableInfo.length > 0) {
+		const dataTableGuidance = buildDataTableCreationGuidance(dataTableInfo);
+		contextParts.push(dataTableGuidance);
+	}
 
-			contextParts.push(
-				`**Error:** An error occurred in the ${errorEntry.phase} phase: ${errorEntry.summary}`,
-			);
+	if (contextParts.length === 0) {
+		return null;
+	}
 
-			// AI-1812: Provide better guidance based on workflow state and error type
-			if (isRecursionError && hasWorkflow) {
-				// Recursion error but workflow was created
-				const guidance = buildRecursionErrorWithWorkflowGuidance(context.workflowJSON.nodes.length);
-				contextParts.push(...guidance);
-			} else if (isRecursionError && !hasWorkflow) {
-				// Recursion error and no workflow created
-				const guidance = buildRecursionErrorNoWorkflowGuidance();
-				contextParts.push(...guidance);
-			} else {
-				// Other errors (not recursion-related)
-				contextParts.push(buildGeneralErrorGuidance());
-			}
-		}
+	return new HumanMessage({
+		content: `[Internal Context - Use this to craft your response]\n${contextParts.join('\n\n')}`,
+	});
+}
 
-		// Discovery context
-		if (context.discoveryContext?.nodesFound.length) {
-			contextParts.push(
-				`**Discovery:** Found ${context.discoveryContext.nodesFound.length} relevant nodes`,
-			);
-		}
+/**
+ * Responder Agent
+ *
+ * Synthesizes final user-facing responses from workflow building context.
+ * Handles conversational queries and explanations.
+ *
+ */
+export class ResponderAgent {
+	private readonly agent: ReactAgent;
 
-		// Builder output (handles both node creation and parameter configuration)
-		const builderOutput = getBuilderOutput(context.coordinationLog);
-		if (builderOutput) {
-			contextParts.push(`**Builder:** ${builderOutput}`);
-		} else if (context.workflowJSON.nodes.length) {
-			contextParts.push(`**Workflow:** ${context.workflowJSON.nodes.length} nodes created`);
-		}
+	private readonly enableIntrospection: boolean;
 
-		// Data Table creation guidance
-		// If the workflow contains Data Table nodes, inform user they need to create tables manually
-		const dataTableInfo = extractDataTableInfo(context.workflowJSON);
-		if (dataTableInfo.length > 0) {
-			const dataTableGuidance = buildDataTableCreationGuidance(dataTableInfo);
-			contextParts.push(dataTableGuidance);
-		}
+	constructor(config: ResponderAgentConfig) {
+		this.enableIntrospection = config.enableIntrospection === true;
 
-		if (contextParts.length === 0) {
-			return null;
-		}
+		const tools = this.enableIntrospection ? [createIntrospectTool().tool] : [];
 
-		return new HumanMessage({
-			content: `[Internal Context - Use this to craft your response]\n${contextParts.join('\n\n')}`,
+		this.agent = createAgent({
+			model: config.llm,
+			tools,
+			systemPrompt: new SystemMessage({
+				content: [
+					{
+						type: 'text',
+						text: buildResponderPrompt({ enableIntrospection: config.enableIntrospection }),
+						cache_control: { type: 'ephemeral' },
+					},
+				],
+			}),
 		});
 	}
 
@@ -201,153 +207,38 @@ export class ResponderAgent {
 	 * @returns Response message and any introspection events collected
 	 */
 	async invoke(context: ResponderContext, config?: RunnableConfig): Promise<ResponderResult> {
-		const agent = this.systemPrompt.pipe(this.llmWithTools);
+		// Build context message and add to input messages (once, not via middleware)
+		const contextMessage = buildContextMessage({
+			coordinationLog: context.coordinationLog,
+			discoveryContext: context.discoveryContext ?? null,
+			workflowJSON: context.workflowJSON,
+			previousSummary: context.previousSummary,
+		});
 
-		const contextMessage = this.buildContextMessage(context);
-		let messagesToSend: BaseMessage[] = contextMessage
-			? [...context.messages, contextMessage]
-			: [...context.messages];
+		const inputMessages = contextMessage ? [...context.messages, contextMessage] : context.messages;
 
-		// Collect AI messages for introspection event extraction
-		const aiMessages: BaseMessage[] = [];
+		const result = await this.agent.invoke({ messages: inputMessages }, config);
 
-		const MAX_ITERATIONS = 5;
-
-		for (let i = 0; i < MAX_ITERATIONS; i++) {
-			// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-			const result = await agent.invoke({ messages: messagesToSend }, config);
-
-			if (!isAIMessage(result as BaseMessage)) {
-				return {
-					response: new AIMessage({
-						content: 'I encountered an issue generating a response. Please try again.',
-					}),
-					introspectionEvents: extractIntrospectionEventsFromMessages(aiMessages),
-				};
-			}
-
-			// result is narrowed to AIMessage by the type guard above
-			const aiResult = result as AIMessage;
-			aiMessages.push(aiResult);
-
-			// Check if there are tool calls
-			if (!aiResult.tool_calls || aiResult.tool_calls.length === 0) {
-				// No tool calls - this is the final response
-				return {
-					response: aiResult,
-					introspectionEvents: extractIntrospectionEventsFromMessages(aiMessages),
-				};
-			}
-
-			// Execute tool calls
-			const toolMessages = await this.executeToolCalls(aiResult, config);
-
-			// Add AI message and tool messages for next iteration
-			messagesToSend = [...messagesToSend, aiResult, ...toolMessages];
-		}
-
-		// If we hit max iterations, make one final call without expecting tools
-		// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-		const lastResult = await agent.invoke({ messages: messagesToSend }, config);
-		if (isAIMessage(lastResult as BaseMessage)) {
-			// lastResult is narrowed to AIMessage by the type guard above
-			const lastAiResult = lastResult as AIMessage;
-			aiMessages.push(lastAiResult);
+		if (!isValidAgentResult(result)) {
 			return {
-				response: lastAiResult,
-				introspectionEvents: extractIntrospectionEventsFromMessages(aiMessages),
+				response: new AIMessage({ content: 'I encountered an issue generating a response.' }),
+				introspectionEvents: [],
 			};
 		}
 
+		const lastMessage = result.messages.at(-1);
+
+		// Extract introspection events from all AIMessages in the conversation
+		const introspectionEvents = this.enableIntrospection
+			? extractIntrospectionEventsFromMessages(result.messages)
+			: [];
+
 		return {
-			response: new AIMessage({
-				content: 'I encountered an issue generating a response. Please try again.',
-			}),
-			introspectionEvents: extractIntrospectionEventsFromMessages(aiMessages),
+			response:
+				lastMessage && isAIMessage(lastMessage)
+					? lastMessage
+					: new AIMessage({ content: 'I encountered an issue generating a response.' }),
+			introspectionEvents,
 		};
-	}
-
-	/**
-	 * Execute tool calls from an AI message and return tool messages
-	 */
-	private async executeToolCalls(
-		aiMessage: AIMessage,
-		config?: RunnableConfig,
-	): Promise<ToolMessage[]> {
-		if (!aiMessage.tool_calls || aiMessage.tool_calls.length === 0) {
-			return [];
-		}
-
-		const toolMessages: ToolMessage[] = [];
-
-		for (const toolCall of aiMessage.tool_calls) {
-			if (this.tool && toolCall.name === this.tool.name) {
-				try {
-					// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
-					const result = await this.tool.invoke(toolCall.args ?? {}, {
-						...config,
-						toolCall: {
-							id: toolCall.id,
-							name: toolCall.name,
-							args: toolCall.args ?? {},
-						},
-					});
-
-					// Extract content from Command object response
-					const content = this.extractToolContent(result);
-
-					toolMessages.push(
-						new ToolMessage({
-							content,
-							tool_call_id: toolCall.id ?? '',
-							name: toolCall.name,
-						}),
-					);
-				} catch (error) {
-					toolMessages.push(
-						new ToolMessage({
-							content: `Tool failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-							tool_call_id: toolCall.id ?? '',
-							name: toolCall.name,
-						}),
-					);
-				}
-			} else {
-				// Unknown tool - return error message
-				toolMessages.push(
-					new ToolMessage({
-						content: `Unknown tool: ${toolCall.name}`,
-						tool_call_id: toolCall.id ?? '',
-						name: toolCall.name,
-					}),
-				);
-			}
-		}
-
-		return toolMessages;
-	}
-
-	/**
-	 * Extract content from tool result, handling Command object pattern
-	 */
-	private extractToolContent(result: unknown): string {
-		// Handle Command object pattern used by tools in this codebase
-		if (result && typeof result === 'object' && 'update' in result) {
-			const command = result as { update?: { messages?: BaseMessage[] } };
-			const messages = command.update?.messages;
-			if (messages && messages.length > 0) {
-				const lastMessage = messages[messages.length - 1];
-				if (typeof lastMessage.content === 'string') {
-					return lastMessage.content;
-				}
-			}
-		}
-
-		// Fallback for direct string results
-		if (typeof result === 'string') {
-			return result;
-		}
-
-		return 'Tool executed successfully';
 	}
 }

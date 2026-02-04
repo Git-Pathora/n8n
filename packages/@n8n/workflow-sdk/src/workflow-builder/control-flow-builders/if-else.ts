@@ -7,9 +7,9 @@ export type IfElseTarget =
 	| null
 	| NodeInstance<string, string, unknown>
 	| NodeChain<NodeInstance<string, string, unknown>, NodeInstance<string, string, unknown>>
-	| (
+	| Array<
 			| NodeInstance<string, string, unknown>
 			| NodeChain<NodeInstance<string, string, unknown>, NodeInstance<string, string, unknown>>
-	  )[]
+	  >
 	| IfElseBuilder<unknown>
 	| SwitchCaseBuilder<unknown>;

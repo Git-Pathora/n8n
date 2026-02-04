@@ -1,7 +1,8 @@
 import type { INodeTypes } from 'n8n-workflow';
+
+import { validateWorkflow } from '../validation';
 import { workflow } from '../workflow-builder';
 import { node, trigger, merge } from '../workflow-builder/node-builders/node-builder';
-import { validateWorkflow } from '../validation';
 
 describe('input index validation', () => {
 	const mockNodeTypesProvider: INodeTypes = {

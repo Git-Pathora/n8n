@@ -4,14 +4,14 @@
  * Validates Merge nodes for proper input connections.
  */
 
+import type { GraphNode, NodeInstance } from '../../../types/base';
+import { isInputTarget } from '../../node-builders/node-builder';
 import {
 	type ValidatorPlugin,
 	type ValidationIssue,
 	type PluginContext,
 	findMapKey,
 } from '../types';
-import type { GraphNode, NodeInstance } from '../../../types/base';
-import { isInputTarget } from '../../node-builders/node-builder';
 
 /**
  * Validator for Merge nodes.
@@ -60,9 +60,7 @@ export const mergeNodeValidator: ValidatorPlugin = {
 					// Handle both NodeInstance and InputTarget
 					const targetNode = isInputTarget(conn.target) ? conn.target.node : conn.target;
 					const targetNodeName =
-						typeof targetNode === 'object' && 'name' in targetNode
-							? (targetNode as NodeInstance<string, string, unknown>).name
-							: undefined;
+						typeof targetNode === 'object' && 'name' in targetNode ? targetNode.name : undefined;
 					if (targetNode === node || targetNodeName === originalName) {
 						// For InputTarget, use the specified index; for regular connections use targetInputIndex; default to 0
 						const targetIndex = isInputTarget(conn.target)

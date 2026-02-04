@@ -25,15 +25,15 @@ function createMockNode(name: string): NodeInstance<string, string, unknown> {
 // Type for named syntax split-in-batches builder
 interface SplitInBatchesBuilderLike {
 	sibNode: NodeInstance<string, string, unknown>;
-	_doneNodes: NodeInstance<string, string, unknown>[];
-	_eachNodes: NodeInstance<string, string, unknown>[];
+	_doneNodes: Array<NodeInstance<string, string, unknown>>;
+	_eachNodes: Array<NodeInstance<string, string, unknown>>;
 	_doneTarget?:
 		| NodeInstance<string, string, unknown>
-		| NodeInstance<string, string, unknown>[]
+		| Array<NodeInstance<string, string, unknown>>
 		| null;
 	_eachTarget?:
 		| NodeInstance<string, string, unknown>
-		| NodeInstance<string, string, unknown>[]
+		| Array<NodeInstance<string, string, unknown>>
 		| null;
 }
 
@@ -43,11 +43,11 @@ function createSplitInBatchesBuilder(
 		sibNodeName?: string;
 		doneTarget?:
 			| NodeInstance<string, string, unknown>
-			| NodeInstance<string, string, unknown>[]
+			| Array<NodeInstance<string, string, unknown>>
 			| null;
 		eachTarget?:
 			| NodeInstance<string, string, unknown>
-			| NodeInstance<string, string, unknown>[]
+			| Array<NodeInstance<string, string, unknown>>
 			| null;
 	} = {},
 ): SplitInBatchesBuilderLike {
@@ -329,16 +329,14 @@ describe('splitInBatchesHandler', () => {
 		// Extended builder type that includes fluent API properties
 		interface FluentSplitInBatchesBuilder {
 			sibNode: NodeInstance<string, string, unknown>;
-			_doneNodes: NodeInstance<string, string, unknown>[];
-			_eachNodes: NodeInstance<string, string, unknown>[];
-			_doneBatches: (
-				| NodeInstance<string, string, unknown>
-				| NodeInstance<string, string, unknown>[]
-			)[];
-			_eachBatches: (
-				| NodeInstance<string, string, unknown>
-				| NodeInstance<string, string, unknown>[]
-			)[];
+			_doneNodes: Array<NodeInstance<string, string, unknown>>;
+			_eachNodes: Array<NodeInstance<string, string, unknown>>;
+			_doneBatches: Array<
+				NodeInstance<string, string, unknown> | Array<NodeInstance<string, string, unknown>>
+			>;
+			_eachBatches: Array<
+				NodeInstance<string, string, unknown> | Array<NodeInstance<string, string, unknown>>
+			>;
 			_hasLoop: boolean;
 			// No _doneTarget/_eachTarget - fluent API uses batches instead
 		}
@@ -346,14 +344,12 @@ describe('splitInBatchesHandler', () => {
 		function createFluentBuilder(
 			options: {
 				sibNodeName?: string;
-				doneBatches?: (
-					| NodeInstance<string, string, unknown>
-					| NodeInstance<string, string, unknown>[]
-				)[];
-				eachBatches?: (
-					| NodeInstance<string, string, unknown>
-					| NodeInstance<string, string, unknown>[]
-				)[];
+				doneBatches?: Array<
+					NodeInstance<string, string, unknown> | Array<NodeInstance<string, string, unknown>>
+				>;
+				eachBatches?: Array<
+					NodeInstance<string, string, unknown> | Array<NodeInstance<string, string, unknown>>
+				>;
 				hasLoop?: boolean;
 			} = {},
 		): FluentSplitInBatchesBuilder {

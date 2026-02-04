@@ -9,24 +9,21 @@
  * - Processing branches for both Composite and Builder patterns
  */
 
-import type { MutablePluginContext } from '../types';
 import type {
 	ConnectionTarget,
 	NodeInstance,
 	IfElseComposite,
 	SwitchCaseComposite,
-	IfElseBuilder,
-	SwitchCaseBuilder,
-	NodeChain,
 } from '../../../types/base';
 import { isNodeChain } from '../../../types/base';
+import { isIfElseBuilder, isSwitchCaseBuilder } from '../../node-builders/node-builder';
 import {
 	isIfElseComposite,
 	isSwitchCaseComposite,
 	isSplitInBatchesBuilder,
 	extractSplitInBatchesBuilder,
 } from '../../type-guards';
-import { isIfElseBuilder, isSwitchCaseBuilder } from '../../node-builders/node-builder';
+import type { MutablePluginContext } from '../types';
 
 /**
  * Get the head node name from a target (which could be a node, chain, or composite).
@@ -37,7 +34,7 @@ export function getTargetNodeName(target: unknown): string | undefined {
 
 	// Handle NodeChain
 	if (isNodeChain(target)) {
-		return (target as NodeChain).head.name;
+		return target.head.name;
 	}
 
 	// Handle composites
@@ -51,12 +48,12 @@ export function getTargetNodeName(target: unknown): string | undefined {
 
 	// Handle IfElseBuilder (fluent API)
 	if (isIfElseBuilder(target)) {
-		return (target as IfElseBuilder<unknown>).ifNode.name;
+		return target.ifNode.name;
 	}
 
 	// Handle SwitchCaseBuilder (fluent API)
 	if (isSwitchCaseBuilder(target)) {
-		return (target as SwitchCaseBuilder<unknown>).switchNode.name;
+		return target.switchNode.name;
 	}
 
 	// Handle SplitInBatchesBuilder (including EachChain/DoneChain)
@@ -130,7 +127,7 @@ export function processBranchForComposite(
 	if (Array.isArray(branch)) {
 		// Fan-out: multiple parallel targets from this branch
 		const targets: ConnectionTarget[] = [];
-		for (const branchNode of branch as (NodeInstance<string, string, unknown> | null)[]) {
+		for (const branchNode of branch as Array<NodeInstance<string, string, unknown> | null>) {
 			if (branchNode === null) continue;
 			const branchHead = ctx.addBranchToGraph(branchNode);
 			targets.push({ node: branchHead, type: 'main', index: 0 });

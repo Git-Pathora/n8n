@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import { jsonToCode } from './json-to-code';
 import { codeToJson } from './code-to-json';
+import { jsonToCode } from './json-to-code';
 
 const [command, filePath] = process.argv.slice(2);
 

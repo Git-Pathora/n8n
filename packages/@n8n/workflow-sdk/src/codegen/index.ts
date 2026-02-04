@@ -10,15 +10,16 @@
  * 4. Generate Code - emit SDK code from composite tree
  */
 
-import type { WorkflowJSON } from '../types/base';
 import type { NodeExecutionSchema, Schema, IRunExecutionData } from 'n8n-workflow';
-import { buildSemanticGraph } from './semantic-graph';
-import { annotateGraph } from './graph-annotator';
-import { buildCompositeTree } from './composite-builder';
+
 import { generateCode } from './code-generator';
-import { buildExpressionAnnotations } from './expression-annotator';
+import { buildCompositeTree } from './composite-builder';
 import { buildNodeExecutionStatus, formatExecutionStatusJSDoc } from './execution-status';
+import { buildExpressionAnnotations } from './expression-annotator';
+import { annotateGraph } from './graph-annotator';
+import { buildSemanticGraph } from './semantic-graph';
 import type { ExpressionValue } from './types';
+import type { WorkflowJSON } from '../types/base';
 
 // Re-export types
 export type {

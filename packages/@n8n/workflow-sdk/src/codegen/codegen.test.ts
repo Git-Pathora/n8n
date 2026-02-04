@@ -326,11 +326,11 @@ describe('generateWorkflowCode', () => {
 		// Critical: verify downstream connections from True Branch are preserved
 		const trueBranchConns = parsedJson.connections['True Branch'];
 		expect(trueBranchConns).toBeDefined();
-		expect(trueBranchConns!.main[0]![0]!.node).toBe('Downstream Node');
+		expect(trueBranchConns.main[0]![0].node).toBe('Downstream Node');
 
 		const downstreamConns = parsedJson.connections['Downstream Node'];
 		expect(downstreamConns).toBeDefined();
-		expect(downstreamConns!.main[0]![0]!.node).toBe('Final Node');
+		expect(downstreamConns.main[0]![0].node).toBe('Final Node');
 	});
 
 	it('should escape special characters in strings', () => {
@@ -629,8 +629,8 @@ describe('generateWorkflowCode with AI subnodes', () => {
 		// Verify AI connections are preserved
 		expect(parsedJson.connections['OpenAI Model']).toBeDefined();
 		expect(parsedJson.connections['OpenAI Model'].ai_languageModel).toBeDefined();
-		expect(parsedJson.connections['OpenAI Model'].ai_languageModel![0]![0]!.node).toBe('AI Agent');
-		expect(parsedJson.connections['OpenAI Model'].ai_languageModel![0]![0]!.type).toBe(
+		expect(parsedJson.connections['OpenAI Model'].ai_languageModel[0]![0].node).toBe('AI Agent');
+		expect(parsedJson.connections['OpenAI Model'].ai_languageModel[0]![0].type).toBe(
 			'ai_languageModel',
 		);
 	});
@@ -935,8 +935,8 @@ describe('generateWorkflowCode with AI subnodes', () => {
 			// Verify fan-out connections are preserved
 			const httpConnections = parsedJson.connections['HTTP Request'];
 			expect(httpConnections).toBeDefined();
-			expect(httpConnections!.main[0]).toHaveLength(2);
-			expect(httpConnections!.main[0]!.map((c) => c!.node).sort()).toEqual([
+			expect(httpConnections.main[0]).toHaveLength(2);
+			expect(httpConnections.main[0]!.map((c) => c.node).sort()).toEqual([
 				'Process A',
 				'Process B',
 			]);
@@ -2027,10 +2027,10 @@ describe('SplitInBatches multi-output handling', () => {
 
 		// Both outputs must be connected
 		expect(parsed.connections['Loop']).toBeDefined();
-		expect(parsed.connections['Loop'].main[0]![0]!.node).toBe('Done');
-		expect(parsed.connections['Loop'].main[1]![0]!.node).toBe('Process');
+		expect(parsed.connections['Loop'].main[0]![0].node).toBe('Done');
+		expect(parsed.connections['Loop'].main[1]![0].node).toBe('Process');
 		// Cycle back must exist
-		expect(parsed.connections['Process'].main[0]![0]!.node).toBe('Loop');
+		expect(parsed.connections['Process'].main[0]![0].node).toBe('Loop');
 	});
 
 	it('should preserve chains after both SplitInBatches outputs', () => {
@@ -2098,7 +2098,7 @@ describe('SplitInBatches multi-output handling', () => {
 		const parsed = parseWorkflowCode(code);
 
 		// Chain after done output must be preserved
-		expect(parsed.connections['Done'].main[0]![0]!.node).toBe('Final');
+		expect(parsed.connections['Done'].main[0]![0].node).toBe('Final');
 	});
 });
 
@@ -2161,8 +2161,8 @@ describe('Fan-out pattern handling', () => {
 
 		// Both fan-out targets must be connected
 		expect(parsed.connections['Source']).toBeDefined();
-		expect(parsed.connections['Source']!.main[0]).toHaveLength(2);
-		const targetNodes = parsed.connections['Source']!.main[0]!.map((c) => c!.node).sort();
+		expect(parsed.connections['Source'].main[0]).toHaveLength(2);
+		const targetNodes = parsed.connections['Source'].main[0]!.map((c) => c.node).sort();
 		expect(targetNodes).toEqual(['TargetA', 'TargetB']);
 	});
 
@@ -2252,17 +2252,17 @@ describe('Fan-out pattern handling', () => {
 
 		// Fan-out must preserve both paths
 		expect(parsed.connections['FanOutSource']).toBeDefined();
-		expect(parsed.connections['FanOutSource']!.main[0]).toHaveLength(2);
-		const fanOutTargets = parsed.connections['FanOutSource']!.main[0]!.map((c) => c!.node).sort();
+		expect(parsed.connections['FanOutSource'].main[0]).toHaveLength(2);
+		const fanOutTargets = parsed.connections['FanOutSource'].main[0]!.map((c) => c.node).sort();
 		expect(fanOutTargets).toEqual(['PathA', 'PathB']);
 
 		// Both paths must connect to their downstream nodes
-		expect(parsed.connections['PathA'].main[0]![0]!.node).toBe('ProcessA');
-		expect(parsed.connections['PathB'].main[0]![0]!.node).toBe('ProcessB');
+		expect(parsed.connections['PathA'].main[0]![0].node).toBe('ProcessA');
+		expect(parsed.connections['PathB'].main[0]![0].node).toBe('ProcessB');
 
 		// Both must converge at Merge
-		expect(parsed.connections['ProcessA'].main[0]![0]!.node).toBe('Merge');
-		expect(parsed.connections['ProcessB'].main[0]![0]!.node).toBe('Merge');
+		expect(parsed.connections['ProcessA'].main[0]![0].node).toBe('Merge');
+		expect(parsed.connections['ProcessB'].main[0]![0].node).toBe('Merge');
 	});
 });
 
@@ -2332,11 +2332,11 @@ describe('IF branches feeding into Merge', () => {
 
 		// Both IF branches must exist
 		expect(parsed.connections['IF']).toBeDefined();
-		expect(parsed.connections['IF'].main[0]![0]!.node).toBe('TrueNode');
-		expect(parsed.connections['IF'].main[1]![0]!.node).toBe('FalseNode');
+		expect(parsed.connections['IF'].main[0]![0].node).toBe('TrueNode');
+		expect(parsed.connections['IF'].main[1]![0].node).toBe('FalseNode');
 		// Both branches must connect to Merge
-		expect(parsed.connections['TrueNode'].main[0]![0]!.node).toBe('Merge');
-		expect(parsed.connections['FalseNode'].main[0]![0]!.node).toBe('Merge');
+		expect(parsed.connections['TrueNode'].main[0]![0].node).toBe('Merge');
+		expect(parsed.connections['FalseNode'].main[0]![0].node).toBe('Merge');
 	});
 
 	it('should preserve IF false-only branch connecting to Merge', () => {
@@ -2404,7 +2404,7 @@ describe('IF branches feeding into Merge', () => {
 		// IF false branch must connect to Merge
 		expect(parsed.connections['IF']).toBeDefined();
 		expect(parsed.connections['IF'].main[1]).toBeDefined();
-		expect(parsed.connections['IF'].main[1]![0]!.node).toBe('Merge');
+		expect(parsed.connections['IF'].main[1]![0].node).toBe('Merge');
 	});
 });
 
@@ -2488,13 +2488,13 @@ describe('Phase 2b: .input(n) syntax for merge patterns', () => {
 
 		// Both IF branches must exist
 		expect(parsed.connections['IF']).toBeDefined();
-		expect(parsed.connections['IF'].main[0]![0]!.node).toBe('TrueProcess');
-		expect(parsed.connections['IF'].main[1]![0]!.node).toBe('FalseProcess');
+		expect(parsed.connections['IF'].main[0]![0].node).toBe('TrueProcess');
+		expect(parsed.connections['IF'].main[1]![0].node).toBe('FalseProcess');
 		// Both branches must connect to Merge at correct inputs
-		expect(parsed.connections['TrueProcess'].main[0]![0]!.node).toBe('Merge');
-		expect(parsed.connections['TrueProcess'].main[0]![0]!.index).toBe(0);
-		expect(parsed.connections['FalseProcess'].main[0]![0]!.node).toBe('Merge');
-		expect(parsed.connections['FalseProcess'].main[0]![0]!.index).toBe(1);
+		expect(parsed.connections['TrueProcess'].main[0]![0].node).toBe('Merge');
+		expect(parsed.connections['TrueProcess'].main[0]![0].index).toBe(0);
+		expect(parsed.connections['FalseProcess'].main[0]![0].node).toBe('Merge');
+		expect(parsed.connections['FalseProcess'].main[0]![0].index).toBe(1);
 	});
 
 	it('should generate .input(n) syntax for any multi-input node (not just Merge)', () => {
@@ -2618,11 +2618,11 @@ describe('Multiple triggers', () => {
 
 		// Both triggers must have connections to SharedNode
 		expect(parsed.connections['TriggerA']).toBeDefined();
-		expect(parsed.connections['TriggerA'].main[0]![0]!.node).toBe('SharedNode');
+		expect(parsed.connections['TriggerA'].main[0]![0].node).toBe('SharedNode');
 		expect(parsed.connections['TriggerB']).toBeDefined();
-		expect(parsed.connections['TriggerB'].main[0]![0]!.node).toBe('SharedNode');
+		expect(parsed.connections['TriggerB'].main[0]![0].node).toBe('SharedNode');
 		// SharedNode must connect to EndNode
-		expect(parsed.connections['SharedNode'].main[0]![0]!.node).toBe('EndNode');
+		expect(parsed.connections['SharedNode'].main[0]![0].node).toBe('EndNode');
 	});
 
 	it('should preserve merge downstream connection when fan-out includes direct merge connection', () => {
@@ -2702,7 +2702,7 @@ describe('Multiple triggers', () => {
 		// CRITICAL: Verify Merge -> AI Agent connection is preserved
 		expect(parsed.connections['Merge']).toBeDefined();
 		expect(parsed.connections['Merge'].main[0]).toBeDefined();
-		expect(parsed.connections['Merge'].main[0]![0]!.node).toBe('AI Agent');
+		expect(parsed.connections['Merge'].main[0]![0].node).toBe('AI Agent');
 	});
 });
 
@@ -2814,22 +2814,22 @@ describe('SplitInBatches with IF branch converging to Merge (workflow 6993 patte
 		// CRITICAL: Verify Loop Over Items[1] -> Company website exists connection
 		expect(parsed.connections['Loop Over Items']).toBeDefined();
 		expect(parsed.connections['Loop Over Items'].main[1]).toBeDefined();
-		expect(parsed.connections['Loop Over Items'].main[1]![0]!.node).toBe('Company website exists');
+		expect(parsed.connections['Loop Over Items'].main[1]![0].node).toBe('Company website exists');
 
 		// CRITICAL: Verify IF branches are connected
 		expect(parsed.connections['Company website exists']).toBeDefined();
-		expect(parsed.connections['Company website exists'].main[0]![0]!.node).toBe(
+		expect(parsed.connections['Company website exists'].main[0]![0].node).toBe(
 			'Scrape & Summarize',
 		);
-		expect(parsed.connections['Company website exists'].main[1]![0]!.node).toBe('Merge');
+		expect(parsed.connections['Company website exists'].main[1]![0].node).toBe('Merge');
 
 		// CRITICAL: Verify the chain continues from Merge
 		expect(parsed.connections['Merge']).toBeDefined();
-		expect(parsed.connections['Merge'].main[0]![0]!.node).toBe('Message Generator');
+		expect(parsed.connections['Merge'].main[0]![0].node).toBe('Message Generator');
 
 		// CRITICAL: Verify the loop back connection
 		expect(parsed.connections['Supabase Upsert']).toBeDefined();
-		expect(parsed.connections['Supabase Upsert'].main[0]![0]!.node).toBe('Loop Over Items');
+		expect(parsed.connections['Supabase Upsert'].main[0]![0].node).toBe('Loop Over Items');
 	});
 });
 

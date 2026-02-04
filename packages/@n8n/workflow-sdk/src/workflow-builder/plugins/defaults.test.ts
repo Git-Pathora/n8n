@@ -1,5 +1,5 @@
-import { PluginRegistry } from './registry';
 import { registerDefaultPlugins } from './defaults';
+import { PluginRegistry } from './registry';
 
 describe('Default Plugins', () => {
 	let registry: PluginRegistry;

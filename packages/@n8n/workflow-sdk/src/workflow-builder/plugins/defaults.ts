@@ -5,7 +5,9 @@
  * This includes validators, composite handlers, and serializers.
  */
 
+import { ifElseHandler, switchCaseHandler, splitInBatchesHandler } from './composite-handlers';
 import type { PluginRegistry } from './registry';
+import { jsonSerializer } from './serializers';
 import type { ValidatorPlugin, CompositeHandlerPlugin, SerializerPlugin } from './types';
 
 // Import real validators
@@ -28,10 +30,8 @@ import {
 } from './validators';
 
 // Import real composite handlers
-import { ifElseHandler, switchCaseHandler, splitInBatchesHandler } from './composite-handlers';
 
 // Import real serializers
-import { jsonSerializer } from './serializers';
 
 // Note: Core composite handlers are now imported from ./composite-handlers
 

@@ -3,6 +3,7 @@
  * This tests if the new codegen can replace the old one.
  */
 import { describe, it, expect } from '@jest/globals';
+
 import { generateWorkflowCode } from './index';
 import { parseWorkflowCode } from './parse-workflow-code';
 import type { WorkflowJSON } from '../types/base';
@@ -49,7 +50,7 @@ describe('new codegen roundtrip', () => {
 
 		// Verify connection preserved
 		expect(parsedJson.connections['Manual Trigger']).toBeDefined();
-		expect(parsedJson.connections['Manual Trigger']!.main[0]![0]!.node).toBe('HTTP Request');
+		expect(parsedJson.connections['Manual Trigger'].main[0]![0].node).toBe('HTTP Request');
 	});
 
 	it('IF branch roundtrip', () => {
@@ -112,8 +113,8 @@ describe('new codegen roundtrip', () => {
 
 		// Verify IF connections to branches
 		expect(parsedJson.connections['IF']).toBeDefined();
-		expect(parsedJson.connections['IF']!.main[0]![0]!.node).toBe('True Branch');
-		expect(parsedJson.connections['IF']!.main[1]![0]!.node).toBe('False Branch');
+		expect(parsedJson.connections['IF'].main[0]![0].node).toBe('True Branch');
+		expect(parsedJson.connections['IF'].main[1]![0].node).toBe('False Branch');
 	});
 
 	it('merge pattern roundtrip', () => {
@@ -182,13 +183,13 @@ describe('new codegen roundtrip', () => {
 
 		// Verify merge connections
 		expect(parsedJson.connections['Branch A']).toBeDefined();
-		expect(parsedJson.connections['Branch A']!.main[0]![0]!.node).toBe('Merge');
+		expect(parsedJson.connections['Branch A'].main[0]![0].node).toBe('Merge');
 		expect(parsedJson.connections['Branch B']).toBeDefined();
-		expect(parsedJson.connections['Branch B']!.main[0]![0]!.node).toBe('Merge');
+		expect(parsedJson.connections['Branch B'].main[0]![0].node).toBe('Merge');
 
 		// Verify fan-out: Trigger should connect to BOTH Branch A and Branch B
 		expect(parsedJson.connections['Trigger']).toBeDefined();
-		const triggerOutputs = parsedJson.connections['Trigger']!.main[0]!;
+		const triggerOutputs = parsedJson.connections['Trigger'].main[0]!;
 		expect(triggerOutputs).toHaveLength(2);
 		const targetNames = triggerOutputs.map((c: { node: string }) => c.node).sort();
 		expect(targetNames).toEqual(['Branch A', 'Branch B']);

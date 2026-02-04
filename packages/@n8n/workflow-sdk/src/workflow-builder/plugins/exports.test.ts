@@ -2,7 +2,6 @@
  * Test that the public API exports are accessible
  */
 import { PluginRegistry, pluginRegistry, registerDefaultPlugins, workflow } from '../../index';
-
 import type {
 	ValidationIssue,
 	PluginContext,

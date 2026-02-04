@@ -1,8 +1,9 @@
 import { describe, it, expect } from '@jest/globals';
+
 import { buildErrorHandler, hasErrorOutput, getErrorOutputTargets } from './error-handler';
-import type { SemanticGraph, SemanticNode } from '../types';
-import type { CompositeNode, LeafNode } from '../composite-tree';
 import type { OnError } from '../../types/base';
+import type { CompositeNode, LeafNode } from '../composite-tree';
+import type { SemanticGraph, SemanticNode } from '../types';
 
 /**
  * Create a minimal semantic node for testing

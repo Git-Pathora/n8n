@@ -5,8 +5,8 @@
  * instances of any node type (as defined in nodeType.description.maxNodes).
  */
 
-import type { ValidatorPlugin, PluginContext, ValidationIssue } from '../types';
 import { parseVersion } from '../../string-utils';
+import type { ValidatorPlugin, PluginContext, ValidationIssue } from '../types';
 
 /**
  * Validator that checks for max nodes constraint violations.

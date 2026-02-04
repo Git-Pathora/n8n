@@ -1,4 +1,5 @@
 import { FROM_AI_AUTO_GENERATED_MARKER } from 'n8n-workflow';
+
 import type { Expression, ExpressionContext, FromAIArgumentType } from '../types/base';
 
 /**
@@ -42,7 +43,7 @@ function createExpressionProxy(path: string[] = []): unknown {
 
 			if (lastPart === 'keys' && parentPath.join('.') === 'binary') {
 				// Special case: $.binary.keys() -> Object.keys($binary)
-				return { __path__: ['__SPECIAL__', `Object.keys($binary)`] };
+				return { __path__: ['__SPECIAL__', 'Object.keys($binary)'] };
 			}
 
 			// Handle $('NodeName') syntax

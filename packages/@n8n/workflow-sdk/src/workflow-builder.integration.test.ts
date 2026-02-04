@@ -10,12 +10,12 @@
  * Each test should FAIL initially until the corresponding feature is implemented.
  */
 
-import { workflow } from './workflow-builder';
-import { node, trigger } from './workflow-builder/node-builders/node-builder';
-import { splitInBatches } from './workflow-builder/control-flow-builders/split-in-batches';
-import { nextBatch } from './workflow-builder/control-flow-builders/next-batch';
-import { languageModel, tool } from './workflow-builder/node-builders/subnode-builders';
 import type { NodeInstance } from './types/base';
+import { workflow } from './workflow-builder';
+import { nextBatch } from './workflow-builder/control-flow-builders/next-batch';
+import { splitInBatches } from './workflow-builder/control-flow-builders/split-in-batches';
+import { node, trigger } from './workflow-builder/node-builders/node-builder';
+import { languageModel, tool } from './workflow-builder/node-builders/subnode-builders';
 
 /**
  * Helper to create a simple node with a name
@@ -134,7 +134,7 @@ describe('New SDK API', () => {
 			expect(connA).toBeDefined();
 			// Output 1 should have the connection
 			expect(connA.main[1]).toBeDefined();
-			expect(connA.main[1]![0]!.node).toBe('B');
+			expect(connA.main[1]![0].node).toBe('B');
 		});
 
 		it('supports .input(n) for connecting to specific input indices (future API)', () => {
@@ -153,8 +153,8 @@ describe('New SDK API', () => {
 			// Verify connection exists with correct target input index
 			const connA = json.connections['A'];
 			expect(connA).toBeDefined();
-			expect(connA.main[0]![0]!.node).toBe('Merge');
-			expect(connA.main[0]![0]!.index).toBe(1); // Input index 1
+			expect(connA.main[0]![0].node).toBe('Merge');
+			expect(connA.main[0]![0].index).toBe(1); // Input index 1
 		});
 
 		it('returns terminal InputTarget that cannot be chained', () => {
@@ -217,7 +217,7 @@ describe('New SDK API', () => {
 
 			// Verify switch output 1 connects to C
 			expect(switchConns.main[1]).toHaveLength(1);
-			expect(switchConns.main[1]![0]!.node).toBe('C');
+			expect(switchConns.main[1]![0].node).toBe('C');
 		});
 	});
 
@@ -240,11 +240,11 @@ describe('New SDK API', () => {
 			expect(json.nodes).toHaveLength(4); // Start, IF, A, B
 
 			// Trigger connects to IF
-			expect(json.connections['Start'].main[0]![0]!.node).toBe('IF');
+			expect(json.connections['Start'].main[0]![0].node).toBe('IF');
 
 			// IF connects to branches
-			expect(json.connections['IF'].main[0]![0]!.node).toBe('A');
-			expect(json.connections['IF'].main[1]![0]!.node).toBe('B');
+			expect(json.connections['IF'].main[0]![0].node).toBe('A');
+			expect(json.connections['IF'].main[1]![0].node).toBe('B');
 		});
 	});
 
@@ -273,8 +273,8 @@ describe('New SDK API', () => {
 			expect(convergenceNodes).toHaveLength(1);
 
 			// Both branches should connect to the same Convergence node
-			expect(json.connections['A'].main[0]![0]!.node).toBe('Convergence');
-			expect(json.connections['B'].main[0]![0]!.node).toBe('Convergence');
+			expect(json.connections['A'].main[0]![0].node).toBe('Convergence');
+			expect(json.connections['B'].main[0]![0].node).toBe('Convergence');
 		});
 	});
 
@@ -306,7 +306,7 @@ describe('New SDK API', () => {
 
 			// Verify Wait connects back to Check
 			expect(json.connections['Wait']).toBeDefined();
-			expect(json.connections['Wait'].main[0]![0]!.node).toBe('Check');
+			expect(json.connections['Wait'].main[0]![0].node).toBe('Check');
 		});
 	});
 
@@ -328,7 +328,7 @@ describe('New SDK API', () => {
 
 			// Output 0 connects to A
 			expect(switchConns[0]).toBeDefined();
-			expect(switchConns[0]![0]!.node).toBe('A');
+			expect(switchConns[0]![0].node).toBe('A');
 
 			// Outputs 1, 2 should be undefined or empty
 			expect(switchConns[1] ?? []).toHaveLength(0);
@@ -336,7 +336,7 @@ describe('New SDK API', () => {
 
 			// Output 3 connects to B
 			expect(switchConns[3]).toBeDefined();
-			expect(switchConns[3]![0]!.node).toBe('B');
+			expect(switchConns[3]![0].node).toBe('B');
 		});
 	});
 
@@ -351,7 +351,7 @@ describe('New SDK API', () => {
 			const json = wf.toJSON();
 
 			// IF should only have output 0 connected
-			expect(json.connections['IF'].main[0]![0]!.node).toBe('A');
+			expect(json.connections['IF'].main[0]![0].node).toBe('A');
 			// Output 1 should have no connections
 			expect(json.connections['IF'].main[1] ?? []).toHaveLength(0);
 		});
@@ -368,7 +368,7 @@ describe('New SDK API', () => {
 			// IF output 0 should have no connections
 			expect(json.connections['IF'].main[0] ?? []).toHaveLength(0);
 			// Output 1 should be connected
-			expect(json.connections['IF'].main[1]![0]!.node).toBe('B');
+			expect(json.connections['IF'].main[1]![0].node).toBe('B');
 		});
 	});
 
@@ -387,8 +387,8 @@ describe('New SDK API', () => {
 			const json = wf.toJSON();
 
 			// Both triggers should connect to Shared
-			expect(json.connections['Manual'].main[0]![0]!.node).toBe('Shared');
-			expect(json.connections['Schedule'].main[0]![0]!.node).toBe('Shared');
+			expect(json.connections['Manual'].main[0]![0].node).toBe('Shared');
+			expect(json.connections['Schedule'].main[0]![0].node).toBe('Shared');
 
 			// Shared should only exist once
 			const sharedNodes = json.nodes.filter((n) => n.name === 'Shared');
@@ -418,9 +418,9 @@ describe('New SDK API', () => {
 			const json = wf.toJSON();
 
 			const classifierConns = json.connections['Classifier'].main;
-			expect(classifierConns[0]![0]!.node).toBe('Category A');
-			expect(classifierConns[1]![0]!.node).toBe('Category B');
-			expect(classifierConns[2]![0]!.node).toBe('Category C');
+			expect(classifierConns[0]![0].node).toBe('Category A');
+			expect(classifierConns[1]![0].node).toBe('Category B');
+			expect(classifierConns[2]![0].node).toBe('Category C');
 		});
 	});
 
@@ -456,15 +456,15 @@ describe('New SDK API', () => {
 
 			// Verify SIB connections
 			const sibConns = json.connections['Batch'].main;
-			expect(sibConns[0]![0]!.node).toBe('Summary'); // done -> Summary
-			expect(sibConns[1]![0]!.node).toBe('Process'); // each -> Process
+			expect(sibConns[0]![0].node).toBe('Summary'); // done -> Summary
+			expect(sibConns[1]![0].node).toBe('Process'); // each -> Process
 
 			// Verify merge input connections
-			const summaryConn = json.connections['Summary'].main[0]![0]!;
+			const summaryConn = json.connections['Summary'].main[0]![0];
 			expect(summaryConn.node).toBe('Merge');
 			expect(summaryConn.index).toBe(0);
 
-			const processConn = json.connections['Process'].main[0]![0]!;
+			const processConn = json.connections['Process'].main[0]![0];
 			expect(processConn.node).toBe('Merge');
 			expect(processConn.index).toBe(1);
 		});
@@ -496,11 +496,11 @@ describe('New SDK API', () => {
 			expect(json.connections['Start'].main[0]).toHaveLength(2);
 
 			// A and B should connect to different merge inputs
-			expect(json.connections['A'].main[0]![0]!.node).toBe('Merge');
-			expect(json.connections['A'].main[0]![0]!.index).toBe(0);
+			expect(json.connections['A'].main[0]![0].node).toBe('Merge');
+			expect(json.connections['A'].main[0]![0].index).toBe(0);
 
-			expect(json.connections['B'].main[0]![0]!.node).toBe('Merge');
-			expect(json.connections['B'].main[0]![0]!.index).toBe(1);
+			expect(json.connections['B'].main[0]![0].node).toBe('Merge');
+			expect(json.connections['B'].main[0]![0].index).toBe(1);
 		});
 	});
 
@@ -526,9 +526,9 @@ describe('New SDK API', () => {
 			const json = wf.toJSON();
 
 			// HTTP output 0 -> Success
-			expect(json.connections['HTTP'].main[0]![0]!.node).toBe('Success');
+			expect(json.connections['HTTP'].main[0]![0].node).toBe('Success');
 			// HTTP output 1 (error) -> Error
-			expect(json.connections['HTTP'].main[1]![0]!.node).toBe('Error');
+			expect(json.connections['HTTP'].main[1]![0].node).toBe('Error');
 		});
 	});
 
@@ -676,10 +676,10 @@ describe('New SDK API', () => {
 			const json = wf.toJSON();
 
 			// Verify batch loop structure
-			expect(json.connections['Process Batches'].main[0]![0]!.node).toBe('Summarize');
-			expect(json.connections['Process Batches'].main[1]![0]!.node).toBe('Process Item');
+			expect(json.connections['Process Batches'].main[0]![0].node).toBe('Summarize');
+			expect(json.connections['Process Batches'].main[1]![0].node).toBe('Process Item');
 			// Process Item loops back to Split In Batches via nextBatch()
-			expect(json.connections['Process Item'].main[0]![0]!.node).toBe('Process Batches');
+			expect(json.connections['Process Item'].main[0]![0].node).toBe('Process Batches');
 		});
 	});
 
@@ -704,11 +704,11 @@ describe('New SDK API', () => {
 			expect(json.nodes).toHaveLength(5);
 
 			// Verify connections
-			expect(json.connections['Start'].main[0]![0]!.node).toBe('Check Value');
-			expect(json.connections['Check Value'].main[0]![0]!.node).toBe('Handle True');
-			expect(json.connections['Check Value'].main[1]![0]!.node).toBe('Handle False');
-			expect(json.connections['Handle True'].main[0]![0]!.node).toBe('Finalize');
-			expect(json.connections['Handle False'].main[0]![0]!.node).toBe('Finalize');
+			expect(json.connections['Start'].main[0]![0].node).toBe('Check Value');
+			expect(json.connections['Check Value'].main[0]![0].node).toBe('Handle True');
+			expect(json.connections['Check Value'].main[1]![0].node).toBe('Handle False');
+			expect(json.connections['Handle True'].main[0]![0].node).toBe('Finalize');
+			expect(json.connections['Handle False'].main[0]![0].node).toBe('Finalize');
 		});
 
 		it('builds a batch processing workflow with loop', () => {
@@ -734,10 +734,10 @@ describe('New SDK API', () => {
 			const json = wf.toJSON();
 
 			// Verify batch loop structure
-			expect(json.connections['Process Batches'].main[0]![0]!.node).toBe('Summarize');
-			expect(json.connections['Process Batches'].main[1]![0]!.node).toBe('Process Item');
+			expect(json.connections['Process Batches'].main[0]![0].node).toBe('Summarize');
+			expect(json.connections['Process Batches'].main[1]![0].node).toBe('Process Item');
 			// Process Item loops back to Split In Batches
-			expect(json.connections['Process Item'].main[0]![0]!.node).toBe('Process Batches');
+			expect(json.connections['Process Item'].main[0]![0].node).toBe('Process Batches');
 		});
 
 		it('builds an error handling workflow', () => {
@@ -762,10 +762,10 @@ describe('New SDK API', () => {
 			const json = wf.toJSON();
 
 			// Both success and error paths should converge at Notify
-			expect(json.connections['Risky API Call'].main[0]![0]!.node).toBe('Process Success');
-			expect(json.connections['Risky API Call'].main[1]![0]!.node).toBe('Handle Error');
-			expect(json.connections['Process Success'].main[0]![0]!.node).toBe('Notify');
-			expect(json.connections['Handle Error'].main[0]![0]!.node).toBe('Notify');
+			expect(json.connections['Risky API Call'].main[0]![0].node).toBe('Process Success');
+			expect(json.connections['Risky API Call'].main[1]![0].node).toBe('Handle Error');
+			expect(json.connections['Process Success'].main[0]![0].node).toBe('Notify');
+			expect(json.connections['Handle Error'].main[0]![0].node).toBe('Notify');
 		});
 	});
 });

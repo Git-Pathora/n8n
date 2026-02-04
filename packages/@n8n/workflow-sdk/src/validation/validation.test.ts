@@ -1,8 +1,8 @@
 import { validateWorkflow, ValidationError } from '.';
+import type { NodeInstance } from '../types/base';
 import { workflow } from '../workflow-builder';
 import { node, trigger, sticky } from '../workflow-builder/node-builders/node-builder';
 import { languageModel, tool } from '../workflow-builder/node-builders/subnode-builders';
-import type { NodeInstance } from '../types/base';
 
 describe('Validation', () => {
 	describe('validateWorkflow()', () => {

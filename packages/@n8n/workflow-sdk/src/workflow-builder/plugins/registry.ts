@@ -154,7 +154,7 @@ export class PluginRegistry {
 
 		// Handler returned just the name - can't use nameMapping without ID
 		// But we can check if the name is a key in nameMapping (legacy support)
-		const baseName = info as string;
+		const baseName = info;
 		if (nameMapping) {
 			const mappedName = nameMapping.get(baseName);
 			if (mappedName) return mappedName;

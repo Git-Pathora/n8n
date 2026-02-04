@@ -9,9 +9,9 @@
  * standalone workflow nodes.
  */
 
+import type { GraphNode } from '../../../types/base';
 import type { ValidatorPlugin, PluginContext, ValidationIssue } from '../types';
 import { isAutoRenamed, formatNodeRef } from '../types';
-import type { GraphNode } from '../../../types/base';
 
 /**
  * Subnode type patterns and their required AI connection types.

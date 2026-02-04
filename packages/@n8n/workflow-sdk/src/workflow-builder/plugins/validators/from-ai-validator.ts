@@ -4,9 +4,9 @@
  * Validates that $fromAI expressions are only used in tool nodes.
  */
 
-import type { ValidatorPlugin, ValidationIssue, PluginContext } from '../types';
 import type { GraphNode, NodeInstance } from '../../../types/base';
 import { isToolNode, containsFromAI } from '../../validation-helpers';
+import type { ValidatorPlugin, ValidationIssue, PluginContext } from '../types';
 
 /**
  * Validator for $fromAI expression usage.

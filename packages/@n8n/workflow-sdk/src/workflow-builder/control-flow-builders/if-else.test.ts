@@ -1,7 +1,7 @@
-import { workflow } from '../../workflow-builder';
-import { node, trigger, isIfElseBuilder, ifElse } from '../node-builders/node-builder';
 import { parseWorkflowCode } from '../../codegen/parse-workflow-code';
 import type { NodeInstance } from '../../types/base';
+import { workflow } from '../../workflow-builder';
+import { node, trigger, isIfElseBuilder, ifElse } from '../node-builders/node-builder';
 
 // Helper type for IF node
 type IfNode = NodeInstance<'n8n-nodes-base.if', string, unknown>;
@@ -162,9 +162,9 @@ describe('IF Else fluent API', () => {
 			expect(ifConns).toBeDefined();
 
 			// true branch at output 0
-			expect(ifConns.main[0]![0]!.node).toBe('True Branch');
+			expect(ifConns.main[0]![0].node).toBe('True Branch');
 			// false branch at output 1
-			expect(ifConns.main[1]![0]!.node).toBe('False Branch');
+			expect(ifConns.main[1]![0].node).toBe('False Branch');
 		});
 
 		it('should support null for empty branches', () => {
@@ -193,7 +193,7 @@ describe('IF Else fluent API', () => {
 			expect(ifConns).toBeDefined();
 
 			// true branch at output 0
-			expect(ifConns.main[0]![0]!.node).toBe('True Branch');
+			expect(ifConns.main[0]![0].node).toBe('True Branch');
 			// false branch at output 1 - should be empty or undefined
 			expect(ifConns.main[1]).toBeUndefined();
 		});
@@ -241,7 +241,7 @@ describe('IF Else fluent API', () => {
 			expect(output0Targets).toEqual(['Target A', 'Target B']);
 
 			// false at output 1
-			expect(ifConns.main[1]![0]!.node).toBe('Target C');
+			expect(ifConns.main[1]![0].node).toBe('Target C');
 		});
 
 		it('should identify builder with isIfElseBuilder', () => {
@@ -298,12 +298,12 @@ describe('IF Else fluent API', () => {
 			// IF should connect to chain head (Node A)
 			const ifConns = json.connections['My IF'];
 			expect(ifConns).toBeDefined();
-			expect(ifConns.main[0]![0]!.node).toBe('Node A');
+			expect(ifConns.main[0]![0].node).toBe('Node A');
 
 			// Chain internal connection: Node A -> Node B
 			const nodeAConns = json.connections['Node A'];
 			expect(nodeAConns).toBeDefined();
-			expect(nodeAConns.main[0]![0]!.node).toBe('Node B');
+			expect(nodeAConns.main[0]![0].node).toBe('Node B');
 		});
 	});
 });

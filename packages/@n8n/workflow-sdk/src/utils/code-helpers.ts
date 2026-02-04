@@ -3,6 +3,7 @@ import type { CodeResult, AllItemsContext, EachItemContext } from '../types/base
 /**
  * Extract the function body and strip the ctx. prefix
  */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-function-type
 function extractFunctionBody(fn: Function): string {
 	const fnStr = fn.toString();
 

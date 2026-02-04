@@ -1,7 +1,8 @@
 import { describe, it, expect } from '@jest/globals';
+
 import { buildIfElseComposite, type BuildContext } from './if-else-handler';
-import type { SemanticGraph, SemanticNode } from '../types';
 import type { CompositeNode, LeafNode } from '../composite-tree';
+import type { SemanticGraph, SemanticNode } from '../types';
 
 /**
  * Create a minimal semantic node for testing

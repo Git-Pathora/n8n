@@ -1,14 +1,15 @@
 import { describe, it, expect } from '@jest/globals';
+
 import { buildCompositeTree } from './composite-builder';
-import { buildSemanticGraph } from './semantic-graph';
-import { annotateGraph } from './graph-annotator';
-import type { WorkflowJSON } from '../types/base';
 import type {
 	LeafNode,
 	ChainNode,
 	IfElseCompositeNode,
 	SplitInBatchesCompositeNode,
 } from './composite-tree';
+import { annotateGraph } from './graph-annotator';
+import { buildSemanticGraph } from './semantic-graph';
+import type { WorkflowJSON } from '../types/base';
 
 // Helper to build and annotate graph
 function prepareGraph(json: WorkflowJSON) {

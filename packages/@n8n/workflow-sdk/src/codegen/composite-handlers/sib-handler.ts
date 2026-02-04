@@ -4,8 +4,8 @@
  * Builds SplitInBatchesCompositeNode from a semantic SplitInBatches node.
  */
 
-import type { SemanticNode } from '../types';
 import type { CompositeNode, SplitInBatchesCompositeNode } from '../composite-tree';
+import type { SemanticNode } from '../types';
 import { type BuildContext, createLeaf, createVarRef, shouldBeVariable } from './build-utils';
 
 // Re-export BuildContext for consumers

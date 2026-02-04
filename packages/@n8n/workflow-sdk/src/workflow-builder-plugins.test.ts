@@ -6,11 +6,12 @@
  * composite handling, and serialization.
  */
 
+import type { NodeInstance, WorkflowJSON, IfElseComposite } from './types/base';
 import { workflow } from './workflow-builder';
-import { node, trigger, ifElse, switchCase } from './workflow-builder/node-builders/node-builder';
 import { splitInBatches } from './workflow-builder/control-flow-builders/split-in-batches';
-import type { NodeInstance } from './types/base';
+import { node, trigger, ifElse, switchCase } from './workflow-builder/node-builders/node-builder';
 import { PluginRegistry } from './workflow-builder/plugins/registry';
+import { jsonSerializer } from './workflow-builder/plugins/serializers/json-serializer';
 import type {
 	ValidatorPlugin,
 	PluginContext,
@@ -18,8 +19,6 @@ import type {
 	CompositeHandlerPlugin,
 	MutablePluginContext,
 } from './workflow-builder/plugins/types';
-import type { WorkflowJSON, IfElseComposite } from './types/base';
-import { jsonSerializer } from './workflow-builder/plugins/serializers/json-serializer';
 
 // Helper to create mock validators
 function createMockValidator(
@@ -302,7 +301,7 @@ describe('WorkflowBuilder plugin integration', () => {
 					input !== null &&
 					typeof input === 'object' &&
 					'_isIfElseBuilder' in input &&
-					(input as { _isIfElseBuilder: boolean })._isIfElseBuilder === true,
+					(input as { _isIfElseBuilder: boolean })._isIfElseBuilder,
 				addNodes: mockAddNodes,
 			};
 			testRegistry.registerCompositeHandler(mockHandler);
@@ -369,7 +368,7 @@ describe('WorkflowBuilder plugin integration', () => {
 					input !== null &&
 					typeof input === 'object' &&
 					'_isIfElseBuilder' in input &&
-					(input as { _isIfElseBuilder: boolean })._isIfElseBuilder === true,
+					(input as { _isIfElseBuilder: boolean })._isIfElseBuilder,
 				addNodes: (input, ctx) => {
 					receivedCtx = ctx;
 					// Actually add the if node so workflow doesn't fail
@@ -407,7 +406,7 @@ describe('WorkflowBuilder plugin integration', () => {
 					input !== null &&
 					typeof input === 'object' &&
 					'_isIfElseBuilder' in input &&
-					(input as { _isIfElseBuilder: boolean })._isIfElseBuilder === true,
+					(input as { _isIfElseBuilder: boolean })._isIfElseBuilder,
 				addNodes: mockAddNodes,
 			};
 			testRegistry.registerCompositeHandler(mockHandler);

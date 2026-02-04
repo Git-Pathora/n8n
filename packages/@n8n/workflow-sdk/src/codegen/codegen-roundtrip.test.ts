@@ -1,14 +1,15 @@
 import * as fs from 'fs';
 import * as path from 'path';
+
 import { generateWorkflowCode } from './index';
 import { parseWorkflowCode, parseWorkflowCodeToBuilder } from './parse-workflow-code';
-import type { WorkflowJSON } from '../types/base';
 import {
 	ensureFixtures,
 	FixtureDownloadError,
 	DOWNLOADED_FIXTURES_DIR,
 	COMMITTED_FIXTURES_DIR,
 } from '../__tests__/fixtures-download';
+import type { WorkflowJSON } from '../types/base';
 
 // Workflows with known issues that need to be skipped
 // 5979: Code generator creates duplicate inline nodes, causing duplicate detection to rename them
@@ -138,7 +139,7 @@ describe('parseWorkflowCode', () => {
 
 		// Verify connections
 		expect(parsedJson.connections['Manual Trigger']).toBeDefined();
-		expect(parsedJson.connections['Manual Trigger']!.main[0]![0]!.node).toBe('HTTP Request');
+		expect(parsedJson.connections['Manual Trigger'].main[0]![0].node).toBe('HTTP Request');
 	});
 
 	it('should parse workflow with settings', () => {
@@ -285,8 +286,8 @@ describe('parseWorkflowCode', () => {
 
 		// Check branching connections
 		expect(parsedJson.connections['IF']).toBeDefined();
-		expect(parsedJson.connections['IF']!.main[0]![0]!.node).toBe('True Branch');
-		expect(parsedJson.connections['IF']!.main[1]![0]!.node).toBe('False Branch');
+		expect(parsedJson.connections['IF'].main[0]![0].node).toBe('True Branch');
+		expect(parsedJson.connections['IF'].main[1]![0].node).toBe('False Branch');
 	});
 
 	it('should preserve connections when both IF branches converge to the same node', () => {
@@ -367,15 +368,15 @@ describe('parseWorkflowCode', () => {
 
 		// Verify IF connections to branch nodes
 		expect(parsedJson.connections['IF']).toBeDefined();
-		expect(parsedJson.connections['IF']!.main[0]![0]!.node).toBe('True Path');
-		expect(parsedJson.connections['IF']!.main[1]![0]!.node).toBe('False Path');
+		expect(parsedJson.connections['IF'].main[0]![0].node).toBe('True Path');
+		expect(parsedJson.connections['IF'].main[1]![0].node).toBe('False Path');
 
 		// CRITICAL: Verify BOTH branches connect to the convergence node
 		expect(parsedJson.connections['True Path']).toBeDefined();
-		expect(parsedJson.connections['True Path']!.main[0]![0]!.node).toBe('Convergence Node');
+		expect(parsedJson.connections['True Path'].main[0]![0].node).toBe('Convergence Node');
 
 		expect(parsedJson.connections['False Path']).toBeDefined();
-		expect(parsedJson.connections['False Path']!.main[0]![0]!.node).toBe('Convergence Node');
+		expect(parsedJson.connections['False Path'].main[0]![0].node).toBe('Convergence Node');
 	});
 
 	it('should preserve connections for switch case with downstream chain', () => {
@@ -458,13 +459,13 @@ describe('parseWorkflowCode', () => {
 
 		// Verify Switch connections to case branches
 		expect(parsedJson.connections['Switch']).toBeDefined();
-		expect(parsedJson.connections['Switch']!.main[0]![0]!.node).toBe('Case A Node');
-		expect(parsedJson.connections['Switch']!.main[1]![0]!.node).toBe('Case B Node');
+		expect(parsedJson.connections['Switch'].main[0]![0].node).toBe('Case A Node');
+		expect(parsedJson.connections['Switch'].main[1]![0].node).toBe('Case B Node');
 
 		// CRITICAL: Verify the downstream connection is preserved
 		// Case B Node should connect to Case B Downstream
 		expect(parsedJson.connections['Case B Node']).toBeDefined();
-		expect(parsedJson.connections['Case B Node']!.main[0]![0]!.node).toBe('Case B Downstream');
+		expect(parsedJson.connections['Case B Node'].main[0]![0].node).toBe('Case B Downstream');
 	});
 
 	it('should preserve cycle connections in polling loop pattern (Wait → IF)', () => {
@@ -547,16 +548,16 @@ describe('parseWorkflowCode', () => {
 
 		// Verify IF node connections
 		expect(parsedJson.connections['Job Complete?']).toBeDefined();
-		expect(parsedJson.connections['Job Complete?']!.main[0]![0]!.node).toBe('Get Dataset');
-		expect(parsedJson.connections['Job Complete?']!.main[1]![0]!.node).toBe('Check Status');
+		expect(parsedJson.connections['Job Complete?'].main[0]![0].node).toBe('Get Dataset');
+		expect(parsedJson.connections['Job Complete?'].main[1]![0].node).toBe('Check Status');
 
 		// Verify Check Status → Wait connection
 		expect(parsedJson.connections['Check Status']).toBeDefined();
-		expect(parsedJson.connections['Check Status']!.main[0]![0]!.node).toBe('Wait');
+		expect(parsedJson.connections['Check Status'].main[0]![0].node).toBe('Wait');
 
 		// CRITICAL: Verify the CYCLE connection Wait → Job Complete? is preserved
 		expect(parsedJson.connections['Wait']).toBeDefined();
-		expect(parsedJson.connections['Wait']!.main[0]![0]!.node).toBe('Job Complete?');
+		expect(parsedJson.connections['Wait'].main[0]![0].node).toBe('Job Complete?');
 	});
 
 	it('should preserve merge input indices when fan-out includes both regular node and merge', () => {
@@ -1574,12 +1575,12 @@ return workflow('test-simple-multi-sticky', 'Simple Multi-Sticky Workflow')
 
 			// CRITICAL: Both triggers must have connections to their shared targets
 			expect(parsedJson.connections['Manual Trigger']).toBeDefined();
-			const trigger1Targets = parsedJson.connections['Manual Trigger']!.main[0]!.map((c) => c.node);
+			const trigger1Targets = parsedJson.connections['Manual Trigger'].main[0]!.map((c) => c.node);
 			expect(trigger1Targets).toContain('Shared Node A');
 			expect(trigger1Targets).toContain('Shared Node B');
 
 			expect(parsedJson.connections['Schedule Trigger']).toBeDefined();
-			const trigger2Targets = parsedJson.connections['Schedule Trigger']!.main[0]!.map(
+			const trigger2Targets = parsedJson.connections['Schedule Trigger'].main[0]!.map(
 				(c) => c.node,
 			);
 			expect(trigger2Targets).toContain('Shared Node A');
@@ -1668,7 +1669,8 @@ return workflow('test-simple-multi-sticky', 'Simple Multi-Sticky Workflow')
 			// Note: The codegen may output as fan-out (all on slot 0) rather than separate slots
 			// The important thing is all targets are connected
 			expect(parsedJson.connections['Text Classifier']).toBeDefined();
-			const textClassifierTargets = parsedJson.connections['Text Classifier']!.main.flat()
+			const textClassifierTargets = parsedJson.connections['Text Classifier'].main
+				.flat()
 				.filter((c): c is NonNullable<typeof c> => c !== null)
 				.map((c) => c.node);
 			expect(textClassifierTargets).toContain('Branch A Node');
@@ -1815,23 +1817,23 @@ return { json: { result } };\`
 			// Verify connections
 			const sibConns = parsedJson.connections['Loop Over Items13'];
 			expect(sibConns).toBeDefined();
-			expect(sibConns!.main[0]).toBeDefined();
-			expect(sibConns!.main[1]).toBeDefined();
+			expect(sibConns.main[0]).toBeDefined();
+			expect(sibConns.main[1]).toBeDefined();
 
 			// SIB done (output 0) → Merge input 0
-			const doneConn = sibConns!.main[0]![0];
+			const doneConn = sibConns.main[0]![0];
 			expect(doneConn.node).toBe('Merge');
 			expect(doneConn.index).toBe(0);
 
 			// SIB each (output 1) → Merge input 1
-			const eachConn = sibConns!.main[1]![0];
+			const eachConn = sibConns.main[1]![0];
 			expect(eachConn.node).toBe('Merge');
 			expect(eachConn.index).toBe(1);
 
 			// Merge → SIB (loop back)
 			const mergeConns = parsedJson.connections['Merge'];
 			expect(mergeConns).toBeDefined();
-			expect(mergeConns!.main[0]![0].node).toBe('Loop Over Items13');
+			expect(mergeConns.main[0]![0].node).toBe('Loop Over Items13');
 		});
 	});
 
@@ -1897,7 +1899,7 @@ describe('Codegen Roundtrip with Real Workflows', () => {
 			if (error instanceof FixtureDownloadError) {
 				throw new Error(
 					`Failed to download test fixtures from n8n.io API: ${error.message}. ` +
-						`Check your network connection and ensure the API is accessible.`,
+						'Check your network connection and ensure the API is accessible.',
 				);
 			}
 			throw error;
@@ -2057,8 +2059,8 @@ describe('Codegen Roundtrip with Real Workflows', () => {
 						const extra = [...parsedNames].filter((n) => !originalNames.has(n));
 						console.log(`Node count mismatch for ${id}:`);
 						console.log(`  Original: ${json.nodes.length}, Parsed: ${parsedJson.nodes.length}`);
-						if (missing.length) console.log(`  Missing nodes:`, missing);
-						if (extra.length) console.log(`  Extra nodes:`, extra);
+						if (missing.length) console.log('  Missing nodes:', missing);
+						if (extra.length) console.log('  Extra nodes:', extra);
 					}
 					expect(parsedJson.nodes).toHaveLength(json.nodes.length);
 

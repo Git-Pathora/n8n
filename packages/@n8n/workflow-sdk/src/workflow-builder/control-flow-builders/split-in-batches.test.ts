@@ -1,9 +1,9 @@
-import { splitInBatches } from './split-in-batches';
-import { workflow } from '../../workflow-builder';
-import { node, trigger } from '../node-builders/node-builder';
 import { nextBatch } from './next-batch';
+import { splitInBatches } from './split-in-batches';
 import { parseWorkflowCode } from '../../codegen/parse-workflow-code';
 import type { NodeInstance } from '../../types/base';
+import { workflow } from '../../workflow-builder';
+import { node, trigger } from '../node-builders/node-builder';
 
 // Helper type for SplitInBatches node
 type SibNode = NodeInstance<'n8n-nodes-base.splitInBatches', string, unknown>;
@@ -82,16 +82,16 @@ describe('Split In Batches', () => {
 
 			// Output 0 should connect to finalize
 			expect(sibConnections.main[0]).toHaveLength(1);
-			expect(sibConnections.main[0]![0]!.node).toBe('Finalize');
+			expect(sibConnections.main[0]![0].node).toBe('Finalize');
 
 			// Output 1 should connect to process
 			expect(sibConnections.main[1]).toHaveLength(1);
-			expect(sibConnections.main[1]![0]!.node).toBe('Process Batch');
+			expect(sibConnections.main[1]![0].node).toBe('Process Batch');
 
 			// Process should loop back to split in batches
 			const processConnections = json.connections['Process Batch'];
 			expect(processConnections).toBeDefined();
-			expect(processConnections.main[0]![0]!.node).toBe(foundSibNode!.name);
+			expect(processConnections.main[0]![0].node).toBe(foundSibNode!.name);
 		});
 
 		it('should support fan-out with plain array in .onDone() for parallel branches', () => {
@@ -157,11 +157,11 @@ describe('Split In Batches', () => {
 			// Both fetch nodes should connect to generate letter
 			const schufaConns = json.connections['Fetch Schufa'];
 			expect(schufaConns).toBeDefined();
-			expect(schufaConns.main[0]![0]!.node).toBe('Generate Cover Letter');
+			expect(schufaConns.main[0]![0].node).toBe('Generate Cover Letter');
 
 			const salaryConns = json.connections['Fetch Salary'];
 			expect(salaryConns).toBeDefined();
-			expect(salaryConns.main[0]![0]!.node).toBe('Generate Cover Letter');
+			expect(salaryConns.main[0]![0].node).toBe('Generate Cover Letter');
 		});
 
 		it('should support fan-out with plain array in .onEachBatch() for parallel branches', () => {
@@ -251,25 +251,25 @@ describe('Split In Batches', () => {
 			// Generate Items should connect to Loop (splitInBatches)
 			const generateConnections = json.connections['Generate Items'];
 			expect(generateConnections).toBeDefined();
-			expect(generateConnections.main[0]![0]!.node).toBe('Loop');
+			expect(generateConnections.main[0]![0].node).toBe('Loop');
 
 			// Loop output 0 (done) should connect to Finalize
 			const loopConnections = json.connections['Loop'];
 			expect(loopConnections).toBeDefined();
-			expect(loopConnections.main[0]![0]!.node).toBe('Finalize');
+			expect(loopConnections.main[0]![0].node).toBe('Finalize');
 
 			// Loop output 1 (each) should connect to Wait
-			expect(loopConnections.main[1]![0]!.node).toBe('Wait');
+			expect(loopConnections.main[1]![0].node).toBe('Wait');
 
 			// Wait should connect to Code
 			const waitConnections = json.connections['Wait'];
 			expect(waitConnections).toBeDefined();
-			expect(waitConnections.main[0]![0]!.node).toBe('Code');
+			expect(waitConnections.main[0]![0].node).toBe('Code');
 
 			// Code should loop back to Loop
 			const codeConnections = json.connections['Code'];
 			expect(codeConnections).toBeDefined();
-			expect(codeConnections.main[0]![0]!.node).toBe('Loop');
+			expect(codeConnections.main[0]![0].node).toBe('Loop');
 		});
 	});
 
@@ -306,16 +306,16 @@ describe('Split In Batches', () => {
 			const sibConnections = json.connections['Loop'];
 			expect(sibConnections).toBeDefined();
 			expect(sibConnections.main[0]).toHaveLength(1);
-			expect(sibConnections.main[0]![0]!.node).toBe('Finalize');
+			expect(sibConnections.main[0]![0].node).toBe('Finalize');
 
 			// SIB output 1 (each) should connect to Process Batch
 			expect(sibConnections.main[1]).toHaveLength(1);
-			expect(sibConnections.main[1]![0]!.node).toBe('Process Batch');
+			expect(sibConnections.main[1]![0].node).toBe('Process Batch');
 
 			// Process Batch should loop back to Loop
 			const processConnections = json.connections['Process Batch'];
 			expect(processConnections).toBeDefined();
-			expect(processConnections.main[0]![0]!.node).toBe('Loop');
+			expect(processConnections.main[0]![0].node).toBe('Loop');
 		});
 
 		it('should support methods in any order: .onDone().onEachBatch()', () => {
@@ -348,10 +348,10 @@ describe('Split In Batches', () => {
 
 			// SIB output 0 (done) should connect to Finalize
 			const sibConnections = json.connections['Loop'];
-			expect(sibConnections.main[0]![0]!.node).toBe('Finalize');
+			expect(sibConnections.main[0]![0].node).toBe('Finalize');
 
 			// SIB output 1 (each) should connect to Process Batch
-			expect(sibConnections.main[1]![0]!.node).toBe('Process Batch');
+			expect(sibConnections.main[1]![0].node).toBe('Process Batch');
 		});
 
 		it('should support omitting .onDone() for empty done branch', () => {
@@ -385,7 +385,7 @@ describe('Split In Batches', () => {
 
 			// each output (1) should connect to Process Batch
 			expect(sibConnections.main[1]).toHaveLength(1);
-			expect(sibConnections.main[1]![0]!.node).toBe('Process Batch');
+			expect(sibConnections.main[1]![0].node).toBe('Process Batch');
 		});
 
 		it('should support omitting .onEachBatch() for empty each branch', () => {
@@ -416,7 +416,7 @@ describe('Split In Batches', () => {
 
 			// done output (0) should connect to Finalize
 			expect(sibConnections.main[0]).toHaveLength(1);
-			expect(sibConnections.main[0]![0]!.node).toBe('Finalize');
+			expect(sibConnections.main[0]![0].node).toBe('Finalize');
 
 			// each output (1) should be empty
 			expect(sibConnections.main[1] ?? []).toHaveLength(0);
@@ -496,16 +496,16 @@ describe('Split In Batches', () => {
 			const sibConnections = json.connections['Loop'];
 			expect(sibConnections).toBeDefined();
 			expect(sibConnections.main[0]).toHaveLength(1);
-			expect(sibConnections.main[0]![0]!.node).toBe('Finalize');
+			expect(sibConnections.main[0]![0].node).toBe('Finalize');
 
 			// SIB output 1 (each) should connect to Process Batch
 			expect(sibConnections.main[1]).toHaveLength(1);
-			expect(sibConnections.main[1]![0]!.node).toBe('Process Batch');
+			expect(sibConnections.main[1]![0].node).toBe('Process Batch');
 
 			// Process Batch should loop back to Loop
 			const processConnections = json.connections['Process Batch'];
 			expect(processConnections).toBeDefined();
-			expect(processConnections.main[0]![0]!.node).toBe('Loop');
+			expect(processConnections.main[0]![0].node).toBe('Loop');
 		});
 
 		it('should support null for empty branches', () => {
@@ -540,7 +540,7 @@ describe('Split In Batches', () => {
 
 			// each output (1) should connect back to itself
 			expect(sibConnections.main[1]).toHaveLength(1);
-			expect(sibConnections.main[1]![0]!.node).toBe('Loop');
+			expect(sibConnections.main[1]![0].node).toBe('Loop');
 		});
 
 		it('should support plain array for multiple targets from one branch', () => {
@@ -657,14 +657,14 @@ describe('Split In Batches', () => {
 			expect(nodeNames).toContain('Create Batch 1');
 
 			// Morning Loop output 1 should connect to "Process" (the first one)
-			expect(json.connections['Morning Loop']!.main[1]![0]!.node).toBe('Process');
+			expect(json.connections['Morning Loop'].main[1]![0].node).toBe('Process');
 
 			// Afternoon Loop output 1 should connect to "Process 1" (the renamed one)
-			expect(json.connections['Afternoon Loop']!.main[1]![0]!.node).toBe('Process 1');
+			expect(json.connections['Afternoon Loop'].main[1]![0].node).toBe('Process 1');
 
 			// Verify loop-back connections are correct
-			expect(json.connections['Process']!.main[0]![0]!.node).toBe('Morning Loop');
-			expect(json.connections['Process 1']!.main[0]![0]!.node).toBe('Afternoon Loop');
+			expect(json.connections['Process'].main[0]![0].node).toBe('Morning Loop');
+			expect(json.connections['Process 1'].main[0]![0].node).toBe('Afternoon Loop');
 		});
 	});
 
@@ -980,16 +980,16 @@ return workflow('eval-1769451317134-scv1mk1th', 'YouTube Shorts Auto-Publisher')
 
 			// Output 0 (done) connects to Done
 			expect(sibConnections.main[0]).toHaveLength(1);
-			expect(sibConnections.main[0]![0]!.node).toBe('Done');
+			expect(sibConnections.main[0]![0].node).toBe('Done');
 
 			// Output 1 (each) connects to Process
 			expect(sibConnections.main[1]).toHaveLength(1);
-			expect(sibConnections.main[1]![0]!.node).toBe('Process');
+			expect(sibConnections.main[1]![0].node).toBe('Process');
 
 			// Process should loop back to Split Videos
 			const processConnections = json.connections['Process'];
 			expect(processConnections).toBeDefined();
-			expect(processConnections.main[0]![0]!.node).toBe('Split Videos');
+			expect(processConnections.main[0]![0].node).toBe('Split Videos');
 		});
 	});
 });

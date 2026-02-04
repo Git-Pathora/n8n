@@ -6,13 +6,13 @@
  * rather than nested inside branch handlers.
  */
 
-import type { SemanticNode } from './types';
-import type { CompositeNode } from './composite-tree';
 import {
 	type DeferredInputConnection,
 	type DeferredMergeDownstream,
 	extractInputIndex,
 } from './composite-handlers/build-utils';
+import type { CompositeNode } from './composite-tree';
+import type { SemanticNode } from './types';
 
 // Re-export types for consumers
 export type {

@@ -3,6 +3,7 @@
  * Defines allowed SDK functions, methods, and detects dangerous patterns.
  */
 import type { Node, CallExpression, MemberExpression } from 'estree';
+
 import { SecurityError, UnsupportedNodeError } from './errors';
 
 /**

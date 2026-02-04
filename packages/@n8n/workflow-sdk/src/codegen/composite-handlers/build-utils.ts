@@ -4,7 +4,7 @@
  * Shared utilities for composite handlers and the main composite builder.
  */
 
-import type { SemanticGraph, SemanticNode } from '../types';
+import { isStickyNoteType, isMergeNodeType, isSwitchNodeType } from '../../constants/node-types';
 import type {
 	CompositeNode,
 	LeafNode,
@@ -12,8 +12,8 @@ import type {
 	DeferredInputConnection,
 	DeferredMergeDownstream,
 } from '../composite-tree';
+import type { SemanticGraph, SemanticNode } from '../types';
 import { toVarName } from '../variable-names';
-import { isStickyNoteType, isMergeNodeType, isSwitchNodeType } from '../../constants/node-types';
 
 // Re-export for consumers
 export { toVarName } from '../variable-names';

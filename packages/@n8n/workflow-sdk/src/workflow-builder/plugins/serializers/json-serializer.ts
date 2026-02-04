@@ -4,7 +4,8 @@
  * Serializes workflows to n8n's standard JSON format.
  */
 
-import type { SerializerPlugin, SerializerContext } from '../types';
+import { deepCopy } from 'n8n-workflow';
+
 import type {
 	WorkflowJSON,
 	NodeJSON,
@@ -12,13 +13,14 @@ import type {
 	IDataObject,
 	GraphNode,
 } from '../../../types/base';
+import { START_X, DEFAULT_Y } from '../../constants';
+import { calculateNodePositions } from '../../layout-utils';
 import {
 	normalizeResourceLocators,
 	escapeNewlinesInExpressionStrings,
 	parseVersion,
 } from '../../string-utils';
-import { START_X, DEFAULT_Y } from '../../constants';
-import { calculateNodePositions } from '../../layout-utils';
+import type { SerializerPlugin, SerializerContext } from '../types';
 
 /**
  * Serialize a single node to NodeJSON format.
@@ -31,7 +33,7 @@ function serializeNode(
 	const instance = graphNode.instance;
 
 	// Skip invalid nodes (shouldn't happen, but defensive)
-	if (!instance || !instance.name || !instance.type) {
+	if (!instance?.name || !instance.type) {
 		return undefined;
 	}
 
@@ -63,7 +65,7 @@ function serializeNode(
 	// For fromJSON nodes, preserve parameters as-is.
 	let serializedParams: IDataObject | undefined;
 	if (config.parameters) {
-		const parsed = JSON.parse(JSON.stringify(config.parameters));
+		const parsed = deepCopy(config.parameters);
 		if (isFromJson) {
 			serializedParams = parsed;
 		} else {
@@ -84,7 +86,7 @@ function serializeNode(
 	// Add optional properties
 	if (config.credentials) {
 		// Serialize credentials to ensure newCredential() markers are converted to JSON
-		n8nNode.credentials = JSON.parse(JSON.stringify(config.credentials));
+		n8nNode.credentials = deepCopy(config.credentials);
 	}
 	if (config.disabled) {
 		n8nNode.disabled = config.disabled;

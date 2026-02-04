@@ -5,13 +5,13 @@
  * These utilities help identify when multiple branches converge at a merge node.
  */
 
-import type { SemanticNode } from './types';
 import type { BuildContext } from './composite-handlers/build-utils';
 import {
 	isMergeType,
 	extractInputIndex,
 	getAllFirstOutputTargets,
 } from './composite-handlers/build-utils';
+import type { SemanticNode } from './types';
 
 /**
  * Check if a node has outputs going to destinations OTHER than the specified merge node.
@@ -96,7 +96,7 @@ export function findDirectMergeInFanOut(
 		const targetNode = ctx.graph.nodes.get(targetName);
 		if (targetNode) {
 			const outputs = getAllFirstOutputTargets(targetNode);
-			if (outputs.includes(mergeTarget!.name)) return true;
+			if (outputs.includes(mergeTarget.name)) return true;
 		}
 		return false;
 	});

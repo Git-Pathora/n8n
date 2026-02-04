@@ -5,7 +5,7 @@ import type { NodeInstance } from '../../types/base';
  */
 export interface FanInSources {
 	readonly _isFanIn: true;
-	readonly sources: NodeInstance<string, string, unknown>[];
+	readonly sources: Array<NodeInstance<string, string, unknown>>;
 }
 
 /**
@@ -29,7 +29,7 @@ export interface FanInSources {
  * fanIn(sourceA, sourceB).forEach(src => src.to(mergeNode.input(0)))
  * ```
  */
-export function fanIn(...sources: NodeInstance<string, string, unknown>[]): FanInSources {
+export function fanIn(...sources: Array<NodeInstance<string, string, unknown>>): FanInSources {
 	return {
 		_isFanIn: true,
 		sources,
@@ -44,6 +44,6 @@ export function isFanIn(value: unknown): value is FanInSources {
 		value !== null &&
 		typeof value === 'object' &&
 		'_isFanIn' in value &&
-		(value as FanInSources)._isFanIn === true
+		(value as FanInSources)._isFanIn
 	);
 }

@@ -1,3 +1,4 @@
+import type { NodeInstance, WorkflowJSON } from './types/base';
 import { workflow } from './workflow-builder';
 import { node, trigger, sticky } from './workflow-builder/node-builders/node-builder';
 import {
@@ -6,7 +7,6 @@ import {
 	tool,
 	outputParser,
 } from './workflow-builder/node-builders/subnode-builders';
-import type { NodeInstance, WorkflowJSON } from './types/base';
 
 describe('Workflow Builder', () => {
 	describe('workflow()', () => {
@@ -75,8 +75,8 @@ describe('Workflow Builder', () => {
 			);
 
 			// Connections should be preserved
-			expect(json.connections['Start'].main[0]![0]!.node).toBe('HTTP Request');
-			expect(json.connections['HTTP Request'].main[0]![0]!.node).toBe('Set Data');
+			expect(json.connections['Start'].main[0]![0].node).toBe('HTTP Request');
+			expect(json.connections['HTTP Request'].main[0]![0].node).toBe('Set Data');
 		});
 
 		it('should add multiple sticky notes with explicit names', () => {
@@ -1252,15 +1252,15 @@ describe('Workflow Builder', () => {
 
 			// Linear node should connect to Switch
 			expect(json.connections['Get Issues']).toBeDefined();
-			expect(json.connections['Get Issues']!.main[0]![0]!.node).toBe('Triage Issues');
+			expect(json.connections['Get Issues'].main[0]![0].node).toBe('Triage Issues');
 
 			// Switch should connect to ALL 3 cases
 			expect(json.connections['Triage Issues']).toBeDefined();
-			expect(json.connections['Triage Issues']!.main[0]![0]!.node).toBe('Update as Bug');
-			expect(json.connections['Triage Issues']!.main[1]![0]!.node).toBe('Update as Feature');
+			expect(json.connections['Triage Issues'].main[0]![0].node).toBe('Update as Bug');
+			expect(json.connections['Triage Issues'].main[1]![0].node).toBe('Update as Feature');
 			// THIS IS THE BUG - output 2 (fallback) should be connected
-			expect(json.connections['Triage Issues']!.main[2]).toBeDefined();
-			expect(json.connections['Triage Issues']!.main[2]![0]!.node).toBe('Update as Other');
+			expect(json.connections['Triage Issues'].main[2]).toBeDefined();
+			expect(json.connections['Triage Issues'].main[2]![0].node).toBe('Update as Other');
 		});
 
 		it('should connect previous node to switch when using chain with add()', () => {
@@ -1306,16 +1306,16 @@ describe('Workflow Builder', () => {
 			expect(json.nodes).toHaveLength(5);
 
 			// Trigger should connect to Linear node
-			expect(json.connections['Start']!.main[0]![0]!.node).toBe('Get Issues');
+			expect(json.connections['Start'].main[0]![0].node).toBe('Get Issues');
 
 			// Linear node should connect to Switch - THIS IS THE BUG!
 			// Before fix: json.connections['Get Issues'] is undefined
 			expect(json.connections['Get Issues']).toBeDefined();
-			expect(json.connections['Get Issues']!.main[0]![0]!.node).toBe('Triage');
+			expect(json.connections['Get Issues'].main[0]![0].node).toBe('Triage');
 
 			// Switch should connect to cases
-			expect(json.connections['Triage']!.main[0]![0]!.node).toBe('Bug Handler');
-			expect(json.connections['Triage']!.main[1]![0]!.node).toBe('Feature Handler');
+			expect(json.connections['Triage'].main[0]![0].node).toBe('Bug Handler');
+			expect(json.connections['Triage'].main[1]![0].node).toBe('Feature Handler');
 		});
 
 		it('should create Switch node with case branches', () => {
@@ -1481,11 +1481,11 @@ describe('Workflow Builder', () => {
 
 			// Trigger should connect to Switch
 			expect(json.connections['Webhook Trigger']).toBeDefined();
-			expect(json.connections['Webhook Trigger']!.main[0]![0]!.node).toBe('Route by Amount');
+			expect(json.connections['Webhook Trigger'].main[0]![0].node).toBe('Route by Amount');
 
 			// Switch should connect to cases
-			expect(json.connections['Route by Amount']!.main[0]![0]!.node).toBe('Auto Approve');
-			expect(json.connections['Route by Amount']!.main[1]![0]!.node).toBe('Manual Approve');
+			expect(json.connections['Route by Amount'].main[0]![0].node).toBe('Auto Approve');
+			expect(json.connections['Route by Amount'].main[1]![0].node).toBe('Manual Approve');
 		});
 	});
 

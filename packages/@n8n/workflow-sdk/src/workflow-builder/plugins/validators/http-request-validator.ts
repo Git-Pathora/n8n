@@ -4,13 +4,13 @@
  * Validates HTTP Request nodes for security issues.
  */
 
-import type { ValidatorPlugin, ValidationIssue, PluginContext } from '../types';
 import type { GraphNode, NodeInstance } from '../../../types/base';
 import {
 	containsExpression,
 	isSensitiveHeader,
 	isCredentialFieldName,
 } from '../../validation-helpers';
+import type { ValidatorPlugin, ValidationIssue, PluginContext } from '../types';
 
 /**
  * Validator for HTTP Request nodes.

@@ -5,10 +5,10 @@
  * that exist in predecessor node outputs.
  */
 
-import type { ValidatorPlugin, ValidationIssue, PluginContext } from '../types';
-import type { GraphNode, NodeInstance, IDataObject } from '../../../types/base';
-import { extractExpressions, parseExpression, hasPath } from '../../validation-helpers';
+import type { GraphNode, NodeInstance } from '../../../types/base';
 import { filterMethodsFromPath } from '../../string-utils';
+import { extractExpressions, parseExpression, hasPath } from '../../validation-helpers';
+import type { ValidatorPlugin, ValidationIssue, PluginContext } from '../types';
 
 /**
  * Resolve the target node name from a connection target.
@@ -171,7 +171,7 @@ export const expressionPathValidator: ValidatorPlugin = {
 
 		// First: collect output declarations from node configs (LLM-generated)
 		for (const [mapKey, graphNode] of ctx.nodes) {
-			const output = graphNode.instance.config?.output as IDataObject[] | undefined;
+			const output = graphNode.instance.config?.output;
 			if (output && output.length > 0) {
 				outputShapes.set(mapKey, output[0] as Record<string, unknown>);
 			}
@@ -180,7 +180,7 @@ export const expressionPathValidator: ValidatorPlugin = {
 		// Second: fall back to node config pinData for nodes without output declarations
 		for (const [mapKey, graphNode] of ctx.nodes) {
 			if (!outputShapes.has(mapKey)) {
-				const nodePinData = graphNode.instance.config?.pinData as IDataObject[] | undefined;
+				const nodePinData = graphNode.instance.config?.pinData;
 				if (nodePinData && nodePinData.length > 0) {
 					outputShapes.set(mapKey, nodePinData[0] as Record<string, unknown>);
 				}

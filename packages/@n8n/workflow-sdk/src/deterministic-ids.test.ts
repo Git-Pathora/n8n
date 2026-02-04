@@ -1,7 +1,8 @@
 import { createHash } from 'crypto';
+
+import { parseWorkflowCodeToBuilder, generateWorkflowCode } from './index';
 import { workflow } from './workflow-builder';
 import { node, trigger } from './workflow-builder/node-builders/node-builder';
-import { parseWorkflowCodeToBuilder, generateWorkflowCode } from './index';
 
 /**
  * Generate a deterministic UUID based on workflow ID, node type, and node name.

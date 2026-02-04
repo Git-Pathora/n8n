@@ -4,7 +4,7 @@
  * Functions for resolving connection targets and managing node connections.
  */
 
-import type { GraphNode, NodeInstance, NodeChain } from '../types/base';
+import type { GraphNode, NodeInstance } from '../types/base';
 import type { PluginRegistry } from './plugins/registry';
 import { isNodeChain } from '../types/base';
 import { isInputTarget } from './node-builders/node-builder';
@@ -64,7 +64,7 @@ export function resolveTargetNodeName(
 
 	// Check for NodeChain - return the head's name
 	if (isNodeChain(target)) {
-		return getNodeName((target as NodeChain).head);
+		return getNodeName(target.head);
 	}
 
 	// Try registry resolution for composites (IfElse, SwitchCase, SplitInBatches)

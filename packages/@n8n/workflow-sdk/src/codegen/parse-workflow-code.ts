@@ -4,6 +4,9 @@
  *
  * Uses a secure AST-based interpreter instead of eval/new Function() for safety.
  */
+import { interpretSDKCode, InterpreterError, SecurityError } from '../ast-interpreter';
+import type { SDKFunctions } from '../ast-interpreter';
+import { expr as exprFn } from '../expression';
 import { workflow as workflowFn } from '../workflow-builder';
 import {
 	node as nodeFn,
@@ -31,9 +34,6 @@ import {
 } from '../workflow-builder/node-builders/subnode-builders';
 import { splitInBatches as splitInBatchesFn } from '../workflow-builder/control-flow-builders/split-in-batches';
 import { nextBatch as nextBatchFn } from '../workflow-builder/control-flow-builders/next-batch';
-import { expr as exprFn } from '../expression';
-import { interpretSDKCode, InterpreterError, SecurityError } from '../ast-interpreter';
-import type { SDKFunctions } from '../ast-interpreter';
 import type { WorkflowJSON, WorkflowBuilder } from '../types/base';
 
 /**
@@ -80,6 +80,7 @@ function escapeN8nVariablesInTemplateLiterals(code: string): string {
 		// Note: varName includes the $ prefix (e.g., "$today"), so we need to escape it for regex
 		const escapedVarName = varName.replace(/\$/g, '\\$');
 		const pattern = new RegExp('(?<!\\\\)\\$\\{' + escapedVarName, 'g');
+		// eslint-disable-next-line prefer-template
 		result = result.replace(pattern, '\\${' + varName);
 	}
 
@@ -536,7 +537,7 @@ export function parseWorkflowCode(code: string): WorkflowJSON {
 			// Re-throw security errors with more context
 			throw new SyntaxError(
 				`Failed to parse workflow code: ${error.message}. ` +
-					`This code contains patterns that are not allowed for security reasons.`,
+					'This code contains patterns that are not allowed for security reasons.',
 			);
 		}
 		if (error instanceof InterpreterError) {
@@ -547,7 +548,7 @@ export function parseWorkflowCode(code: string): WorkflowJSON {
 			// Convert interpreter errors to syntax errors for consistent API
 			throw new SyntaxError(
 				`Failed to parse workflow code: ${error.message}. ` +
-					`Common causes include unclosed template literals, missing commas, or unbalanced brackets.`,
+					'Common causes include unclosed template literals, missing commas, or unbalanced brackets.',
 			);
 		}
 		throw error;
@@ -585,7 +586,7 @@ export function parseWorkflowCodeToBuilder(code: string): WorkflowBuilder {
 		if (error instanceof SecurityError) {
 			throw new SyntaxError(
 				`Failed to parse workflow code: ${error.message}. ` +
-					`This code contains patterns that are not allowed for security reasons.`,
+					'This code contains patterns that are not allowed for security reasons.',
 			);
 		}
 		if (error instanceof InterpreterError) {
@@ -594,7 +595,7 @@ export function parseWorkflowCodeToBuilder(code: string): WorkflowBuilder {
 			}
 			throw new SyntaxError(
 				`Failed to parse workflow code: ${error.message}. ` +
-					`Common causes include unclosed template literals, missing commas, or unbalanced brackets.`,
+					'Common causes include unclosed template literals, missing commas, or unbalanced brackets.',
 			);
 		}
 		throw error;

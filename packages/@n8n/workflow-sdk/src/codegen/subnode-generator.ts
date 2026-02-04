@@ -5,8 +5,6 @@
  * Supports both inline generation and variable reference modes.
  */
 
-import type { SemanticGraph, SemanticNode, AiConnectionType } from './types';
-import { escapeString, formatKey } from './string-utils';
 import {
 	AI_CONNECTION_TO_CONFIG_KEY,
 	AI_CONNECTION_TO_BUILDER,
@@ -14,6 +12,8 @@ import {
 	AI_OPTIONAL_ARRAY_TYPES,
 } from './constants';
 import { generateDefaultNodeName } from './node-type-utils';
+import { escapeString, formatKey } from './string-utils';
+import type { SemanticGraph, SemanticNode, AiConnectionType } from './types';
 
 /**
  * Options for subnode generation
@@ -143,7 +143,7 @@ export function generateSubnodeCall(
 	if (configParts.length > 0) {
 		parts.push(`config: { ${configParts.join(', ')} }`);
 	} else {
-		parts.push(`config: {}`);
+		parts.push('config: {}');
 	}
 
 	return `${builderName}({ ${parts.join(', ')} })`;

@@ -1,6 +1,7 @@
 import fs from 'fs';
-import { parseWorkflowCodeToBuilder } from '../codegen/parse-workflow-code';
+
 import { generateOutputPath } from './utils';
+import { parseWorkflowCodeToBuilder } from '../codegen/parse-workflow-code';
 
 /**
  * Convert SDK code to workflow JSON.

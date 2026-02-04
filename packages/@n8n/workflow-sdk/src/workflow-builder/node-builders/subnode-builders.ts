@@ -31,6 +31,8 @@
  */
 
 import { v4 as uuid } from 'uuid';
+
+import { createFromAIExpression } from '../../expression';
 import type {
 	NodeConfig,
 	NodeInput,
@@ -51,7 +53,6 @@ import type {
 	InputTarget,
 	OutputSelector,
 } from '../../types/base';
-import { createFromAIExpression } from '../../expression';
 
 // =============================================================================
 // Internal Subnode Instance Implementation

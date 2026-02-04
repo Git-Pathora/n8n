@@ -5,10 +5,10 @@
  * Only applies to versions >= 1.4 when promptType was introduced.
  */
 
-import type { ValidatorPlugin, ValidationIssue, PluginContext } from '../types';
 import type { GraphNode, NodeInstance } from '../../../types/base';
-import { containsExpression, containsMalformedExpression } from '../../validation-helpers';
 import { parseVersion } from '../../string-utils';
+import { containsExpression, containsMalformedExpression } from '../../validation-helpers';
+import type { ValidatorPlugin, ValidationIssue, PluginContext } from '../types';
 
 /**
  * Validator for Chain LLM nodes.

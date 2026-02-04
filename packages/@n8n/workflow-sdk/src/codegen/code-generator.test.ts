@@ -1,9 +1,10 @@
 import { describe, it, expect } from '@jest/globals';
+
 import { generateCode } from './code-generator';
-import { buildSemanticGraph } from './semantic-graph';
-import { annotateGraph } from './graph-annotator';
 import { buildCompositeTree } from './composite-builder';
+import { annotateGraph } from './graph-annotator';
 import { parseWorkflowCode } from './parse-workflow-code';
+import { buildSemanticGraph } from './semantic-graph';
 import type { WorkflowJSON } from '../types/base';
 
 // Helper to generate code from workflow JSON
@@ -766,7 +767,7 @@ describe('code-generator', () => {
 				expect(code).toContain('\\u2019'); // Unicode escape sequence in generated code
 
 				// When eval'd, should produce the original character
-				const evalResult = eval(`'What\\u2019s the weather in Paris?'`);
+				const evalResult = eval("'What\\u2019s the weather in Paris?'");
 				expect(evalResult).toBe(originalName);
 			});
 

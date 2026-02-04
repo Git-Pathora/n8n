@@ -1,4 +1,5 @@
 import type { INodeTypes } from 'n8n-workflow';
+
 import { resolveMainInputCount } from './input-resolver';
 
 describe('resolveMainInputCount', () => {

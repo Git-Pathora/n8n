@@ -124,7 +124,7 @@ export function findMissingExpressionPrefixes(
 		});
 	} else if (value && typeof value === 'object') {
 		// Skip PlaceholderValue objects - their hint property is documentation, not actual expressions
-		if ('__placeholder' in value && (value as { __placeholder: boolean }).__placeholder === true) {
+		if ('__placeholder' in value && (value as { __placeholder: boolean }).__placeholder) {
 			return issues;
 		}
 		for (const [key, val] of Object.entries(value)) {
@@ -179,7 +179,7 @@ export function findInvalidDateMethods(
 		});
 	} else if (value && typeof value === 'object') {
 		// Skip PlaceholderValue objects
-		if ('__placeholder' in value && (value as { __placeholder: boolean }).__placeholder === true) {
+		if ('__placeholder' in value && (value as { __placeholder: boolean }).__placeholder) {
 			return issues;
 		}
 		for (const [key, val] of Object.entries(value)) {

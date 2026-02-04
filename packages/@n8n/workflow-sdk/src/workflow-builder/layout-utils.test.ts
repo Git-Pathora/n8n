@@ -2,9 +2,9 @@
  * Tests for layout utility functions
  */
 
+import { NODE_SPACING_X, DEFAULT_Y, START_X } from './constants';
 import { calculateNodePositions } from './layout-utils';
 import type { GraphNode, ConnectionTarget } from '../types/base';
-import { NODE_SPACING_X, DEFAULT_Y, START_X } from './constants';
 
 // Helper to create connection targets with correct type
 function makeTarget(node: string, index: number = 0): ConnectionTarget {

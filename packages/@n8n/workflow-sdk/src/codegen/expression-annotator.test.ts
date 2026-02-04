@@ -1,4 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
+
 import { buildExpressionAnnotations } from './expression-annotator';
 import type { ExpressionValue } from './types';
 

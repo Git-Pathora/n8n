@@ -1,4 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
+
 import { escapeString, needsQuoting, formatKey, escapeRegexChars } from './string-utils';
 
 describe('string-utils', () => {

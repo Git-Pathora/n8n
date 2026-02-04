@@ -4,10 +4,10 @@
  * Validates that expressions have the required '=' prefix.
  */
 
-import type { ValidatorPlugin, ValidationIssue, PluginContext } from '../types';
+import { isStickyNoteType } from '../../../constants/node-types';
 import type { GraphNode, NodeInstance } from '../../../types/base';
 import { findMissingExpressionPrefixes } from '../../validation-helpers';
-import { isStickyNoteType } from '../../../constants/node-types';
+import type { ValidatorPlugin, ValidationIssue, PluginContext } from '../types';
 
 /**
  * Validator for expression prefixes.

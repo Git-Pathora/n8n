@@ -11,8 +11,8 @@ import type {
 	GeneratePinDataOptions,
 	WorkflowBuilderOptions,
 } from './types/base';
-import { pluginRegistry, type PluginRegistry } from './workflow-builder/plugins/registry';
 import { registerDefaultPlugins } from './workflow-builder/plugins/defaults';
+import { pluginRegistry, type PluginRegistry } from './workflow-builder/plugins/registry';
 import { jsonSerializer } from './workflow-builder/plugins/serializers';
 import type {
 	PluginContext,
@@ -27,9 +27,9 @@ import { isNodeChain } from './types/base';
 import { isInputTarget, cloneNodeWithId } from './workflow-builder/node-builders/node-builder';
 import { generateDeterministicNodeId } from './workflow-builder/string-utils';
 import { shouldGeneratePinData } from './workflow-builder/pin-data-utils';
+import { addNodeWithSubnodes as addNodeWithSubnodesUtil } from './workflow-builder/subnode-utils';
 import { parseWorkflowJSON } from './workflow-builder/workflow-import';
 import { resolveTargetNodeName as resolveTargetNodeNameUtil } from './workflow-builder/connection-utils';
-import { addNodeWithSubnodes as addNodeWithSubnodesUtil } from './workflow-builder/subnode-utils';
 
 /**
  * Internal workflow builder implementation
@@ -193,7 +193,7 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 			for (const target of node) {
 				if (isInputTarget(target)) {
 					// InputTarget - add the target node
-					const inputTargetNode = target.node as NodeInstance<string, string, unknown>;
+					const inputTargetNode = target.node;
 					if (!newNodes.has(inputTargetNode.name)) {
 						this.addNodeWithSubnodes(newNodes, inputTargetNode);
 					}
@@ -546,8 +546,8 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 		options: import('./validation/index').ValidationOptions = {},
 	): import('./validation/index').ValidationResult {
 		const { ValidationError, ValidationWarning } = require('./validation/index');
-		const errors: import('./validation/index').ValidationError[] = [];
-		const warnings: import('./validation/index').ValidationWarning[] = [];
+		const errors: Array<import('./validation/index').ValidationError> = [];
+		const warnings: Array<import('./validation/index').ValidationWarning> = [];
 
 		// Run plugin-based validators (use provided registry or global)
 		const registry = this._registry ?? pluginRegistry;
@@ -595,8 +595,8 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 	 */
 	private collectValidationIssues(
 		issues: ValidationIssue[],
-		errors: import('./validation/index').ValidationError[],
-		warnings: import('./validation/index').ValidationWarning[],
+		errors: Array<import('./validation/index').ValidationError>,
+		warnings: Array<import('./validation/index').ValidationWarning>,
 		ValidationErrorClass: typeof import('./validation/index').ValidationError,
 		ValidationWarningClass: typeof import('./validation/index').ValidationWarning,
 	): void {
@@ -717,13 +717,13 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 
 			// Handle NodeChains - use addBranchToGraph to add all nodes with their connections
 			if (isNodeChain(target)) {
-				this.addBranchToGraph(nodes, target as NodeChain, nameMapping);
+				this.addBranchToGraph(nodes, target, nameMapping);
 				continue;
 			}
 
 			// Handle InputTarget - add the referenced node
 			if (isInputTarget(target)) {
-				const inputTargetNode = target.node as NodeInstance<string, string, unknown>;
+				const inputTargetNode = target.node;
 				if (!nodes.has(inputTargetNode.name)) {
 					const actualKey = this.addNodeWithSubnodes(nodes, inputTargetNode);
 					if (actualKey && nameMapping && actualKey !== inputTargetNode.name) {
@@ -734,7 +734,7 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 			}
 
 			// Add the target node if not already in the map
-			const targetNode = target as NodeInstance<string, string, unknown>;
+			const targetNode = target;
 			if (!nodes.has(targetNode.name)) {
 				const actualKey = this.addNodeWithSubnodes(nodes, targetNode);
 				if (actualKey && nameMapping && actualKey !== targetNode.name) {
@@ -763,13 +763,13 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 
 			// Handle NodeChains - use addBranchToGraph to add all nodes with their connections
 			if (isNodeChain(target)) {
-				this.addBranchToGraph(nodes, target as NodeChain);
+				this.addBranchToGraph(nodes, target);
 				continue;
 			}
 
 			// Handle InputTarget - add the referenced node
 			if (isInputTarget(target)) {
-				const inputTargetNode = target.node as NodeInstance<string, string, unknown>;
+				const inputTargetNode = target.node;
 				if (!nodes.has(inputTargetNode.name)) {
 					this.addNodeWithSubnodes(nodes, inputTargetNode);
 				}
@@ -777,7 +777,7 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 			}
 
 			// Add the target node if not already in the map
-			const targetNode = target as NodeInstance<string, string, unknown>;
+			const targetNode = target;
 			if (!nodes.has(targetNode.name)) {
 				this.addNodeWithSubnodes(nodes, targetNode);
 			}
@@ -1003,7 +1003,7 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 							// This chain node declared this connection
 							// First, ensure target nodes are added to the graph (e.g., error handler chains)
 							if (isNodeChain(target)) {
-								const chainTarget = target as NodeChain;
+								const chainTarget = target;
 								// Add each node in the chain that isn't already in the map
 								// We can't just check the head because the chain may reuse an existing
 								// node as head (e.g., set_content) while having new nodes after it
@@ -1031,7 +1031,7 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 							// Use the effectiveNameMapping to get the actual key if the node was renamed
 							const mappedKey = nodeToCheck && effectiveNameMapping.get(nodeToCheck.id);
 							const actualSourceKey = mappedKey ?? nodeName;
-							const sourceGraphNode = nodes.get(actualSourceKey!);
+							const sourceGraphNode = nodes.get(actualSourceKey);
 							if (sourceGraphNode) {
 								const targetName = this.resolveTargetNodeName(target, effectiveNameMapping);
 								if (targetName) {

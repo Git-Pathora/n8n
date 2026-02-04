@@ -2,9 +2,9 @@
  * Tests for SIB (SplitInBatches) merge handler utilities
  */
 
+import type { BuildContext } from './composite-handlers/build-utils';
 import { detectSibMergePattern, buildSibMergeExplicitConnections } from './sib-merge-handler';
 import type { SemanticNode, SemanticGraph } from './types';
-import type { BuildContext } from './composite-handlers/build-utils';
 
 // Helper to create a mock SemanticNode
 function createMockNode(

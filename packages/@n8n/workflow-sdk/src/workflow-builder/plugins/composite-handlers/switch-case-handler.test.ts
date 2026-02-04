@@ -24,7 +24,7 @@ function createMockNode(name: string): NodeInstance<string, string, unknown> {
 
 type CaseValue =
 	| NodeInstance<string, string, unknown>
-	| (NodeInstance<string, string, unknown> | null)[]
+	| Array<NodeInstance<string, string, unknown> | null>
 	| null;
 
 // Helper to create a mock SwitchCaseComposite

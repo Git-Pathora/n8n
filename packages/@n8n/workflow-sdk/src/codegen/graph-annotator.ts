@@ -120,7 +120,7 @@ function findConvergenceNodes(graph: SemanticGraph): void {
 		if (branchOutputs.length < 2) continue;
 
 		// Collect reachable nodes from each branch
-		const branchReachable: Set<string>[] = [];
+		const branchReachable: Array<Set<string>> = [];
 		for (const branchTargets of branchOutputs) {
 			const reachable = new Set<string>();
 			for (const target of branchTargets) {

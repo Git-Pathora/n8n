@@ -1,14 +1,15 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { workflow } from './workflow-builder';
-import { generateWorkflowCode } from './codegen';
-import type { WorkflowJSON } from './types/base';
+
 import {
 	ensureFixtures,
 	FixtureDownloadError,
 	DOWNLOADED_FIXTURES_DIR,
 	COMMITTED_FIXTURES_DIR,
 } from './__tests__/fixtures-download';
+import { generateWorkflowCode } from './codegen';
+import type { WorkflowJSON } from './types/base';
+import { workflow } from './workflow-builder';
 
 /**
  * Writes a .generated.ts file next to the original JSON fixture.
@@ -81,7 +82,7 @@ describe('Real Workflow Round-Trip', () => {
 			if (error instanceof FixtureDownloadError) {
 				throw new Error(
 					`Failed to download test fixtures from n8n.io API: ${error.message}. ` +
-						`Check your network connection and ensure the API is accessible.`,
+						'Check your network connection and ensure the API is accessible.',
 				);
 			}
 			throw error;

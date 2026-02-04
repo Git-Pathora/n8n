@@ -1,3 +1,4 @@
+import type { NodeProperty, NodeTypeDescription } from './generate-types';
 import {
 	generateConditionalSchemaLine,
 	generateSingleVersionSchemaFile,
@@ -7,7 +8,6 @@ import {
 	mergeDisplayOptions,
 	extractDefaultsForDisplayOptions,
 } from './generate-zod-schemas';
-import type { NodeProperty, NodeTypeDescription } from './generate-types';
 
 describe('mapPropertyToZodSchema for resourceLocator', () => {
 	it('returns resourceLocatorValueSchema when no modes are specified', () => {

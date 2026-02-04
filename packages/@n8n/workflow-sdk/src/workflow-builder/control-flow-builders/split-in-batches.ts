@@ -1,4 +1,6 @@
 import { v4 as uuid } from 'uuid';
+
+import { isSplitInBatchesType } from '../../constants/node-types';
 import type {
 	NodeInstance,
 	NodeConfig,
@@ -13,7 +15,6 @@ import type {
 } from '../../types/base';
 import { isNodeChain, isNodeInstance } from '../../types/base';
 import { isIfElseBuilder, isSwitchCaseBuilder } from '../node-builders/node-builder';
-import { isSplitInBatchesType } from '../../constants/node-types';
 
 /**
  * Internal split in batches node implementation
@@ -79,7 +80,7 @@ class SplitInBatchesNodeInstance
  */
 export type NodeBatch =
 	| NodeInstance<string, string, unknown>
-	| NodeInstance<string, string, unknown>[];
+	| Array<NodeInstance<string, string, unknown>>;
 
 /**
  * Target for a branch in named object syntax.
@@ -93,10 +94,10 @@ export type BranchTarget =
 	| null
 	| NodeInstance<string, string, unknown>
 	| NodeChain<NodeInstance<string, string, unknown>, NodeInstance<string, string, unknown>>
-	| (
+	| Array<
 			| NodeInstance<string, string, unknown>
 			| NodeChain<NodeInstance<string, string, unknown>, NodeInstance<string, string, unknown>>
-	  )[];
+	  >;
 
 /**
  * Named object syntax for splitInBatches branches.
@@ -114,8 +115,8 @@ export interface SplitInBatchesBranches {
  */
 class SplitInBatchesBuilderImpl implements SplitInBatchesBuilder<unknown> {
 	readonly sibNode: NodeInstance<'n8n-nodes-base.splitInBatches', string, unknown>;
-	_doneNodes: NodeInstance<string, string, unknown>[] = [];
-	_eachNodes: NodeInstance<string, string, unknown>[] = [];
+	_doneNodes: Array<NodeInstance<string, string, unknown>> = [];
+	_eachNodes: Array<NodeInstance<string, string, unknown>> = [];
 	_doneBatches: NodeBatch[] = [];
 	_eachBatches: NodeBatch[] = [];
 	_hasLoop = false;
@@ -177,21 +178,21 @@ class SplitInBatchesBuilderImpl implements SplitInBatchesBuilder<unknown> {
 	/**
 	 * Get all nodes including the split in batches node
 	 */
-	getAllNodes(): NodeInstance<string, string, unknown>[] {
+	getAllNodes(): Array<NodeInstance<string, string, unknown>> {
 		return [this.sibNode, ...this._doneNodes, ...this._eachNodes];
 	}
 
 	/**
 	 * Get the done chain nodes (output 0)
 	 */
-	getDoneNodes(): NodeInstance<string, string, unknown>[] {
+	getDoneNodes(): Array<NodeInstance<string, string, unknown>> {
 		return this._doneNodes;
 	}
 
 	/**
 	 * Get the each chain nodes (output 1)
 	 */
-	getEachNodes(): NodeInstance<string, string, unknown>[] {
+	getEachNodes(): Array<NodeInstance<string, string, unknown>> {
 		return this._eachNodes;
 	}
 
@@ -208,8 +209,8 @@ class SplitInBatchesBuilderImpl implements SplitInBatchesBuilder<unknown> {
  */
 class SplitInBatchesBuilderWithExistingNode implements SplitInBatchesBuilder<unknown> {
 	readonly sibNode: NodeInstance<'n8n-nodes-base.splitInBatches', string, unknown>;
-	_doneNodes: NodeInstance<string, string, unknown>[] = [];
-	_eachNodes: NodeInstance<string, string, unknown>[] = [];
+	_doneNodes: Array<NodeInstance<string, string, unknown>> = [];
+	_eachNodes: Array<NodeInstance<string, string, unknown>> = [];
 	_doneBatches: NodeBatch[] = [];
 	_eachBatches: NodeBatch[] = [];
 	_hasLoop = false;
@@ -268,15 +269,15 @@ class SplitInBatchesBuilderWithExistingNode implements SplitInBatchesBuilder<unk
 		return this;
 	}
 
-	getAllNodes(): NodeInstance<string, string, unknown>[] {
+	getAllNodes(): Array<NodeInstance<string, string, unknown>> {
 		return [this.sibNode, ...this._doneNodes, ...this._eachNodes];
 	}
 
-	getDoneNodes(): NodeInstance<string, string, unknown>[] {
+	getDoneNodes(): Array<NodeInstance<string, string, unknown>> {
 		return this._doneNodes;
 	}
 
-	getEachNodes(): NodeInstance<string, string, unknown>[] {
+	getEachNodes(): Array<NodeInstance<string, string, unknown>> {
 		return this._eachNodes;
 	}
 
@@ -375,7 +376,9 @@ export function isSplitInBatchesBuilder(value: unknown): value is SplitInBatches
 /**
  * Extract nodes from a BranchTarget
  */
-function extractNodesFromTarget(target: BranchTarget): NodeInstance<string, string, unknown>[] {
+function extractNodesFromTarget(
+	target: BranchTarget,
+): Array<NodeInstance<string, string, unknown>> {
 	if (target === null) {
 		return [];
 	}
@@ -388,7 +391,7 @@ function extractNodesFromTarget(target: BranchTarget): NodeInstance<string, stri
 	// Handle IfElseBuilder (fluent API)
 	if (isIfElseBuilder(target)) {
 		const builder = target as IfElseBuilder<unknown>;
-		const nodes: NodeInstance<string, string, unknown>[] = [builder.ifNode];
+		const nodes: Array<NodeInstance<string, string, unknown>> = [builder.ifNode];
 		nodes.push(...extractNodesFromTarget(builder.trueBranch as BranchTarget));
 		nodes.push(...extractNodesFromTarget(builder.falseBranch as BranchTarget));
 		return nodes;
@@ -396,7 +399,7 @@ function extractNodesFromTarget(target: BranchTarget): NodeInstance<string, stri
 	// Handle SwitchCaseBuilder (fluent API)
 	if (isSwitchCaseBuilder(target)) {
 		const builder = target as SwitchCaseBuilder<unknown>;
-		const nodes: NodeInstance<string, string, unknown>[] = [builder.switchNode];
+		const nodes: Array<NodeInstance<string, string, unknown>> = [builder.switchNode];
 		for (const caseTarget of builder.caseMapping.values()) {
 			nodes.push(...extractNodesFromTarget(caseTarget as BranchTarget));
 		}
@@ -409,7 +412,7 @@ function extractNodesFromTarget(target: BranchTarget): NodeInstance<string, stri
 /**
  * Extract the first node(s) from a BranchTarget for connection purposes
  */
-function getFirstNodes(target: BranchTarget): NodeInstance<string, string, unknown>[] {
+function getFirstNodes(target: BranchTarget): Array<NodeInstance<string, string, unknown>> {
 	if (target === null) {
 		return [];
 	}
@@ -439,8 +442,8 @@ class SplitInBatchesNamedSyntaxBuilder implements SplitInBatchesBuilder<unknown>
 	readonly sibNode: NodeInstance<'n8n-nodes-base.splitInBatches', string, unknown>;
 	readonly _doneTarget: BranchTarget;
 	readonly _eachTarget: BranchTarget;
-	_doneNodes: NodeInstance<string, string, unknown>[] = [];
-	_eachNodes: NodeInstance<string, string, unknown>[] = [];
+	_doneNodes: Array<NodeInstance<string, string, unknown>> = [];
+	_eachNodes: Array<NodeInstance<string, string, unknown>> = [];
 	_doneBatches: NodeBatch[] = [];
 	_eachBatches: NodeBatch[] = [];
 	_hasLoop = false;
@@ -498,15 +501,15 @@ class SplitInBatchesNamedSyntaxBuilder implements SplitInBatchesBuilder<unknown>
 		);
 	}
 
-	getAllNodes(): NodeInstance<string, string, unknown>[] {
+	getAllNodes(): Array<NodeInstance<string, string, unknown>> {
 		return [this.sibNode, ...this._doneNodes, ...this._eachNodes];
 	}
 
-	getDoneNodes(): NodeInstance<string, string, unknown>[] {
+	getDoneNodes(): Array<NodeInstance<string, string, unknown>> {
 		return this._doneNodes;
 	}
 
-	getEachNodes(): NodeInstance<string, string, unknown>[] {
+	getEachNodes(): Array<NodeInstance<string, string, unknown>> {
 		return this._eachNodes;
 	}
 

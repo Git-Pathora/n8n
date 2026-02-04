@@ -5,8 +5,8 @@
  * Merge nodes use deferred connections to express the .input(n) syntax at root level.
  */
 
-import type { SemanticNode } from '../types';
 import type { VariableReference } from '../composite-tree';
+import type { SemanticNode } from '../types';
 import { type BuildContext, createVarRef, extractInputIndex, getOutputIndex } from './build-utils';
 
 // Re-export BuildContext for consumers

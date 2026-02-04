@@ -4,6 +4,7 @@
  */
 
 import { setSeed, hex, email, boolean, number, domainUrl } from 'minifaker';
+
 import 'minifaker/locales/en';
 import type { IDataObject } from '../types/base';
 

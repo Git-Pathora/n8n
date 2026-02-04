@@ -4,6 +4,8 @@
  * Parses n8n JSON format into internal graph structures.
  */
 
+import { deepCopy } from 'n8n-workflow';
+
 import type {
 	WorkflowJSON,
 	NodeInstance,
@@ -43,10 +45,7 @@ export function parseWorkflowJSON(json: WorkflowJSON): ParsedWorkflow {
 
 		// Preserve original credentials exactly - don't transform
 		const credentials = n8nNode.credentials
-			? (JSON.parse(JSON.stringify(n8nNode.credentials)) as Record<
-					string,
-					CredentialReference | NewCredentialValue
-				>)
+			? (deepCopy(n8nNode.credentials) as Record<string, CredentialReference | NewCredentialValue>)
 			: undefined;
 
 		// For nodes without a name (like sticky notes), use the id as the internal name
@@ -70,22 +69,22 @@ export function parseWorkflowJSON(json: WorkflowJSON): ParsedWorkflow {
 				alwaysOutputData: n8nNode.alwaysOutputData,
 				onError: n8nNode.onError,
 			},
-			update: function (config) {
+			update(config) {
 				return { ...this, config: { ...this.config, ...config } };
 			},
-			to: function () {
+			to() {
 				throw new Error('Nodes from fromJSON() do not support to()');
 			},
-			input: function () {
+			input() {
 				throw new Error('Nodes from fromJSON() do not support input()');
 			},
-			output: function () {
+			output() {
 				throw new Error('Nodes from fromJSON() do not support output()');
 			},
-			onError: function () {
+			onError() {
 				throw new Error('Nodes from fromJSON() do not support onError()');
 			},
-			getConnections: function () {
+			getConnections() {
 				return [];
 			},
 		};

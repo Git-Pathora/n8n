@@ -1,7 +1,8 @@
 import { describe, it, expect } from '@jest/globals';
+
 import { buildSplitInBatchesComposite, type BuildContext } from './sib-handler';
-import type { SemanticGraph, SemanticNode, SourceInfo } from '../types';
 import type { CompositeNode, LeafNode } from '../composite-tree';
+import type { SemanticGraph, SemanticNode, SourceInfo } from '../types';
 
 /**
  * Create a minimal semantic node for testing

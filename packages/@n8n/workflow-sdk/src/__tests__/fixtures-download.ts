@@ -27,7 +27,7 @@ export const COMMITTED_FIXTURES_DIR = path.resolve(
 export class FixtureDownloadError extends Error {
 	constructor(
 		message: string,
-		public readonly cause?: Error,
+		readonly cause?: Error,
 	) {
 		super(message);
 		this.name = 'FixtureDownloadError';

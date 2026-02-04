@@ -28,11 +28,11 @@ function createIfElseComposite(
 		ifNodeName?: string;
 		trueBranch?:
 			| NodeInstance<string, string, unknown>
-			| NodeInstance<string, string, unknown>[]
+			| Array<NodeInstance<string, string, unknown>>
 			| null;
 		falseBranch?:
 			| NodeInstance<string, string, unknown>
-			| NodeInstance<string, string, unknown>[]
+			| Array<NodeInstance<string, string, unknown>>
 			| null;
 	} = {},
 ): IfElseComposite {
@@ -77,11 +77,11 @@ function createIfElseBuilder(
 		ifNodeName?: string;
 		trueBranch?:
 			| NodeInstance<string, string, unknown>
-			| NodeInstance<string, string, unknown>[]
+			| Array<NodeInstance<string, string, unknown>>
 			| null;
 		falseBranch?:
 			| NodeInstance<string, string, unknown>
-			| NodeInstance<string, string, unknown>[]
+			| Array<NodeInstance<string, string, unknown>>
 			| null;
 	} = {},
 ): {

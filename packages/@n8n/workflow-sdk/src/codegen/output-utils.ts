@@ -5,8 +5,8 @@
  * These functions help analyze multi-output nodes like classifiers.
  */
 
-import type { SemanticNode } from './types';
 import { getOutputIndex } from './composite-handlers/build-utils';
+import type { SemanticNode } from './types';
 
 /**
  * Target info for multi-output nodes including the target input slot

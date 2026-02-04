@@ -2,6 +2,7 @@
  * Tests for merge-pattern utilities
  */
 
+import type { BuildContext } from './composite-handlers/build-utils';
 import {
 	hasOutputsOutsideMerge,
 	findDirectMergeInFanOut,
@@ -9,7 +10,6 @@ import {
 	findMergeInputIndex,
 } from './merge-pattern';
 import type { SemanticNode, SemanticGraph } from './types';
-import type { BuildContext } from './composite-handlers/build-utils';
 
 // Helper to create a mock SemanticNode
 function createMockNode(

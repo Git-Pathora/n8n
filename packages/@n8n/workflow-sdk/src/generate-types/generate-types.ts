@@ -19,14 +19,15 @@
  */
 
 import * as fs from 'fs';
+import { deepCopy } from 'n8n-workflow';
 import * as os from 'os';
 import * as path from 'path';
 
+import { generateOutputSchemaJson } from './generate-output-schemas';
 import {
 	generateSingleVersionSchemaFile,
 	planSplitVersionSchemaFiles,
 } from './generate-zod-schemas';
-import { generateOutputSchemaJson } from './generate-output-schemas';
 import { checkConditions } from '../validation/display-options';
 
 // =============================================================================
@@ -794,8 +795,8 @@ function generateNestedPropertyJSDoc(
 				// Filter out conditions that match current discriminator context
 				// Strip leading '/' from key for root-level property references
 				const normalizedKey = key.startsWith('/') ? key.slice(1) : key;
-				if (discriminatorContext && discriminatorContext[normalizedKey] !== undefined) {
-					const showValues = values as unknown[];
+				if (discriminatorContext?.[normalizedKey] !== undefined) {
+					const showValues = values;
 					// If the discriminator value is in the show list, this is redundant
 					if (showValues.includes(discriminatorContext[normalizedKey])) return false;
 				}
@@ -803,10 +804,7 @@ function generateNestedPropertyJSDoc(
 			});
 			if (filteredShow.length > 0) {
 				const showConditions = filteredShow
-					.map(
-						([key, values]) =>
-							`${key}: [${(values as unknown[]).map((v) => JSON.stringify(v)).join(', ')}]`,
-					)
+					.map(([key, values]) => `${key}: [${values.map((v) => JSON.stringify(v)).join(', ')}]`)
 					.join(', ');
 				lines.push(`${indent} * @displayOptions.show { ${showConditions} }`);
 			}
@@ -818,8 +816,8 @@ function generateNestedPropertyJSDoc(
 				// Filter out conditions that match current discriminator context
 				// Strip leading '/' from key for root-level property references
 				const normalizedKey = key.startsWith('/') ? key.slice(1) : key;
-				if (discriminatorContext && discriminatorContext[normalizedKey] !== undefined) {
-					const hideValues = values as unknown[];
+				if (discriminatorContext?.[normalizedKey] !== undefined) {
+					const hideValues = values;
 					// If the discriminator value is in the hide list, this is redundant
 					if (hideValues.includes(discriminatorContext[normalizedKey])) return false;
 				}
@@ -827,10 +825,7 @@ function generateNestedPropertyJSDoc(
 			});
 			if (filteredHide.length > 0) {
 				const hideConditions = filteredHide
-					.map(
-						([key, values]) =>
-							`${key}: [${(values as unknown[]).map((v) => JSON.stringify(v)).join(', ')}]`,
-					)
+					.map(([key, values]) => `${key}: [${values.map((v) => JSON.stringify(v)).join(', ')}]`)
 					.join(', ');
 				lines.push(`${indent} * @displayOptions.hide { ${hideConditions} }`);
 			}
@@ -1179,10 +1174,10 @@ export function extractDiscriminatorCombinations(
 			// Find operation prop that shows for this resource
 			const opProp = operationProps.find((op) => {
 				const showResource = op.displayOptions?.show?.resource;
-				return showResource && showResource.includes(resource);
+				return showResource?.includes(resource);
 			});
 
-			if (opProp && opProp.options) {
+			if (opProp?.options) {
 				for (const opOption of opProp.options) {
 					combinations.push({
 						resource,
@@ -1217,7 +1212,7 @@ export function extractDiscriminatorCombinations(
 			}
 		}
 
-		if (discProp && discProp.options) {
+		if (discProp?.options) {
 			// Check if any properties depend on this discriminator
 			const hasDependentProps = node.properties.some(
 				(p) =>
@@ -1531,8 +1526,8 @@ export function generatePropertyJSDoc(
 				// Filter out conditions that match current discriminator context
 				// Strip leading '/' from key for root-level property references
 				const normalizedKey = key.startsWith('/') ? key.slice(1) : key;
-				if (discriminatorContext && discriminatorContext[normalizedKey] !== undefined) {
-					const showValues = values as unknown[];
+				if (discriminatorContext?.[normalizedKey] !== undefined) {
+					const showValues = values;
 					// If the discriminator value is in the show list, this is redundant
 					if (showValues.includes(discriminatorContext[normalizedKey])) return false;
 				}
@@ -1540,10 +1535,7 @@ export function generatePropertyJSDoc(
 			});
 			if (filteredShow.length > 0) {
 				const showConditions = filteredShow
-					.map(
-						([key, values]) =>
-							`${key}: [${(values as unknown[]).map((v) => JSON.stringify(v)).join(', ')}]`,
-					)
+					.map(([key, values]) => `${key}: [${values.map((v) => JSON.stringify(v)).join(', ')}]`)
 					.join(', ');
 				lines.push(` * @displayOptions.show { ${showConditions} }`);
 			}
@@ -1555,8 +1547,8 @@ export function generatePropertyJSDoc(
 				// Filter out conditions that match current discriminator context
 				// Strip leading '/' from key for root-level property references
 				const normalizedKey = key.startsWith('/') ? key.slice(1) : key;
-				if (discriminatorContext && discriminatorContext[normalizedKey] !== undefined) {
-					const hideValues = values as unknown[];
+				if (discriminatorContext?.[normalizedKey] !== undefined) {
+					const hideValues = values;
 					// If the discriminator value is in the hide list, this is redundant
 					if (hideValues.includes(discriminatorContext[normalizedKey])) return false;
 				}
@@ -1564,10 +1556,7 @@ export function generatePropertyJSDoc(
 			});
 			if (filteredHide.length > 0) {
 				const hideConditions = filteredHide
-					.map(
-						([key, values]) =>
-							`${key}: [${(values as unknown[]).map((v) => JSON.stringify(v)).join(', ')}]`,
-					)
+					.map(([key, values]) => `${key}: [${values.map((v) => JSON.stringify(v)).join(', ')}]`)
 					.join(', ');
 				lines.push(` * @displayOptions.hide { ${hideConditions} }`);
 			}
@@ -3246,7 +3235,7 @@ export function extractAIInputTypes(node: NodeTypeDescription): AIInputTypeInfo[
 		}
 
 		// Only include AI input types (starting with 'ai_')
-		if (inputType && inputType.startsWith('ai_')) {
+		if (inputType?.startsWith('ai_')) {
 			// If any input of this type is required, mark it as required
 			const existingRequired = aiTypes.get(inputType) ?? false;
 			aiTypes.set(inputType, existingRequired || isRequired);
@@ -3648,7 +3637,7 @@ function convertNodeToToolVariant(node: NodeTypeDescription): NodeTypeDescriptio
 	}
 
 	// Deep copy to avoid mutating original
-	const toolNode: NodeTypeDescription = JSON.parse(JSON.stringify(node));
+	const toolNode: NodeTypeDescription = deepCopy(node);
 
 	// Update name and displayName
 	toolNode.name = toolNode.name + 'Tool';

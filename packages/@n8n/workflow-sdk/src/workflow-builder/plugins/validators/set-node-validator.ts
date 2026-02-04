@@ -4,6 +4,8 @@
  * Validates Set nodes for security issues like credential-like field names.
  */
 
+import type { GraphNode, NodeInstance } from '../../../types/base';
+import { isCredentialFieldName } from '../../validation-helpers';
 import {
 	type ValidatorPlugin,
 	type ValidationIssue,
@@ -12,8 +14,6 @@ import {
 	isAutoRenamed,
 	formatNodeRef,
 } from '../types';
-import type { GraphNode, NodeInstance } from '../../../types/base';
-import { isCredentialFieldName } from '../../validation-helpers';
 
 /**
  * Validator for Set nodes.

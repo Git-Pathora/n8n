@@ -4,6 +4,7 @@
  */
 import * as acorn from 'acorn';
 import type { Program } from 'estree';
+
 import { InterpreterError } from './errors';
 
 /**

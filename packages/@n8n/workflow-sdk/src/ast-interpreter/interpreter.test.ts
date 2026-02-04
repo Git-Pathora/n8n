@@ -1,14 +1,15 @@
 /**
  * Unit tests for the AST interpreter.
  */
-import { interpretSDKCode, SDKFunctions } from './interpreter';
-import { parseSDKCode } from './parser';
 import {
 	InterpreterError,
 	SecurityError,
 	UnsupportedNodeError,
 	UnknownIdentifierError,
 } from './errors';
+import type { SDKFunctions } from './interpreter';
+import { interpretSDKCode } from './interpreter';
+import { parseSDKCode } from './parser';
 
 // Mock SDK functions for testing
 const createMockSDKFunctions = (): SDKFunctions => ({
@@ -74,19 +75,19 @@ const createMockSDKFunctions = (): SDKFunctions => ({
 describe('AST Interpreter', () => {
 	describe('parseSDKCode', () => {
 		it('should parse simple code', () => {
-			const code = `const x = 1; return x;`;
+			const code = 'const x = 1; return x;';
 			const ast = parseSDKCode(code);
 			expect(ast.type).toBe('Program');
 			expect(ast.body.length).toBe(2);
 		});
 
 		it('should throw InterpreterError for syntax errors', () => {
-			const code = `const x = {;`; // Invalid syntax
+			const code = 'const x = {;'; // Invalid syntax
 			expect(() => parseSDKCode(code)).toThrow(InterpreterError);
 		});
 
 		it('should include location info in error', () => {
-			const code = `const x = {;`;
+			const code = 'const x = {;';
 			try {
 				parseSDKCode(code);
 				fail('Should have thrown');
@@ -105,31 +106,31 @@ describe('AST Interpreter', () => {
 		});
 
 		it('should interpret a simple return statement', () => {
-			const code = `return 42;`;
+			const code = 'return 42;';
 			const result = interpretSDKCode(code, sdkFunctions);
 			expect(result).toBe(42);
 		});
 
 		it('should interpret const variable declaration', () => {
-			const code = `const x = 10; return x;`;
+			const code = 'const x = 10; return x;';
 			const result = interpretSDKCode(code, sdkFunctions);
 			expect(result).toBe(10);
 		});
 
 		it('should interpret object literals', () => {
-			const code = `return { a: 1, b: 'hello', c: true };`;
+			const code = "return { a: 1, b: 'hello', c: true };";
 			const result = interpretSDKCode(code, sdkFunctions);
 			expect(result).toEqual({ a: 1, b: 'hello', c: true });
 		});
 
 		it('should interpret array literals', () => {
-			const code = `return [1, 2, 3];`;
+			const code = 'return [1, 2, 3];';
 			const result = interpretSDKCode(code, sdkFunctions);
 			expect(result).toEqual([1, 2, 3]);
 		});
 
 		it('should interpret nested objects and arrays', () => {
-			const code = `return { items: [{ name: 'a' }, { name: 'b' }] };`;
+			const code = "return { items: [{ name: 'a' }, { name: 'b' }] };";
 			const result = interpretSDKCode(code, sdkFunctions);
 			expect(result).toEqual({ items: [{ name: 'a' }, { name: 'b' }] });
 		});
@@ -147,13 +148,13 @@ describe('AST Interpreter', () => {
 		});
 
 		it('should interpret spread operator in arrays', () => {
-			const code = `const arr = [1, 2]; return [...arr, 3];`;
+			const code = 'const arr = [1, 2]; return [...arr, 3];';
 			const result = interpretSDKCode(code, sdkFunctions);
 			expect(result).toEqual([1, 2, 3]);
 		});
 
 		it('should interpret spread operator in objects', () => {
-			const code = `const obj = { a: 1 }; return { ...obj, b: 2 };`;
+			const code = 'const obj = { a: 1 }; return { ...obj, b: 2 };';
 			const result = interpretSDKCode(code, sdkFunctions);
 			expect(result).toEqual({ a: 1, b: 2 });
 		});
@@ -167,7 +168,7 @@ describe('AST Interpreter', () => {
 		});
 
 		it('should call workflow function', () => {
-			const code = `return workflow('id-123', 'My Workflow');`;
+			const code = "return workflow('id-123', 'My Workflow');";
 			const result = interpretSDKCode(code, sdkFunctions) as { id: string; name: string };
 			expect(sdkFunctions.workflow).toHaveBeenCalledWith('id-123', 'My Workflow');
 			expect(result.id).toBe('id-123');
@@ -175,7 +176,7 @@ describe('AST Interpreter', () => {
 		});
 
 		it('should call node function with config', () => {
-			const code = `return node({ type: 'n8n-nodes-base.set', version: 3, config: {} });`;
+			const code = "return node({ type: 'n8n-nodes-base.set', version: 3, config: {} });";
 			interpretSDKCode(code, sdkFunctions);
 			expect(sdkFunctions.node).toHaveBeenCalledWith({
 				type: 'n8n-nodes-base.set',
@@ -185,7 +186,8 @@ describe('AST Interpreter', () => {
 		});
 
 		it('should call trigger function', () => {
-			const code = `return trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: {} });`;
+			const code =
+				"return trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: {} });";
 			interpretSDKCode(code, sdkFunctions);
 			expect(sdkFunctions.trigger).toHaveBeenCalledWith({
 				type: 'n8n-nodes-base.manualTrigger',
@@ -195,13 +197,14 @@ describe('AST Interpreter', () => {
 		});
 
 		it('should call languageModel function', () => {
-			const code = `return languageModel({ type: '@n8n/n8n-nodes-langchain.lmChatOpenAi', version: 1, config: {} });`;
+			const code =
+				"return languageModel({ type: '@n8n/n8n-nodes-langchain.lmChatOpenAi', version: 1, config: {} });";
 			interpretSDKCode(code, sdkFunctions);
 			expect(sdkFunctions.languageModel).toHaveBeenCalled();
 		});
 
 		it('should call fromAi function', () => {
-			const code = `return fromAi('email', 'The recipient email address');`;
+			const code = "return fromAi('email', 'The recipient email address');";
 			const result = interpretSDKCode(code, sdkFunctions);
 			expect(sdkFunctions.fromAi).toHaveBeenCalledWith('email', 'The recipient email address');
 			expect(result).toContain('$fromAI');
@@ -225,49 +228,49 @@ describe('AST Interpreter', () => {
 		});
 
 		it('should interpret unary minus', () => {
-			const code = `return -5;`;
+			const code = 'return -5;';
 			const result = interpretSDKCode(code, sdkFunctions);
 			expect(result).toBe(-5);
 		});
 
 		it('should interpret unary plus', () => {
-			const code = `return +'10';`;
+			const code = "return +'10';";
 			const result = interpretSDKCode(code, sdkFunctions);
 			expect(result).toBe(10);
 		});
 
 		it('should interpret logical not', () => {
-			const code = `return !false;`;
+			const code = 'return !false;';
 			const result = interpretSDKCode(code, sdkFunctions);
 			expect(result).toBe(true);
 		});
 
 		it('should interpret binary operators', () => {
-			expect(interpretSDKCode(`return 2 + 3;`, sdkFunctions)).toBe(5);
-			expect(interpretSDKCode(`return 5 - 2;`, sdkFunctions)).toBe(3);
-			expect(interpretSDKCode(`return 3 * 4;`, sdkFunctions)).toBe(12);
-			expect(interpretSDKCode(`return 10 / 2;`, sdkFunctions)).toBe(5);
-			expect(interpretSDKCode(`return 7 % 3;`, sdkFunctions)).toBe(1);
+			expect(interpretSDKCode('return 2 + 3;', sdkFunctions)).toBe(5);
+			expect(interpretSDKCode('return 5 - 2;', sdkFunctions)).toBe(3);
+			expect(interpretSDKCode('return 3 * 4;', sdkFunctions)).toBe(12);
+			expect(interpretSDKCode('return 10 / 2;', sdkFunctions)).toBe(5);
+			expect(interpretSDKCode('return 7 % 3;', sdkFunctions)).toBe(1);
 		});
 
 		it('should interpret comparison operators', () => {
-			expect(interpretSDKCode(`return 5 > 3;`, sdkFunctions)).toBe(true);
-			expect(interpretSDKCode(`return 5 < 3;`, sdkFunctions)).toBe(false);
-			expect(interpretSDKCode(`return 5 >= 5;`, sdkFunctions)).toBe(true);
-			expect(interpretSDKCode(`return 5 <= 4;`, sdkFunctions)).toBe(false);
-			expect(interpretSDKCode(`return 5 === 5;`, sdkFunctions)).toBe(true);
-			expect(interpretSDKCode(`return 5 !== 3;`, sdkFunctions)).toBe(true);
+			expect(interpretSDKCode('return 5 > 3;', sdkFunctions)).toBe(true);
+			expect(interpretSDKCode('return 5 < 3;', sdkFunctions)).toBe(false);
+			expect(interpretSDKCode('return 5 >= 5;', sdkFunctions)).toBe(true);
+			expect(interpretSDKCode('return 5 <= 4;', sdkFunctions)).toBe(false);
+			expect(interpretSDKCode('return 5 === 5;', sdkFunctions)).toBe(true);
+			expect(interpretSDKCode('return 5 !== 3;', sdkFunctions)).toBe(true);
 		});
 
 		it('should interpret logical operators', () => {
-			expect(interpretSDKCode(`return true && false;`, sdkFunctions)).toBe(false);
-			expect(interpretSDKCode(`return true || false;`, sdkFunctions)).toBe(true);
-			expect(interpretSDKCode(`return null ?? 'default';`, sdkFunctions)).toBe('default');
+			expect(interpretSDKCode('return true && false;', sdkFunctions)).toBe(false);
+			expect(interpretSDKCode('return true || false;', sdkFunctions)).toBe(true);
+			expect(interpretSDKCode("return null ?? 'default';", sdkFunctions)).toBe('default');
 		});
 
 		it('should interpret conditional (ternary) operator', () => {
-			expect(interpretSDKCode(`return true ? 'yes' : 'no';`, sdkFunctions)).toBe('yes');
-			expect(interpretSDKCode(`return false ? 'yes' : 'no';`, sdkFunctions)).toBe('no');
+			expect(interpretSDKCode("return true ? 'yes' : 'no';", sdkFunctions)).toBe('yes');
+			expect(interpretSDKCode("return false ? 'yes' : 'no';", sdkFunctions)).toBe('no');
 		});
 	});
 
@@ -312,58 +315,58 @@ describe('AST Interpreter', () => {
 		});
 
 		it('should reject eval()', () => {
-			const code = `return eval('1+1');`;
+			const code = "return eval('1+1');";
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
 		});
 
 		it('should reject Function()', () => {
 			// Direct Function call (not chained) - this is caught as a dangerous identifier
-			const code = `return Function;`;
+			const code = 'return Function;';
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
 		});
 
 		it('should reject require()', () => {
-			const code = `return require('fs');`;
+			const code = "return require('fs');";
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
 		});
 
 		it('should reject process access', () => {
-			const code = `return process.env.PATH;`;
+			const code = 'return process.env.PATH;';
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
 		});
 
 		it('should reject global access', () => {
-			const code = `return global.process;`;
+			const code = 'return global.process;';
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
 		});
 
 		it('should reject globalThis access', () => {
-			const code = `return globalThis.process;`;
+			const code = 'return globalThis.process;';
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
 		});
 
 		it('should reject constructor access', () => {
-			const code = `return {}.constructor;`;
+			const code = 'return {}.constructor;';
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
 		});
 
 		it('should reject __proto__ access', () => {
-			const code = `return {}.__proto__;`;
+			const code = 'return {}.__proto__;';
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
 		});
 
 		it('should reject prototype access', () => {
-			const code = `return {}.prototype;`;
+			const code = 'return {}.prototype;';
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
 		});
 
 		it('should reject dynamic property access with expressions', () => {
-			const code = `const prop = 'constructor'; return {}[prop];`;
+			const code = "const prop = 'constructor'; return {}[prop];";
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
 		});
 
 		it('should allow literal property access', () => {
-			const code = `return { foo: 'bar' }['foo'];`;
+			const code = "return { foo: 'bar' }['foo'];";
 			const result = interpretSDKCode(code, sdkFunctions);
 			expect(result).toBe('bar');
 		});
@@ -377,47 +380,47 @@ describe('AST Interpreter', () => {
 		});
 
 		it('should reject arrow functions', () => {
-			const code = `return (() => 1);`;
+			const code = 'return (() => 1);';
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(UnsupportedNodeError);
 		});
 
 		it('should reject function expressions', () => {
-			const code = `return (function() { return 1; });`;
+			const code = 'return (function() { return 1; });';
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(UnsupportedNodeError);
 		});
 
 		it('should reject for loops', () => {
-			const code = `for (let i = 0; i < 10; i++) {}`;
+			const code = 'for (let i = 0; i < 10; i++) {}';
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(UnsupportedNodeError);
 		});
 
 		it('should reject while loops', () => {
-			const code = `while (true) { break; }`;
+			const code = 'while (true) { break; }';
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(UnsupportedNodeError);
 		});
 
 		it('should reject try-catch', () => {
-			const code = `try { return 1; } catch (e) {}`;
+			const code = 'try { return 1; } catch (e) {}';
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(UnsupportedNodeError);
 		});
 
 		it('should reject let declarations', () => {
-			const code = `let x = 1; return x;`;
+			const code = 'let x = 1; return x;';
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
 		});
 
 		it('should reject var declarations', () => {
-			const code = `var x = 1; return x;`;
+			const code = 'var x = 1; return x;';
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
 		});
 
 		it('should reject new expressions', () => {
-			const code = `return new Date();`;
+			const code = 'return new Date();';
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(UnsupportedNodeError);
 		});
 
 		it('should reject assignment expressions', () => {
-			const code = `const x = {}; x.y = 1;`;
+			const code = 'const x = {}; x.y = 1;';
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(UnsupportedNodeError);
 		});
 	});
@@ -430,22 +433,22 @@ describe('AST Interpreter', () => {
 		});
 
 		it('should reject using workflow as variable name', () => {
-			const code = `const workflow = 1; return workflow;`;
+			const code = 'const workflow = 1; return workflow;';
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
 		});
 
 		it('should reject using node as variable name', () => {
-			const code = `const node = 1; return node;`;
+			const code = 'const node = 1; return node;';
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
 		});
 
 		it('should reject using trigger as variable name', () => {
-			const code = `const trigger = 1; return trigger;`;
+			const code = 'const trigger = 1; return trigger;';
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
 		});
 
 		it('should allow user-defined variable names', () => {
-			const code = `const myWorkflow = workflow('id', 'name'); return myWorkflow;`;
+			const code = "const myWorkflow = workflow('id', 'name'); return myWorkflow;";
 			const result = interpretSDKCode(code, sdkFunctions) as { id: string };
 			expect(result.id).toBe('id');
 		});
@@ -459,12 +462,12 @@ describe('AST Interpreter', () => {
 		});
 
 		it('should throw for undefined variables', () => {
-			const code = `return undefinedVar;`;
+			const code = 'return undefinedVar;';
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(UnknownIdentifierError);
 		});
 
 		it('should throw for non-SDK functions', () => {
-			const code = `return someRandomFunction();`;
+			const code = 'return someRandomFunction();';
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(UnknownIdentifierError);
 		});
 	});

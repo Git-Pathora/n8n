@@ -4,26 +4,8 @@
  * Generates LLM-friendly SDK code from a composite tree.
  */
 
-import type { WorkflowJSON } from '../types/base';
-import type { SemanticGraph, SemanticNode, AiConnectionType } from './types';
 import type { Schema } from 'n8n-workflow';
-import type { NodeExecutionStatus } from './execution-status';
-import { generateSchemaJSDoc, schemaToOutputSample } from './execution-schema-jsdoc';
-import { escapeString, escapeRegexChars } from './string-utils';
-import {
-	AI_CONNECTION_TO_CONFIG_KEY,
-	AI_CONNECTION_TO_BUILDER,
-	AI_ALWAYS_ARRAY_TYPES,
-	AI_OPTIONAL_ARRAY_TYPES,
-} from './constants';
-import { getVarName, getUniqueVarName } from './variable-names';
-import {
-	isTriggerType,
-	isStickyNote,
-	isMergeType,
-	generateDefaultNodeName,
-} from './node-type-utils';
-import { formatValue } from './subnode-generator';
+
 import type {
 	CompositeTree,
 	CompositeNode,
@@ -38,6 +20,25 @@ import type {
 	ExplicitConnectionsNode,
 	MultiOutputNode,
 } from './composite-tree';
+import {
+	AI_CONNECTION_TO_CONFIG_KEY,
+	AI_CONNECTION_TO_BUILDER,
+	AI_ALWAYS_ARRAY_TYPES,
+	AI_OPTIONAL_ARRAY_TYPES,
+} from './constants';
+import { schemaToOutputSample } from './execution-schema-jsdoc';
+import type { NodeExecutionStatus } from './execution-status';
+import {
+	isTriggerType,
+	isStickyNote,
+	isMergeType,
+	generateDefaultNodeName,
+} from './node-type-utils';
+import { escapeString, escapeRegexChars } from './string-utils';
+import { formatValue } from './subnode-generator';
+import type { SemanticGraph, SemanticNode, AiConnectionType } from './types';
+import { getVarName, getUniqueVarName } from './variable-names';
+import type { WorkflowJSON } from '../types/base';
 
 /**
  * Execution context options for code generation
@@ -121,7 +122,7 @@ function generateSubnodeCall(
 	if (configParts.length > 0) {
 		parts.push(`config: { ${configParts.join(', ')} }`);
 	} else {
-		parts.push(`config: {}`);
+		parts.push('config: {}');
 	}
 
 	return `${builderName}({ ${parts.join(', ')} })`;
@@ -250,7 +251,7 @@ function generateSubnodeCallWithVarRefs(
 	if (configParts.length > 0) {
 		parts.push(`config: { ${configParts.join(', ')} }`);
 	} else {
-		parts.push(`config: {}`);
+		parts.push('config: {}');
 	}
 
 	return `${builderName}({ ${parts.join(', ')} })`;
@@ -373,7 +374,43 @@ function generateNodeConfig(node: SemanticNode, ctx: GenerationContext): string 
 
 	// Always include config (required by parser), even if empty
 	if (configParts.length > 0) {
-		parts.push(`${innerIndent}config: { ${configParts.join(', ')} }`);
+		const configStr = configParts.join(', ');
+		// If config contains // comments (expression annotations) OR multi-line content, use multi-line format
+		const hasComments = configStr.includes('//');
+		const hasMultiline = configParts.some((entry) => entry.includes('\n'));
+		if (hasComments || hasMultiline) {
+			const configIndent = getIndent({ ...ctx, indent: ctx.indent + 2 });
+			// Join with commas, ensuring each entry (except last) ends with a comma
+			const withCommas = configParts.map((entry, i) => {
+				if (i === configParts.length - 1) return entry; // Last entry, no comma
+
+				// For multi-line entries, check only the LAST line for comment/comma placement
+				// (nested content may have its own commas which shouldn't affect our decision)
+				const lastLineStart = entry.lastIndexOf('\n');
+				const lastLine = lastLineStart >= 0 ? entry.substring(lastLineStart) : entry;
+
+				// If the entry's last line has a comment, insert comma before it
+				if (lastLine.includes('  //') && !lastLine.includes(',  //')) {
+					return (
+						entry.substring(0, entry.length - lastLine.length + lastLineStart + 1) +
+						lastLine.replace('  //', ',  //')
+					);
+				}
+
+				// If last line already has comma before comment, no change needed
+				if (lastLine.includes(',  //')) {
+					return entry;
+				}
+
+				// Otherwise, add comma at the end
+				return entry + ',';
+			});
+			parts.push(
+				`${innerIndent}config: {\n${withCommas.map((p) => `${configIndent}${p}`).join('\n')}\n${innerIndent}}`,
+			);
+		} else {
+			parts.push(`${innerIndent}config: { ${configStr} }`);
+		}
 	} else {
 		parts.push(`${innerIndent}config: {}`);
 	}
@@ -385,6 +422,9 @@ function generateNodeConfig(node: SemanticNode, ctx: GenerationContext): string 
 		const outputSample = schemaToOutputSample(schema);
 		if (outputSample && Object.keys(outputSample).length > 0) {
 			parts.push(`${innerIndent}output: [${formatValue(outputSample, ctx)}]`);
+		} else {
+			// Schema exists but is empty - show output: [{}]
+			parts.push(`${innerIndent}output: [{}]`);
 		}
 	}
 
@@ -848,18 +888,12 @@ function generateComposite(node: CompositeNode, ctx: GenerationContext): string 
 function generateNodeJSDoc(nodeName: string, ctx: GenerationContext): string | null {
 	const jsdocParts: string[] = [];
 
-	// Add output schema if available
-	const schema = ctx.nodeSchemas?.get(nodeName);
-	if (schema) {
-		jsdocParts.push(generateSchemaJSDoc(nodeName, schema));
-	}
-
-	// Add execution status if available
+	// Add execution status if available (output schema is now in the output property)
 	const status = ctx.nodeExecutionStatus?.get(nodeName);
 	if (status?.status === 'error') {
-		jsdocParts.push(`@status error - ${status.errorMessage}`);
+		jsdocParts.push(`@nodeExecutionStatus error - ${status.errorMessage}`);
 	} else if (status?.status === 'success') {
-		jsdocParts.push('@status success');
+		jsdocParts.push('@nodeExecutionStatus success');
 	}
 
 	if (jsdocParts.length === 0) return null;
@@ -920,7 +954,7 @@ function collectNestedMultiOutputs(node: CompositeNode, collected: MultiOutputNo
 			collectNestedMultiOutputs(n, collected);
 		}
 	} else if (node.kind === 'splitInBatches') {
-		const sib = node as SplitInBatchesCompositeNode;
+		const sib = node;
 		if (sib.doneChain) {
 			if (Array.isArray(sib.doneChain)) {
 				for (const b of sib.doneChain) collectNestedMultiOutputs(b, collected);
@@ -936,7 +970,7 @@ function collectNestedMultiOutputs(node: CompositeNode, collected: MultiOutputNo
 			}
 		}
 	} else if (node.kind === 'ifElse') {
-		const ifElse = node as IfElseCompositeNode;
+		const ifElse = node;
 		if (ifElse.trueBranch) {
 			if (Array.isArray(ifElse.trueBranch)) {
 				for (const b of ifElse.trueBranch) collectNestedMultiOutputs(b, collected);
@@ -952,7 +986,7 @@ function collectNestedMultiOutputs(node: CompositeNode, collected: MultiOutputNo
 			}
 		}
 	} else if (node.kind === 'switchCase') {
-		const switchCase = node as SwitchCaseCompositeNode;
+		const switchCase = node;
 		for (const c of switchCase.cases) {
 			if (c) {
 				if (Array.isArray(c)) {
@@ -963,13 +997,13 @@ function collectNestedMultiOutputs(node: CompositeNode, collected: MultiOutputNo
 			}
 		}
 	} else if (node.kind === 'fanOut') {
-		const fanOut = node as FanOutCompositeNode;
+		const fanOut = node;
 		collectNestedMultiOutputs(fanOut.sourceNode, collected);
 		for (const t of fanOut.targets) {
 			collectNestedMultiOutputs(t, collected);
 		}
 	} else if (node.kind === 'merge') {
-		const merge = node as MergeCompositeNode;
+		const merge = node;
 		for (const b of merge.branches) {
 			collectNestedMultiOutputs(b, collected);
 		}
@@ -1010,7 +1044,7 @@ function flattenToWorkflowCalls(
 
 	if (root.kind === 'multiOutput') {
 		// Multi-output node: generate .add(sourceNode) then .add(sourceNode.output(n).to(target)) for each output
-		const multiOutput = root as MultiOutputNode;
+		const multiOutput = root;
 		const sourceVarName = getVarName(multiOutput.sourceNode.name, ctx);
 
 		// First, add the source node itself
@@ -1026,7 +1060,7 @@ function flattenToWorkflowCalls(
 		}
 	} else if (root.kind === 'explicitConnections') {
 		// Explicit connections pattern: generate .add() for each node, then .connect() for each connection
-		const explicitConns = root as ExplicitConnectionsNode;
+		const explicitConns = root;
 
 		// Add each node (use variable references since they're already declared)
 		for (const node of explicitConns.nodes) {
@@ -1055,7 +1089,7 @@ function flattenToWorkflowCalls(
 				// When encountering a multiOutput node in a chain:
 				// 1. Generate .to(sourceNode) to connect the previous node to the multi-output source
 				// 2. Then generate separate .add() calls for each output
-				const multiOutput = node as MultiOutputNode;
+				const multiOutput = node;
 				const sourceVarName = getVarName(multiOutput.sourceNode.name, ctx);
 
 				// Connect to the multi-output source node

@@ -1,4 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
+
 import { NODE_SPACING_X, DEFAULT_Y, START_X } from './constants';
 
 describe('workflow-builder/constants', () => {

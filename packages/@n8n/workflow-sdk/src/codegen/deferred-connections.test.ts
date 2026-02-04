@@ -1,11 +1,12 @@
 import { describe, it, expect } from '@jest/globals';
+
+import type { CompositeNode } from './composite-tree';
 import {
 	createDeferredConnection,
 	findMergeInputIndex,
 	type DeferredConnectionParams,
 } from './deferred-connections';
 import type { SemanticGraph, SemanticNode, SourceInfo } from './types';
-import type { CompositeNode } from './composite-tree';
 
 /**
  * Create a minimal semantic node for testing

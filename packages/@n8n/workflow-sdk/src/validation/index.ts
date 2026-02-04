@@ -1,14 +1,10 @@
-import type {
-	INodeTypes,
-	IConnections as N8nIConnections,
-	IConnection as N8nIConnection,
-	IDisplayOptions,
-} from 'n8n-workflow';
+import type { INodeTypes, IConnections as N8nIConnections, IDisplayOptions } from 'n8n-workflow';
 import { mapConnectionsByDestination } from 'n8n-workflow';
-import type { WorkflowBuilder, WorkflowJSON } from '../types/base';
-import { validateNodeConfig } from './schema-validator';
+
 import { resolveMainInputCount } from './input-resolver';
+import { validateNodeConfig } from './schema-validator';
 import { isStickyNoteType, isHttpRequestType } from '../constants/node-types';
+import type { WorkflowBuilder, WorkflowJSON } from '../types/base';
 
 /**
  * Validation error codes
@@ -585,7 +581,7 @@ function validateSubnodeParameters(
 
 			for (const connList of incomingConnections) {
 				if (!connList) continue;
-				for (const conn of connList as N8nIConnection[]) {
+				for (const conn of connList) {
 					const subnodeName = conn.node;
 					const subnode = nodesByName.get(subnodeName);
 					if (!subnode?.parameters) continue;

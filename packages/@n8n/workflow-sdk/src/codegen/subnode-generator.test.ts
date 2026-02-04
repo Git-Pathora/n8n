@@ -1,7 +1,8 @@
 import { describe, it, expect } from '@jest/globals';
+import type { IDataObject } from 'n8n-workflow';
+
 import { generateSubnodeCall, generateSubnodesConfig } from './subnode-generator';
 import type { SemanticGraph, SemanticNode, AiConnectionType } from './types';
-import type { IDataObject } from 'n8n-workflow';
 
 /**
  * Create a minimal semantic node for testing

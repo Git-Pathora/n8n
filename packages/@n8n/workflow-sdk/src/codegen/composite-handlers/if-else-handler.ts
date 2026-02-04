@@ -4,8 +4,8 @@
  * Builds IfElseCompositeNode from a semantic IF node.
  */
 
-import type { SemanticNode } from '../types';
 import type { CompositeNode, IfElseCompositeNode } from '../composite-tree';
+import type { SemanticNode } from '../types';
 import { type BuildContext, createLeaf, createVarRef, shouldBeVariable } from './build-utils';
 
 // Re-export BuildContext for consumers

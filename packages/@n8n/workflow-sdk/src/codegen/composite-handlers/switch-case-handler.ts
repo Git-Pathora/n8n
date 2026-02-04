@@ -4,8 +4,8 @@
  * Builds SwitchCaseCompositeNode from a semantic Switch node.
  */
 
-import type { SemanticNode } from '../types';
 import type { CompositeNode, SwitchCaseCompositeNode } from '../composite-tree';
+import type { SemanticNode } from '../types';
 import { type BuildContext, createLeaf, createVarRef, shouldBeVariable } from './build-utils';
 
 // Re-export BuildContext for consumers
@@ -78,7 +78,7 @@ export function buildSwitchCaseComposite(
 	node: SemanticNode,
 	ctx: BuildContext,
 ): SwitchCaseCompositeNode {
-	const cases: (CompositeNode | CompositeNode[] | null)[] = [];
+	const cases: Array<CompositeNode | CompositeNode[] | null> = [];
 	const caseIndices: number[] = [];
 
 	const branchCtx: BuildContext = {

@@ -5,8 +5,8 @@
  * Workflows without triggers need to be started manually.
  */
 
-import type { ValidatorPlugin, PluginContext, ValidationIssue } from '../types';
 import { isTriggerNodeType } from '../../../utils/trigger-detection';
+import type { ValidatorPlugin, PluginContext, ValidationIssue } from '../types';
 
 /**
  * Validator that checks for missing trigger nodes.

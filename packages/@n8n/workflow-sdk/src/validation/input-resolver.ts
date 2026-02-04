@@ -1,4 +1,4 @@
-import type { INodeTypes, INodeInputConfiguration } from 'n8n-workflow';
+import type { INodeTypes } from 'n8n-workflow';
 
 /**
  * Resolves the number of main inputs for a node type using the provided INodeTypes.
@@ -33,7 +33,7 @@ export function resolveMainInputCount(
 				return input === 'main';
 			}
 			// INodeInputConfiguration has a 'type' property
-			return (input as INodeInputConfiguration).type === 'main';
+			return input.type === 'main';
 		}).length;
 	} catch {
 		return undefined;

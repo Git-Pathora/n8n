@@ -65,7 +65,7 @@ function processSubnodesRecursively(
 		});
 
 		// Recursively process any nested subnodes
-		const nestedSubnodes = subnode.config?.subnodes as SubnodeConfig | undefined;
+		const nestedSubnodes = subnode.config?.subnodes;
 		if (nestedSubnodes) {
 			processSubnodesRecursively(nodes, subnode, nestedSubnodes);
 		}
@@ -74,7 +74,7 @@ function processSubnodesRecursively(
 	const addNestedSubnodeOrArray = (
 		subnodeOrArray:
 			| NodeInstance<string, string, unknown>
-			| NodeInstance<string, string, unknown>[]
+			| Array<NodeInstance<string, string, unknown>>
 			| undefined,
 		connectionType: string,
 	) => {
@@ -155,7 +155,7 @@ export function addNodeWithSubnodes(
 	});
 
 	// Process subnodes if present
-	const subnodes = nodeInstance.config?.subnodes as SubnodeConfig | undefined;
+	const subnodes = nodeInstance.config?.subnodes;
 	if (!subnodes) return nodeInstance.name;
 
 	// Helper to add a subnode with its AI connection
@@ -189,7 +189,7 @@ export function addNodeWithSubnodes(
 		});
 
 		// Recursively process nested subnodes
-		const nestedSubnodes = subnode.config?.subnodes as SubnodeConfig | undefined;
+		const nestedSubnodes = subnode.config?.subnodes;
 		if (nestedSubnodes) {
 			processSubnodesRecursively(nodes, subnode, nestedSubnodes);
 		}
@@ -198,7 +198,7 @@ export function addNodeWithSubnodes(
 	const addSubnodeOrArray = (
 		subnodeOrArray:
 			| NodeInstance<string, string, unknown>
-			| NodeInstance<string, string, unknown>[]
+			| Array<NodeInstance<string, string, unknown>>
 			| undefined,
 		connectionType: string,
 	) => {

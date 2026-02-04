@@ -40,7 +40,7 @@ const NODE_SEMANTICS: Record<string, NodeSemantics> = {
 
 	'n8n-nodes-base.switch': {
 		outputs: (node: NodeJSON): string[] => {
-			const params = node.parameters as IDataObject | undefined;
+			const params = node.parameters;
 			const rules = params?.rules as IDataObject | undefined;
 			const rulesArray = rules?.rules as unknown[] | undefined;
 			const numCases = rulesArray?.length ?? 4;
@@ -54,7 +54,7 @@ const NODE_SEMANTICS: Record<string, NodeSemantics> = {
 	'n8n-nodes-base.merge': {
 		outputs: ['output'],
 		inputs: (node: NodeJSON): string[] => {
-			const params = node.parameters as IDataObject | undefined;
+			const params = node.parameters;
 			const numInputs = (params?.numberInputs as number) ?? 2;
 			return Array.from({ length: numInputs }, (_, i) => `branch${i}`);
 		},

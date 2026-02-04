@@ -1,4 +1,6 @@
 import { v4 as uuid } from 'uuid';
+
+import { NODE_TYPES, isIfNodeType, isSwitchNodeType } from '../../constants/node-types';
 import {
 	isNodeChain,
 	type NodeInstance,
@@ -18,7 +20,6 @@ import {
 	type IfElseTarget,
 	type SwitchCaseTarget,
 } from '../../types/base';
-import { NODE_TYPES, isIfNodeType, isSwitchNodeType } from '../../constants/node-types';
 import {
 	isSwitchCaseComposite,
 	isIfElseComposite,
@@ -34,7 +35,7 @@ export function isInputTarget(value: unknown): value is InputTarget {
 		typeof value === 'object' &&
 		value !== null &&
 		'_isInputTarget' in value &&
-		(value as InputTarget)._isInputTarget === true
+		(value as InputTarget)._isInputTarget
 	);
 }
 
@@ -46,7 +47,7 @@ export function isOutputSelector(value: unknown): value is OutputSelector<string
 		typeof value === 'object' &&
 		value !== null &&
 		'_isOutputSelector' in value &&
-		(value as OutputSelector<string, string, unknown>)._isOutputSelector === true
+		(value as OutputSelector<string, string, unknown>)._isOutputSelector
 	);
 }
 
@@ -156,7 +157,7 @@ class NodeInstanceImpl<TType extends string, TVersion extends string, TOutput = 
 		}
 
 		// Handle array (fan-out) or single target
-		const targets: (T | NodeInstance<string, string, unknown>)[] = Array.isArray(target)
+		const targets: Array<T | NodeInstance<string, string, unknown>> = Array.isArray(target)
 			? target
 			: [target];
 
@@ -165,14 +166,14 @@ class NodeInstanceImpl<TType extends string, TVersion extends string, TOutput = 
 		}
 
 		// Helper to extract all nodes from a target (handles NodeChain, builders, etc.)
-		const flattenTarget = (t: unknown): NodeInstance<string, string, unknown>[] => {
+		const flattenTarget = (t: unknown): Array<NodeInstance<string, string, unknown>> => {
 			if (isNodeChain(t)) {
 				return t.allNodes;
 			}
 			// For SplitInBatchesBuilder, return it as-is so it can be detected and handled
 			// by workflow-builder's addSplitInBatchesChainNodes
 			if (isSplitInBatchesBuilder(t)) {
-				return [t as unknown as NodeInstance<string, string, unknown>];
+				return [t as NodeInstance<string, string, unknown>];
 			}
 			// For IfElseBuilder, return it as-is so it can be detected and handled
 			// by workflow-builder's addIfElseBuilderNodes
@@ -325,9 +326,9 @@ class NodeChainImpl<
 	readonly _isChain: true = true;
 	readonly head: THead;
 	readonly tail: TTail;
-	readonly allNodes: NodeInstance<string, string, unknown>[];
+	readonly allNodes: Array<NodeInstance<string, string, unknown>>;
 
-	constructor(head: THead, tail: TTail, allNodes: NodeInstance<string, string, unknown>[]) {
+	constructor(head: THead, tail: TTail, allNodes: Array<NodeInstance<string, string, unknown>>) {
 		this.head = head;
 		this.tail = tail;
 		this.allNodes = allNodes;
@@ -376,19 +377,19 @@ class NodeChainImpl<
 		}
 
 		// Handle array (fan-out) or single target
-		const targets: (T | NodeInstance<string, string, unknown>)[] = Array.isArray(target)
+		const targets: Array<T | NodeInstance<string, string, unknown>> = Array.isArray(target)
 			? target
 			: [target];
 
 		// Helper to extract all nodes from a target (handles NodeChain, builders, etc.)
-		const flattenTarget = (t: unknown): NodeInstance<string, string, unknown>[] => {
+		const flattenTarget = (t: unknown): Array<NodeInstance<string, string, unknown>> => {
 			if (isNodeChain(t)) {
 				return t.allNodes;
 			}
 			// For SplitInBatchesBuilder, return it as-is so it can be detected and handled
 			// by workflow-builder's addSplitInBatchesChainNodes
 			if (isSplitInBatchesBuilder(t)) {
-				return [t as unknown as NodeInstance<string, string, unknown>];
+				return [t as NodeInstance<string, string, unknown>];
 			}
 			// For IfElseBuilder, return it as-is so it can be detected and handled
 			// by workflow-builder's addIfElseBuilderNodes
@@ -531,12 +532,12 @@ class OutputSelectorImpl<TType extends string, TVersion extends string, TOutput 
 /**
  * Extract all nodes from a target (node, chain, composite, or array)
  */
-function extractNodesFromTarget(target: unknown): NodeInstance<string, string, unknown>[] {
+function extractNodesFromTarget(target: unknown): Array<NodeInstance<string, string, unknown>> {
 	if (target === null) return [];
 
 	// Handle array (fan-out)
 	if (Array.isArray(target)) {
-		const nodes: NodeInstance<string, string, unknown>[] = [];
+		const nodes: Array<NodeInstance<string, string, unknown>> = [];
 		for (const t of target) {
 			nodes.push(...extractNodesFromTarget(t));
 		}
@@ -545,7 +546,7 @@ function extractNodesFromTarget(target: unknown): NodeInstance<string, string, u
 
 	// Handle NodeChain
 	if (isNodeChain(target)) {
-		const nodes: NodeInstance<string, string, unknown>[] = [];
+		const nodes: Array<NodeInstance<string, string, unknown>> = [];
 		for (const chainNode of target.allNodes) {
 			nodes.push(...extractNodesFromTarget(chainNode));
 		}
@@ -557,10 +558,10 @@ function extractNodesFromTarget(target: unknown): NodeInstance<string, string, u
 		target !== null &&
 		typeof target === 'object' &&
 		'_isIfElseBuilder' in target &&
-		(target as { _isIfElseBuilder: boolean })._isIfElseBuilder === true
+		(target as { _isIfElseBuilder: boolean })._isIfElseBuilder
 	) {
 		const builder = target as IfElseBuilder<unknown>;
-		const nodes: NodeInstance<string, string, unknown>[] = [builder.ifNode];
+		const nodes: Array<NodeInstance<string, string, unknown>> = [builder.ifNode];
 		nodes.push(...extractNodesFromTarget(builder.trueBranch));
 		nodes.push(...extractNodesFromTarget(builder.falseBranch));
 		return nodes;
@@ -571,10 +572,10 @@ function extractNodesFromTarget(target: unknown): NodeInstance<string, string, u
 		target !== null &&
 		typeof target === 'object' &&
 		'_isSwitchCaseBuilder' in target &&
-		(target as { _isSwitchCaseBuilder: boolean })._isSwitchCaseBuilder === true
+		(target as { _isSwitchCaseBuilder: boolean })._isSwitchCaseBuilder
 	) {
 		const builder = target as SwitchCaseBuilder<unknown>;
-		const nodes: NodeInstance<string, string, unknown>[] = [builder.switchNode];
+		const nodes: Array<NodeInstance<string, string, unknown>> = [builder.switchNode];
 		for (const caseTarget of builder.caseMapping.values()) {
 			nodes.push(...extractNodesFromTarget(caseTarget));
 		}
@@ -603,7 +604,7 @@ export function isIfElseBuilder(value: unknown): value is IfElseBuilder<unknown>
 		value !== null &&
 		typeof value === 'object' &&
 		'_isIfElseBuilder' in value &&
-		(value as IfElseBuilder<unknown>)._isIfElseBuilder === true
+		(value as IfElseBuilder<unknown>)._isIfElseBuilder
 	);
 }
 
@@ -615,7 +616,7 @@ export function isSwitchCaseBuilder(value: unknown): value is SwitchCaseBuilder<
 		value !== null &&
 		typeof value === 'object' &&
 		'_isSwitchCaseBuilder' in value &&
-		(value as SwitchCaseBuilder<unknown>)._isSwitchCaseBuilder === true
+		(value as SwitchCaseBuilder<unknown>)._isSwitchCaseBuilder
 	);
 }
 
@@ -630,7 +631,7 @@ class IfElseBuilderImpl<TOutput = unknown> implements IfElseBuilder<TOutput> {
 	trueBranch: IfElseTarget = null;
 	falseBranch: IfElseTarget = null;
 	/** All nodes from both branches (for workflow-builder) */
-	_allBranchNodes: NodeInstance<string, string, unknown>[] = [];
+	_allBranchNodes: Array<NodeInstance<string, string, unknown>> = [];
 
 	constructor(ifNode: NodeInstance<'n8n-nodes-base.if', string, TOutput>) {
 		this.ifNode = ifNode;
@@ -657,7 +658,7 @@ class IfElseBuilderImpl<TOutput = unknown> implements IfElseBuilder<TOutput> {
 	}
 
 	private _updateAllBranchNodes(): void {
-		const allNodes: NodeInstance<string, string, unknown>[] = [];
+		const allNodes: Array<NodeInstance<string, string, unknown>> = [];
 		for (const node of extractNodesFromTarget(this.trueBranch)) {
 			if (!allNodes.some((n) => n.name === node.name)) {
 				allNodes.push(node);
@@ -682,7 +683,7 @@ class SwitchCaseBuilderImpl<TOutput = unknown> implements SwitchCaseBuilder<TOut
 	readonly switchNode: NodeInstance<'n8n-nodes-base.switch', string, TOutput>;
 	readonly caseMapping: Map<number, SwitchCaseTarget> = new Map();
 	/** All nodes from all cases (for workflow-builder) */
-	_allCaseNodes: NodeInstance<string, string, unknown>[] = [];
+	_allCaseNodes: Array<NodeInstance<string, string, unknown>> = [];
 	/** Source chain if created from NodeChain.onCase() (e.g., trigger.to(switch).onCase()) */
 	sourceChain?: NodeChain<
 		NodeInstance<string, string, unknown>,
@@ -708,7 +709,7 @@ class SwitchCaseBuilderImpl<TOutput = unknown> implements SwitchCaseBuilder<TOut
 	}
 
 	private _updateAllCaseNodes(): void {
-		const allNodes: NodeInstance<string, string, unknown>[] = [];
+		const allNodes: Array<NodeInstance<string, string, unknown>> = [];
 		for (const target of this.caseMapping.values()) {
 			for (const node of extractNodesFromTarget(target)) {
 				if (!allNodes.some((n) => n.name === node.name)) {
@@ -924,7 +925,7 @@ const STICKY_PADDING = 50;
 /**
  * Calculate bounding box around a set of nodes
  */
-function calculateNodesBoundingBox(nodes: NodeInstance<string, string, unknown>[]): {
+function calculateNodesBoundingBox(nodes: Array<NodeInstance<string, string, unknown>>): {
 	position: [number, number];
 	width: number;
 	height: number;
@@ -998,7 +999,7 @@ class StickyNoteInstance implements NodeInstance<'n8n-nodes-base.stickyNote', 'v
 			height: (config.parameters?.height as number) ?? (this.config.parameters?.height as number),
 			name: config.name ?? this.name,
 		};
-		return new StickyNoteInstance(newContent as string, newConfig);
+		return new StickyNoteInstance(newContent, newConfig);
 	}
 
 	input(_index: number): InputTarget {
@@ -1149,7 +1150,7 @@ export function createChainWithAdditionalNodes<
 	TTail extends NodeInstance<string, string, unknown>,
 >(
 	baseChain: NodeChain<THead, TTail>,
-	additionalNodes: NodeInstance<string, string, unknown>[],
+	additionalNodes: Array<NodeInstance<string, string, unknown>>,
 ): NodeChain<THead, TTail> {
 	// Filter out nodes that are already in allNodes to avoid duplicates
 	const existingNames = new Set(baseChain.allNodes.map((n) => n.name));

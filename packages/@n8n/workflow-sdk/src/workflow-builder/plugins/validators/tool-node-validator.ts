@@ -4,9 +4,9 @@
  * Validates Tool nodes for missing parameters.
  */
 
-import type { ValidatorPlugin, ValidationIssue, PluginContext } from '../types';
 import type { GraphNode, NodeInstance } from '../../../types/base';
 import { isToolNode, TOOLS_WITHOUT_PARAMETERS } from '../../validation-helpers';
+import type { ValidatorPlugin, ValidationIssue, PluginContext } from '../types';
 
 /**
  * Validator for Tool nodes.

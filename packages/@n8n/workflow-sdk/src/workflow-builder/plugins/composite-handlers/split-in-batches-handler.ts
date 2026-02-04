@@ -7,14 +7,16 @@
  * - Fluent API: splitInBatches(config).onDone(...).onEachBatch(...)
  */
 
-import type { CompositeHandlerPlugin, MutablePluginContext } from '../types';
-import type { NodeInstance, ConnectionTarget, NodeChain } from '../../../types/base';
+import type { NodeInstance, ConnectionTarget } from '../../../types/base';
 import { isNodeChain } from '../../../types/base';
+import type { CompositeHandlerPlugin, MutablePluginContext } from '../types';
 
 /**
  * A batch of nodes - either a single node or an array of nodes for fan-out
  */
-type NodeBatch = NodeInstance<string, string, unknown> | NodeInstance<string, string, unknown>[];
+type NodeBatch =
+	| NodeInstance<string, string, unknown>
+	| Array<NodeInstance<string, string, unknown>>;
 
 /**
  * Shape of a SplitInBatchesBuilder for type checking
@@ -22,16 +24,16 @@ type NodeBatch = NodeInstance<string, string, unknown> | NodeInstance<string, st
  */
 interface SplitInBatchesBuilderShape {
 	sibNode: NodeInstance<string, string, unknown>;
-	_doneNodes: NodeInstance<string, string, unknown>[];
-	_eachNodes: NodeInstance<string, string, unknown>[];
+	_doneNodes: Array<NodeInstance<string, string, unknown>>;
+	_eachNodes: Array<NodeInstance<string, string, unknown>>;
 	// Named syntax targets
 	_doneTarget?:
 		| NodeInstance<string, string, unknown>
-		| NodeInstance<string, string, unknown>[]
+		| Array<NodeInstance<string, string, unknown>>
 		| null;
 	_eachTarget?:
 		| NodeInstance<string, string, unknown>
-		| NodeInstance<string, string, unknown>[]
+		| Array<NodeInstance<string, string, unknown>>
 		| null;
 	// Fluent API batches
 	_doneBatches?: NodeBatch[];
@@ -230,7 +232,7 @@ function processFluentApi(input: SplitInBatchesBuilderShape, ctx: MutablePluginC
 				targets.push({ node: targetHead, type: 'main', index: 0 });
 				// Track the last node for loop connection
 				if (isNodeChain(target)) {
-					lastEachNode = (target as NodeChain).tail?.name ?? targetHead;
+					lastEachNode = target.tail?.name ?? targetHead;
 				} else {
 					lastEachNode = targetHead;
 				}
@@ -241,7 +243,7 @@ function processFluentApi(input: SplitInBatchesBuilderShape, ctx: MutablePluginC
 			sibMainConns.set(1, [{ node: targetHead, type: 'main', index: 0 }]);
 			// Track the last node for loop connection
 			if (isNodeChain(eachTarget)) {
-				lastEachNode = (eachTarget as NodeChain).tail?.name ?? targetHead;
+				lastEachNode = eachTarget.tail?.name ?? targetHead;
 			} else {
 				lastEachNode = targetHead;
 			}

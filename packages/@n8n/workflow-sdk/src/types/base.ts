@@ -363,7 +363,7 @@ export interface StickyNoteConfig {
 	width?: number;
 	height?: number;
 	name?: string;
-	nodes?: NodeInstance<string, string, unknown>[];
+	nodes?: Array<NodeInstance<string, string, unknown>>;
 }
 
 // =============================================================================
@@ -480,7 +480,7 @@ export interface NodeChain<
 	readonly _isChain: true;
 	readonly head: THead;
 	readonly tail: TTail;
-	readonly allNodes: NodeInstance<string, string, unknown>[];
+	readonly allNodes: Array<NodeInstance<string, string, unknown>>;
 
 	to<T extends NodeInstance<string, string, unknown>>(
 		target: T | T[] | InputTarget,
@@ -619,10 +619,10 @@ export interface IfElseComposite {
 	readonly ifNode: NodeInstance<'n8n-nodes-base.if', string, unknown>;
 	readonly trueBranch:
 		| NodeInstance<string, string, unknown>
-		| NodeInstance<string, string, unknown>[];
+		| Array<NodeInstance<string, string, unknown>>;
 	readonly falseBranch:
 		| NodeInstance<string, string, unknown>
-		| NodeInstance<string, string, unknown>[];
+		| Array<NodeInstance<string, string, unknown>>;
 }
 
 /**
@@ -641,11 +641,9 @@ export interface SwitchCaseConfig {
 export interface SwitchCaseComposite {
 	readonly switchNode: NodeInstance<'n8n-nodes-base.switch', string, unknown>;
 	/** Cases can be null (no connection), single node, or array (fan-out to multiple parallel nodes) */
-	readonly cases: (
-		| NodeInstance<string, string, unknown>
-		| NodeInstance<string, string, unknown>[]
-		| null
-	)[];
+	readonly cases: Array<
+		NodeInstance<string, string, unknown> | Array<NodeInstance<string, string, unknown>> | null
+	>;
 }
 
 // =============================================================================
@@ -659,10 +657,10 @@ export type IfElseTarget =
 	| null
 	| NodeInstance<string, string, unknown>
 	| NodeChain<NodeInstance<string, string, unknown>, NodeInstance<string, string, unknown>>
-	| (
+	| Array<
 			| NodeInstance<string, string, unknown>
 			| NodeChain<NodeInstance<string, string, unknown>, NodeInstance<string, string, unknown>>
-	  )[]
+	  >
 	| IfElseBuilder<unknown>
 	| SwitchCaseBuilder<unknown>;
 
@@ -673,10 +671,10 @@ export type SwitchCaseTarget =
 	| null
 	| NodeInstance<string, string, unknown>
 	| NodeChain<NodeInstance<string, string, unknown>, NodeInstance<string, string, unknown>>
-	| (
+	| Array<
 			| NodeInstance<string, string, unknown>
 			| NodeChain<NodeInstance<string, string, unknown>, NodeInstance<string, string, unknown>>
-	  )[]
+	  >
 	| IfElseBuilder<unknown>
 	| SwitchCaseBuilder<unknown>;
 
@@ -806,10 +804,10 @@ export interface SplitInBatchesBuilder<TOutput = unknown> {
 			| null
 			| NodeInstance<string, string, unknown>
 			| NodeChain<NodeInstance<string, string, unknown>, NodeInstance<string, string, unknown>>
-			| (
+			| Array<
 					| NodeInstance<string, string, unknown>
 					| NodeChain<NodeInstance<string, string, unknown>, NodeInstance<string, string, unknown>>
-			  )[],
+			  >,
 	): SplitInBatchesBuilder<TOutput>;
 
 	/**
@@ -827,10 +825,10 @@ export interface SplitInBatchesBuilder<TOutput = unknown> {
 			| null
 			| NodeInstance<string, string, unknown>
 			| NodeChain<NodeInstance<string, string, unknown>, NodeInstance<string, string, unknown>>
-			| (
+			| Array<
 					| NodeInstance<string, string, unknown>
 					| NodeChain<NodeInstance<string, string, unknown>, NodeInstance<string, string, unknown>>
-			  )[],
+			  >,
 	): SplitInBatchesBuilder<TOutput>;
 }
 

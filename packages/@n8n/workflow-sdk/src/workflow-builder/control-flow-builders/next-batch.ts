@@ -65,6 +65,6 @@ export function isNextBatch(value: unknown): value is NextBatchMarker {
 		value !== null &&
 		typeof value === 'object' &&
 		'_isNextBatch' in value &&
-		(value as NextBatchMarker)._isNextBatch === true
+		(value as NextBatchMarker)._isNextBatch
 	);
 }

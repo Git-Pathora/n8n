@@ -5,10 +5,10 @@
  * outputs to the same Merge node. This requires explicit connection handling.
  */
 
-import type { SemanticNode } from './types';
-import type { ExplicitConnectionsNode, ExplicitConnection } from './composite-tree';
 import type { BuildContext } from './composite-handlers/build-utils';
 import { isMergeType } from './composite-handlers/build-utils';
+import type { ExplicitConnectionsNode, ExplicitConnection } from './composite-tree';
+import type { SemanticNode } from './types';
 
 /**
  * Pattern info for SIB→Merge connections

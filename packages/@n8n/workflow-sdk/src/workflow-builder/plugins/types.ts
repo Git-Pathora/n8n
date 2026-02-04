@@ -88,7 +88,7 @@ export interface NodeTypesProvider {
 				description?: {
 					maxNodes?: number;
 					displayName?: string;
-					properties?: ReadonlyArray<unknown>;
+					properties?: readonly unknown[];
 				};
 		  }
 		| undefined;

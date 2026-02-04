@@ -3,13 +3,14 @@
  * Safely evaluates SDK code by walking the AST instead of using eval/Function.
  */
 import type * as ESTree from 'estree';
-import { parseSDKCode } from './parser';
+
 import {
 	InterpreterError,
 	UnsupportedNodeError,
 	UnknownIdentifierError,
 	SecurityError,
 } from './errors';
+import { parseSDKCode } from './parser';
 import {
 	validateNodeType,
 	validateCallExpression,
@@ -83,7 +84,7 @@ class SDKInterpreter {
 		for (const declarator of node.declarations) {
 			if (declarator.id.type !== 'Identifier') {
 				throw new UnsupportedNodeError(
-					`Destructuring in variable declaration`,
+					'Destructuring in variable declaration',
 					declarator.loc ?? undefined,
 					this.sourceCode,
 				);
@@ -228,7 +229,7 @@ class SDKInterpreter {
 
 		if (typeof func !== 'function') {
 			throw new InterpreterError(
-				`Cannot call non-function`,
+				'Cannot call non-function',
 				node.loc ?? undefined,
 				this.sourceCode,
 			);
@@ -405,6 +406,7 @@ class SDKInterpreter {
 		// Check if this looks like an n8n runtime variable (starts with $)
 		if (this.isN8nRuntimeVariable(expr)) {
 			// Return as escaped literal string: ${$json.name} becomes literal string "${$json.name}"
+			// eslint-disable-next-line prefer-template
 			return '${' + this.expressionToString(expr) + '}';
 		}
 
@@ -461,7 +463,7 @@ class SDKInterpreter {
 					if (arg.type === 'SpreadElement') {
 						return '...' + this.expressionToString(arg.argument);
 					}
-					return this.expressionToString(arg as ESTree.Expression);
+					return this.expressionToString(arg);
 				})
 				.join(', ');
 			return `${callee}(${args})`;
@@ -474,7 +476,7 @@ class SDKInterpreter {
 		}
 		if (expr.type === 'BinaryExpression' || expr.type === 'LogicalExpression') {
 			const left = this.expressionToString(expr.left as ESTree.Expression);
-			const right = this.expressionToString(expr.right as ESTree.Expression);
+			const right = this.expressionToString(expr.right);
 			return `${left} ${expr.operator} ${right}`;
 		}
 		if (expr.type === 'ConditionalExpression') {
@@ -484,8 +486,8 @@ class SDKInterpreter {
 			return `${test} ? ${consequent} : ${alternate}`;
 		}
 		if (expr.type === 'UnaryExpression') {
-			const unary = expr as ESTree.UnaryExpression;
-			const arg = this.expressionToString(unary.argument as ESTree.Expression);
+			const unary = expr;
+			const arg = this.expressionToString(unary.argument);
 			return unary.prefix ? `${unary.operator}${arg}` : `${arg}${unary.operator}`;
 		}
 
@@ -514,7 +516,7 @@ class SDKInterpreter {
 	 * Visit a unary expression.
 	 */
 	private visitUnaryExpression(node: ESTree.UnaryExpression): unknown {
-		const arg = this.evaluate(node.argument as ESTree.Expression);
+		const arg = this.evaluate(node.argument);
 
 		switch (node.operator) {
 			case '-':
@@ -541,7 +543,7 @@ class SDKInterpreter {
 	 */
 	private visitBinaryExpression(node: ESTree.BinaryExpression): unknown {
 		const left = this.evaluate(node.left as ESTree.Expression);
-		const right = this.evaluate(node.right as ESTree.Expression);
+		const right = this.evaluate(node.right);
 
 		switch (node.operator) {
 			case '+':

@@ -5,9 +5,9 @@
  * Uses generated schemas from ~/.n8n/generated-types/ by default.
  */
 
-import type { ZodSchema, ZodIssue } from 'zod';
 import * as os from 'os';
 import * as path from 'path';
+import type { ZodSchema, ZodIssue } from 'zod';
 
 // Import all schema helpers for factory function support
 import * as schemaHelpers from './schema-helpers';

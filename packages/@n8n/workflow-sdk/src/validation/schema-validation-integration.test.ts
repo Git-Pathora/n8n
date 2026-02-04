@@ -7,8 +7,8 @@
  */
 
 import { validateNodeConfig, loadSchema } from './schema-validator';
-import { validateWorkflow } from '../validation';
 import { parseWorkflowCode } from '../codegen/parse-workflow-code';
+import { validateWorkflow } from '../validation';
 
 describe('Schema Validation Integration', () => {
 	describe('Resource/Operation Discriminated (MS Teams v2 - task/create)', () => {

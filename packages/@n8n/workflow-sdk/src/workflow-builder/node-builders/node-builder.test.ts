@@ -1,3 +1,5 @@
+import { deepCopy } from 'n8n-workflow';
+
 import { node, trigger, sticky, placeholder, newCredential, merge } from './node-builder';
 import { languageModel, memory, tool, outputParser } from './subnode-builders';
 
@@ -303,7 +305,7 @@ describe('Node Builder', () => {
 				},
 			});
 			expect(n.config.credentials).toBeDefined();
-			const credJson = JSON.parse(JSON.stringify(n.config.credentials));
+			const credJson = deepCopy(n.config.credentials);
 			// newCredential serializes to undefined, which is omitted from JSON
 			expect(credJson).toEqual({});
 		});
@@ -320,7 +322,7 @@ describe('Node Builder', () => {
 					},
 				},
 			});
-			const credJson = JSON.parse(JSON.stringify(n.config.credentials));
+			const credJson = deepCopy(n.config.credentials);
 			// Regular credentials preserved, newCredential omitted (serializes to undefined)
 			expect(credJson).toEqual({
 				httpBasicAuth: { id: 'existing-123', name: 'Existing Auth' },

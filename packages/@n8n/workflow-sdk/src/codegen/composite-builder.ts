@@ -5,19 +5,6 @@
  * that can be easily converted to SDK code.
  */
 
-import type { SemanticGraph, SemanticNode } from './types';
-import type {
-	CompositeTree,
-	CompositeNode,
-	VariableReference,
-	IfElseCompositeNode,
-	SwitchCaseCompositeNode,
-	SplitInBatchesCompositeNode,
-	FanOutCompositeNode,
-	ExplicitConnectionsNode,
-	MultiOutputNode,
-} from './composite-tree';
-import { getCompositeType } from './semantic-registry';
 import {
 	type BuildContext,
 	createLeaf,
@@ -32,14 +19,27 @@ import {
 	hasErrorOutput,
 	getErrorOutputTargets,
 } from './composite-handlers/build-utils';
+import type {
+	CompositeTree,
+	CompositeNode,
+	VariableReference,
+	IfElseCompositeNode,
+	SwitchCaseCompositeNode,
+	SplitInBatchesCompositeNode,
+	FanOutCompositeNode,
+	ExplicitConnectionsNode,
+	MultiOutputNode,
+} from './composite-tree';
+import { findDirectMergeInFanOut, detectMergePattern, findMergeInputIndex } from './merge-pattern';
 import {
 	getAllOutputTargets,
 	hasMultipleOutputSlots,
 	hasConsecutiveOutputSlots,
 	getOutputTargetsByIndex,
 } from './output-utils';
-import { findDirectMergeInFanOut, detectMergePattern, findMergeInputIndex } from './merge-pattern';
+import { getCompositeType } from './semantic-registry';
 import { detectSibMergePattern, buildSibMergeExplicitConnections } from './sib-merge-handler';
+import type { SemanticGraph, SemanticNode } from './types';
 
 /**
  * Build branch targets for IF/Switch/SplitInBatches - handles single target or fan-out
@@ -312,7 +312,7 @@ function buildIfElse(node: SemanticNode, ctx: BuildContext): IfElseCompositeNode
  * Build composite for a Switch node
  */
 function buildSwitchCase(node: SemanticNode, ctx: BuildContext): SwitchCaseCompositeNode {
-	const cases: (CompositeNode | CompositeNode[] | null)[] = [];
+	const cases: Array<CompositeNode | CompositeNode[] | null> = [];
 	const caseIndices: number[] = [];
 
 	// Create a branch context to track that we're inside Switch cases

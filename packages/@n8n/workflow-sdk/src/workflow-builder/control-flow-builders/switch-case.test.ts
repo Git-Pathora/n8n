@@ -1,6 +1,6 @@
+import type { NodeInstance } from '../../types/base';
 import { workflow } from '../../workflow-builder';
 import { node, trigger, isSwitchCaseBuilder } from '../node-builders/node-builder';
-import type { NodeInstance } from '../../types/base';
 
 // Helper type for Switch node
 type SwitchNode = NodeInstance<'n8n-nodes-base.switch', string, unknown>;
@@ -110,11 +110,11 @@ describe('Switch Case fluent API', () => {
 			expect(switchConns).toBeDefined();
 
 			// case0 at output 0
-			expect(switchConns.main[0]![0]!.node).toBe('Case 0');
+			expect(switchConns.main[0]![0].node).toBe('Case 0');
 			// case1 at output 1
-			expect(switchConns.main[1]![0]!.node).toBe('Case 1');
+			expect(switchConns.main[1]![0].node).toBe('Case 1');
 			// case2 at output 2
-			expect(switchConns.main[2]![0]!.node).toBe('Case 2');
+			expect(switchConns.main[2]![0].node).toBe('Case 2');
 		});
 
 		it('should support sparse cases (skipping indices)', () => {
@@ -150,11 +150,11 @@ describe('Switch Case fluent API', () => {
 			expect(switchConns).toBeDefined();
 
 			// case0 at output 0
-			expect(switchConns.main[0]![0]!.node).toBe('Case 0');
+			expect(switchConns.main[0]![0].node).toBe('Case 0');
 			// case1 at output 1 - should be empty or undefined (skipped)
 			expect(switchConns.main[1] === undefined || switchConns.main[1]!.length === 0).toBe(true);
 			// case2 at output 2
-			expect(switchConns.main[2]![0]!.node).toBe('Case 2');
+			expect(switchConns.main[2]![0].node).toBe('Case 2');
 		});
 
 		it('should support plain array for multiple targets from one case', () => {
@@ -200,7 +200,7 @@ describe('Switch Case fluent API', () => {
 			expect(output0Targets).toEqual(['Target A', 'Target B']);
 
 			// case1 at output 1
-			expect(switchConns.main[1]![0]!.node).toBe('Target C');
+			expect(switchConns.main[1]![0].node).toBe('Target C');
 		});
 
 		it('should identify builder with isSwitchCaseBuilder', () => {

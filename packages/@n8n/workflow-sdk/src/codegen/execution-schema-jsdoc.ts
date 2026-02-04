@@ -24,7 +24,7 @@ export function schemaToOutputSample(schema: Schema): Record<string, unknown> | 
 			sample[field.key] = parseSchemaValue(field.value, field.type);
 		} else if (field.type === 'object' && Array.isArray(field.value)) {
 			// Recursively convert nested objects
-			const nestedSample = schemaToOutputSample(field as Schema);
+			const nestedSample = schemaToOutputSample(field);
 			sample[field.key] = nestedSample ?? {};
 		} else if (field.type === 'array' && Array.isArray(field.value)) {
 			// For arrays, try to get a sample from the first element if available

@@ -5,10 +5,10 @@
  * graph where connections use meaningful names instead of indices.
  */
 
-import type { WorkflowJSON, NodeJSON } from '../types/base';
+import { getOutputName, getInputName } from './semantic-registry';
 import type { SemanticGraph, SemanticNode, SemanticConnection, AiConnectionType } from './types';
 import { AI_CONNECTION_TYPES } from './types';
-import { getOutputName, getInputName } from './semantic-registry';
+import type { WorkflowJSON, NodeJSON } from '../types/base';
 import { isTriggerNodeType } from '../utils/trigger-detection';
 
 /**

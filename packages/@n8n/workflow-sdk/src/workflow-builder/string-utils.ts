@@ -107,7 +107,7 @@ export function normalizeResourceLocators(params: unknown): unknown {
 
 	for (const [key, value] of Object.entries(record)) {
 		if (isResourceLocatorLike(value)) {
-			const rlValue = value as Record<string, unknown>;
+			const rlValue = value;
 			const normalizedInner = normalizeResourceLocators(rlValue) as Record<string, unknown>;
 
 			// Clear placeholder value when mode is 'list' - list mode requires user selection

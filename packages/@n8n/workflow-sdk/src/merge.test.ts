@@ -1,6 +1,6 @@
+import type { NodeInstance } from './types/base';
 import { workflow } from './workflow-builder';
 import { node, trigger } from './workflow-builder/node-builders/node-builder';
-import type { NodeInstance } from './types/base';
 
 // Helper type for Merge node
 type MergeNode = NodeInstance<'n8n-nodes-base.merge', string, unknown>;
@@ -83,19 +83,19 @@ describe('Merge', () => {
 			// Source 1 should connect to Merge input 0
 			const source1Conns = json.connections['Source 1'];
 			expect(source1Conns).toBeDefined();
-			expect(source1Conns.main[0]![0]!.node).toBe('My Merge');
-			expect(source1Conns.main[0]![0]!.index).toBe(0);
+			expect(source1Conns.main[0]![0].node).toBe('My Merge');
+			expect(source1Conns.main[0]![0].index).toBe(0);
 
 			// Source 2 should connect to Merge input 1
 			const source2Conns = json.connections['Source 2'];
 			expect(source2Conns).toBeDefined();
-			expect(source2Conns.main[0]![0]!.node).toBe('My Merge');
-			expect(source2Conns.main[0]![0]!.index).toBe(1);
+			expect(source2Conns.main[0]![0].node).toBe('My Merge');
+			expect(source2Conns.main[0]![0].index).toBe(1);
 
 			// Merge should connect to downstream
 			const mergeConns = json.connections['My Merge'];
 			expect(mergeConns).toBeDefined();
-			expect(mergeConns.main[0]![0]!.node).toBe('Downstream');
+			expect(mergeConns.main[0]![0].node).toBe('Downstream');
 		});
 
 		it('should support multiple sources to same input index', () => {
@@ -136,20 +136,20 @@ describe('Merge', () => {
 			// Source A should connect to Merge input 0
 			const sourceAConns = json.connections['Source A'];
 			expect(sourceAConns).toBeDefined();
-			expect(sourceAConns.main[0]![0]!.node).toBe('My Merge');
-			expect(sourceAConns.main[0]![0]!.index).toBe(0);
+			expect(sourceAConns.main[0]![0].node).toBe('My Merge');
+			expect(sourceAConns.main[0]![0].index).toBe(0);
 
 			// Source B should also connect to Merge input 0
 			const sourceBConns = json.connections['Source B'];
 			expect(sourceBConns).toBeDefined();
-			expect(sourceBConns.main[0]![0]!.node).toBe('My Merge');
-			expect(sourceBConns.main[0]![0]!.index).toBe(0);
+			expect(sourceBConns.main[0]![0].node).toBe('My Merge');
+			expect(sourceBConns.main[0]![0].index).toBe(0);
 
 			// Source C should connect to Merge input 1
 			const sourceCConns = json.connections['Source C'];
 			expect(sourceCConns).toBeDefined();
-			expect(sourceCConns.main[0]![0]!.node).toBe('My Merge');
-			expect(sourceCConns.main[0]![0]!.index).toBe(1);
+			expect(sourceCConns.main[0]![0].node).toBe('My Merge');
+			expect(sourceCConns.main[0]![0].index).toBe(1);
 		});
 
 		it('should work with chains connecting to merge inputs', () => {
@@ -184,12 +184,12 @@ describe('Merge', () => {
 			const json = wf.toJSON();
 
 			// Transform 1 (tail of first chain) should connect to Merge input 0
-			expect(json.connections['Transform 1'].main[0]![0]!.node).toBe('Combine');
-			expect(json.connections['Transform 1'].main[0]![0]!.index).toBe(0);
+			expect(json.connections['Transform 1'].main[0]![0].node).toBe('Combine');
+			expect(json.connections['Transform 1'].main[0]![0].index).toBe(0);
 
 			// Process 2 should connect to Merge input 1
-			expect(json.connections['Process 2'].main[0]![0]!.node).toBe('Combine');
-			expect(json.connections['Process 2'].main[0]![0]!.index).toBe(1);
+			expect(json.connections['Process 2'].main[0]![0].node).toBe('Combine');
+			expect(json.connections['Process 2'].main[0]![0].index).toBe(1);
 		});
 
 		it('should support three or more inputs', () => {
@@ -223,9 +223,9 @@ describe('Merge', () => {
 
 			const json = wf.toJSON();
 
-			expect(json.connections['API 1'].main[0]![0]!.index).toBe(0);
-			expect(json.connections['API 2'].main[0]![0]!.index).toBe(1);
-			expect(json.connections['API 3'].main[0]![0]!.index).toBe(2);
+			expect(json.connections['API 1'].main[0]![0].index).toBe(0);
+			expect(json.connections['API 2'].main[0]![0].index).toBe(1);
+			expect(json.connections['API 3'].main[0]![0].index).toBe(2);
 		});
 	});
 });

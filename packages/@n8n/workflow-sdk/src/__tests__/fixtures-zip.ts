@@ -106,7 +106,7 @@ export function validateAllWorkflowsExist(): void {
 	if (missing.length > 0) {
 		throw new Error(
 			`Missing workflow files from manifest:\n${missing.join('\n')}\n` +
-				`Ensure public_published_templates.zip is committed and extracted.`,
+				'Ensure public_published_templates.zip is committed and extracted.',
 		);
 	}
 }

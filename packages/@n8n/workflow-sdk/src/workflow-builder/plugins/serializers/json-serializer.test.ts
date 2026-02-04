@@ -1,5 +1,4 @@
 import { jsonSerializer } from './json-serializer';
-import type { WorkflowJSON } from '../../../types/base';
 import type { SerializerContext } from '../types';
 
 // Helper to create a mock serializer context
@@ -38,7 +37,7 @@ describe('jsonSerializer', () => {
 				workflowName: 'My Workflow',
 			});
 
-			const result = jsonSerializer.serialize(ctx) as WorkflowJSON;
+			const result = jsonSerializer.serialize(ctx);
 
 			expect(result.id).toBe('wf-1');
 			expect(result.name).toBe('My Workflow');
@@ -49,7 +48,7 @@ describe('jsonSerializer', () => {
 				settings: { timezone: 'UTC', executionTimeout: 300 },
 			});
 
-			const result = jsonSerializer.serialize(ctx) as WorkflowJSON;
+			const result = jsonSerializer.serialize(ctx);
 
 			expect(result.settings).toEqual({ timezone: 'UTC', executionTimeout: 300 });
 		});
@@ -59,7 +58,7 @@ describe('jsonSerializer', () => {
 				pinData: { 'Node 1': [{ key: 'value' }] },
 			});
 
-			const result = jsonSerializer.serialize(ctx) as WorkflowJSON;
+			const result = jsonSerializer.serialize(ctx);
 
 			expect(result.pinData).toEqual({ 'Node 1': [{ key: 'value' }] });
 		});
@@ -69,7 +68,7 @@ describe('jsonSerializer', () => {
 				pinData: undefined,
 			});
 
-			const result = jsonSerializer.serialize(ctx) as WorkflowJSON;
+			const result = jsonSerializer.serialize(ctx);
 
 			expect(result.pinData).toBeUndefined();
 		});
@@ -79,7 +78,7 @@ describe('jsonSerializer', () => {
 				nodes: new Map(),
 			});
 
-			const result = jsonSerializer.serialize(ctx) as WorkflowJSON;
+			const result = jsonSerializer.serialize(ctx);
 
 			expect(result.nodes).toEqual([]);
 		});
@@ -89,7 +88,7 @@ describe('jsonSerializer', () => {
 				nodes: new Map(),
 			});
 
-			const result = jsonSerializer.serialize(ctx) as WorkflowJSON;
+			const result = jsonSerializer.serialize(ctx);
 
 			expect(result.connections).toEqual({});
 		});

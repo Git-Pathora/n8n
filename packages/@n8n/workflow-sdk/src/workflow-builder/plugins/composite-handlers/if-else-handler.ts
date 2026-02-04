@@ -4,21 +4,21 @@
  * Handles IfElseComposite and IfElseBuilder structures - if/else branching patterns.
  */
 
-import type { CompositeHandlerPlugin, MutablePluginContext } from '../types';
-import type {
-	IfElseComposite,
-	ConnectionTarget,
-	NodeInstance,
-	IfElseBuilder,
-} from '../../../types/base';
-import { isIfElseComposite } from '../../type-guards';
-import { isIfElseBuilder } from '../../node-builders/node-builder';
 import {
 	collectFromTarget,
 	addBranchTargetNodes,
 	processBranchForComposite,
 	processBranchForBuilder,
 } from './branch-handler-utils';
+import type {
+	IfElseComposite,
+	ConnectionTarget,
+	NodeInstance,
+	IfElseBuilder,
+} from '../../../types/base';
+import { isIfElseBuilder } from '../../node-builders/node-builder';
+import { isIfElseComposite } from '../../type-guards';
+import type { CompositeHandlerPlugin, MutablePluginContext } from '../types';
 
 /**
  * Type representing either Composite or Builder format
@@ -44,7 +44,7 @@ export const ifElseHandler: CompositeHandlerPlugin<IfElseInput> = {
 		if (isIfElseBuilder(input)) {
 			return { name: input.ifNode.name, id: input.ifNode.id };
 		}
-		const composite = input as IfElseComposite;
+		const composite = input;
 		return { name: composite.ifNode.name, id: composite.ifNode.id };
 	},
 
@@ -58,7 +58,7 @@ export const ifElseHandler: CompositeHandlerPlugin<IfElseInput> = {
 			collectFromTarget(input.trueBranch, collector);
 			collectFromTarget(input.falseBranch, collector);
 		} else {
-			const composite = input as IfElseComposite;
+			const composite = input;
 			collector(composite.ifNode);
 			collectFromTarget(composite.trueBranch, collector);
 			collectFromTarget(composite.falseBranch, collector);
@@ -70,7 +70,7 @@ export const ifElseHandler: CompositeHandlerPlugin<IfElseInput> = {
 
 		// Handle IfElseBuilder differently - need to set up connections BEFORE adding branches
 		if (isIfElseBuilder(input)) {
-			const builder = input as IfElseBuilder<unknown>;
+			const builder = input;
 
 			// IMPORTANT: Build IF connections BEFORE adding branch nodes
 			// This ensures that when merge handlers run, they can detect existing IF→Merge connections
@@ -122,7 +122,7 @@ export const ifElseHandler: CompositeHandlerPlugin<IfElseInput> = {
 		}
 
 		// IfElseComposite: add branches first, then use results for connections
-		const composite = input as IfElseComposite;
+		const composite = input;
 
 		// Process true branch (output 0)
 		processBranchForComposite(composite.trueBranch, 0, ctx, ifMainConns);

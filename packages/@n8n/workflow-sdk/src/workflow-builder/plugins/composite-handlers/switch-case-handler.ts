@@ -4,21 +4,21 @@
  * Handles SwitchCaseComposite and SwitchCaseBuilder structures - switch/case branching patterns.
  */
 
-import type { CompositeHandlerPlugin, MutablePluginContext } from '../types';
-import type {
-	SwitchCaseComposite,
-	ConnectionTarget,
-	NodeInstance,
-	SwitchCaseBuilder,
-} from '../../../types/base';
-import { isSwitchCaseComposite } from '../../type-guards';
-import { isSwitchCaseBuilder } from '../../node-builders/node-builder';
 import {
 	collectFromTarget,
 	addBranchTargetNodes,
 	processBranchForComposite,
 	processBranchForBuilder,
 } from './branch-handler-utils';
+import type {
+	SwitchCaseComposite,
+	ConnectionTarget,
+	NodeInstance,
+	SwitchCaseBuilder,
+} from '../../../types/base';
+import { isSwitchCaseBuilder } from '../../node-builders/node-builder';
+import { isSwitchCaseComposite } from '../../type-guards';
+import type { CompositeHandlerPlugin, MutablePluginContext } from '../types';
 
 /**
  * Type representing either Composite or Builder format
@@ -44,7 +44,7 @@ export const switchCaseHandler: CompositeHandlerPlugin<SwitchCaseInput> = {
 		if (isSwitchCaseBuilder(input)) {
 			return { name: input.switchNode.name, id: input.switchNode.id };
 		}
-		const composite = input as SwitchCaseComposite;
+		const composite = input;
 		return { name: composite.switchNode.name, id: composite.switchNode.id };
 	},
 
@@ -81,7 +81,7 @@ export const switchCaseHandler: CompositeHandlerPlugin<SwitchCaseInput> = {
 
 		// Handle SwitchCaseBuilder differently - need to set up connections BEFORE adding case nodes
 		if ('caseMapping' in input && input.caseMapping instanceof Map) {
-			const builder = input as SwitchCaseBuilder<unknown>;
+			const builder = input;
 
 			// IMPORTANT: Build Switch connections BEFORE adding case nodes
 			// This ensures that when merge handlers run, they can detect existing Switch→Merge connections

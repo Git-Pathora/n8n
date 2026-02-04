@@ -11,12 +11,12 @@
  * - Subnodes connected via AI connections (they connect TO parent nodes)
  */
 
-import type { ValidatorPlugin, PluginContext, ValidationIssue } from '../types';
-import { isAutoRenamed, formatNodeRef } from '../types';
+import { isStickyNoteType } from '../../../constants/node-types';
 import type { GraphNode } from '../../../types/base';
 import { isNodeChain } from '../../../types/base';
 import { isTriggerNodeType } from '../../../utils/trigger-detection';
-import { isStickyNoteType } from '../../../constants/node-types';
+import type { ValidatorPlugin, PluginContext, ValidationIssue } from '../types';
+import { isAutoRenamed, formatNodeRef } from '../types';
 
 /**
  * AI connection types used by subnodes to connect to parent nodes.
@@ -73,7 +73,7 @@ function findNodesWithIncomingConnections(
 			for (const [_outputIndex, targets] of mainConns) {
 				for (const target of targets) {
 					if (typeof target === 'object' && 'node' in target) {
-						nodesWithIncoming.add(target.node as string);
+						nodesWithIncoming.add(target.node);
 					}
 				}
 			}

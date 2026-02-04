@@ -1,4 +1,5 @@
 import { describe, it, expect } from '@jest/globals';
+
 import { annotateGraph } from './graph-annotator';
 import { buildSemanticGraph } from './semantic-graph';
 import type { WorkflowJSON } from '../types/base';

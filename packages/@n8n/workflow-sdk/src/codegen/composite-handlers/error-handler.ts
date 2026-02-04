@@ -4,8 +4,8 @@
  * Helper functions for handling nodes with error outputs (onError: 'continueErrorOutput').
  */
 
-import type { SemanticNode } from '../types';
 import type { CompositeNode } from '../composite-tree';
+import type { SemanticNode } from '../types';
 import {
 	type BuildContext,
 	createLeaf,

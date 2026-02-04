@@ -271,8 +271,9 @@ function processFluentApi(input: SplitInBatchesBuilderShape, ctx: MutablePluginC
 	if (input._hasLoop && lastEachNode) {
 		const lastEachGraphNode = ctx.nodes.get(lastEachNode);
 		if (lastEachGraphNode) {
-			const lastEachMainConns = lastEachGraphNode.connections.get('main') ?? new Map();
-			const existingConns = lastEachMainConns.get(0) ?? [];
+			const lastEachMainConns =
+				lastEachGraphNode.connections.get('main') ?? new Map<number, ConnectionTarget[]>();
+			const existingConns: ConnectionTarget[] = lastEachMainConns.get(0) ?? [];
 			lastEachMainConns.set(0, [
 				...existingConns,
 				{ node: input.sibNode.name, type: 'main', index: 0 },
@@ -327,9 +328,10 @@ function processBatches(
 			for (const prevNode of previousBatchNodes) {
 				const prevGraphNode = ctx.nodes.get(prevNode);
 				if (prevGraphNode) {
-					const prevMainConns = prevGraphNode.connections.get('main') ?? new Map();
-					const existingConns = prevMainConns.get(0) ?? [];
-					const newConns = currentBatchNodes.map((n) => ({
+					const prevMainConns =
+						prevGraphNode.connections.get('main') ?? new Map<number, ConnectionTarget[]>();
+					const existingConns: ConnectionTarget[] = prevMainConns.get(0) ?? [];
+					const newConns: ConnectionTarget[] = currentBatchNodes.map((n) => ({
 						node: n,
 						type: 'main' as const,
 						index: 0,

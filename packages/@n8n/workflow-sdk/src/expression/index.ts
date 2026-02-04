@@ -48,7 +48,7 @@ function createExpressionProxy(path: string[] = []): unknown {
 
 			// Handle $('NodeName') syntax
 			if (path.length === 1 && path[0] === '$') {
-				const nodeName = args[0];
+				const nodeName = String(args[0]);
 				return createExpressionProxy(['$', `('${nodeName}')`, 'item']);
 			}
 

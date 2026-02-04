@@ -288,10 +288,16 @@ class NodeInstanceImpl<TType extends string, TVersion extends string, TOutput = 
 
 		// Switch nodes have variable outputs based on parameters
 		if (isSwitchNodeType(this.type)) {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const params = this.config.parameters as Record<string, any> | undefined;
-			const numberOutputs = params?.numberOutputs ?? params?.rules?.rules?.length ?? 4;
-			return typeof numberOutputs === 'number' ? numberOutputs : 4;
+			const params = this.config.parameters as Record<string, unknown> | undefined;
+			if (params?.numberOutputs !== undefined && typeof params.numberOutputs === 'number') {
+				return params.numberOutputs;
+			}
+			const rules = params?.rules as Record<string, unknown> | undefined;
+			const innerRules = rules?.rules as unknown[] | undefined;
+			if (innerRules?.length !== undefined) {
+				return innerRules.length;
+			}
+			return 4;
 		}
 
 		// Regular nodes: error at index 1 (after main output 0)

@@ -335,7 +335,9 @@ class SDKInterpreter {
 			} else if (element.type === 'SpreadElement') {
 				const spreadValue = this.evaluate(element.argument);
 				if (Array.isArray(spreadValue)) {
-					result.push(...spreadValue);
+					for (const item of spreadValue) {
+						result.push(item);
+					}
 				}
 			} else {
 				result.push(this.evaluate(element));

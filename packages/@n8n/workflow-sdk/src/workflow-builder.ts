@@ -60,7 +60,7 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 		this.id = id;
 		this.name = name;
 		this._settings = { ...settings };
-		this._nodes = nodes ? new Map(nodes) : new Map();
+		this._nodes = nodes ? new Map<string, GraphNode>(nodes) : new Map<string, GraphNode>();
 		this._currentNode = currentNode ?? null;
 		this._currentOutput = 0;
 		this._pinData = pinData;
@@ -282,8 +282,9 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 			if (this._currentNode) {
 				const currentGraphNode = this._nodes.get(this._currentNode);
 				if (currentGraphNode) {
-					const mainConns = currentGraphNode.connections.get('main') ?? new Map();
-					const outputConns = mainConns.get(this._currentOutput) ?? [];
+					const mainConns =
+						currentGraphNode.connections.get('main') ?? new Map<number, ConnectionTarget[]>();
+					const outputConns: ConnectionTarget[] = mainConns.get(this._currentOutput) ?? [];
 					outputConns.push({ node: headName, type: 'main', index: 0 });
 					mainConns.set(this._currentOutput, outputConns);
 					currentGraphNode.connections.set('main', mainConns);
@@ -307,12 +308,11 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 			if (this._currentNode) {
 				const currentGraphNode = this._nodes.get(this._currentNode);
 				if (currentGraphNode) {
-					const mainConns = currentGraphNode.connections.get('main') ?? new Map();
-					const outputConnections = mainConns.get(this._currentOutput) ?? [];
+					const mainConns =
+						currentGraphNode.connections.get('main') ?? new Map<number, ConnectionTarget[]>();
+					const outputConnections: ConnectionTarget[] = mainConns.get(this._currentOutput) ?? [];
 					// Check for duplicate connections
-					const alreadyConnected = outputConnections.some(
-						(c: { node: string }) => c.node === node.name,
-					);
+					const alreadyConnected = outputConnections.some((c) => c.node === node.name);
 					if (!alreadyConnected) {
 						mainConns.set(this._currentOutput, [
 							...outputConnections,
@@ -338,8 +338,9 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 		if (this._currentNode) {
 			const currentGraphNode = this._nodes.get(this._currentNode);
 			if (currentGraphNode) {
-				const mainConns = currentGraphNode.connections.get('main') ?? new Map();
-				const outputConnections = mainConns.get(this._currentOutput) ?? [];
+				const mainConns =
+					currentGraphNode.connections.get('main') ?? new Map<number, ConnectionTarget[]>();
+				const outputConnections: ConnectionTarget[] = mainConns.get(this._currentOutput) ?? [];
 				mainConns.set(this._currentOutput, [
 					...outputConnections,
 					{ node: node.name, type: 'main', index: 0 },
@@ -444,12 +445,13 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 					const targetName = this.resolveTargetNodeName(target);
 					if (!targetName) continue;
 
-					const mainConns = graphNode.connections.get('main') ?? new Map();
-					const outputConns = mainConns.get(outputIndex) ?? [];
+					const mainConns =
+						graphNode.connections.get('main') ?? new Map<number, ConnectionTarget[]>();
+					const outputConns: ConnectionTarget[] = mainConns.get(outputIndex) ?? [];
 					// Avoid duplicates - check both target node AND input index
 					const targetIndex = targetInputIndex ?? 0;
 					const alreadyExists = outputConns.some(
-						(c: ConnectionTarget) => c.node === targetName && c.index === targetIndex,
+						(c) => c.node === targetName && c.index === targetIndex,
 					);
 					if (!alreadyExists) {
 						outputConns.push({ node: targetName, type: 'main', index: targetIndex });
@@ -805,8 +807,9 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 			// Connect from current node to the head of this target
 			// Array syntax always uses incrementing output indices (branching behavior)
 			if (this._currentNode && currentGraphNode) {
-				const mainConns = currentGraphNode.connections.get('main') ?? new Map();
-				const outputConnections = mainConns.get(index) ?? [];
+				const mainConns =
+					currentGraphNode.connections.get('main') ?? new Map<number, ConnectionTarget[]>();
+				const outputConnections: ConnectionTarget[] = mainConns.get(index) ?? [];
 				mainConns.set(index, [
 					...outputConnections,
 					{ node: headNodeName, type: 'main', index: 0 },
@@ -841,8 +844,9 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 		if (this._currentNode) {
 			const currentGraphNode = this._nodes.get(this._currentNode);
 			if (currentGraphNode) {
-				const mainConns = currentGraphNode.connections.get('main') ?? new Map();
-				const outputConnections = mainConns.get(this._currentOutput) ?? [];
+				const mainConns =
+					currentGraphNode.connections.get('main') ?? new Map<number, ConnectionTarget[]>();
+				const outputConnections: ConnectionTarget[] = mainConns.get(this._currentOutput) ?? [];
 
 				// Standard behavior: connect to chain head
 				outputConnections.push({ node: headNodeName, type: 'main', index: 0 });
@@ -969,9 +973,11 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 							if (sourceGraphNode) {
 								const targetName = this.resolveTargetNodeName(target, effectiveNameMapping);
 								if (targetName) {
-									const mainConns = sourceGraphNode.connections.get('main') ?? new Map();
-									const outputConns = mainConns.get(outputIndex) ?? [];
-									if (!outputConns.some((c: ConnectionTarget) => c.node === targetName)) {
+									const mainConns =
+										sourceGraphNode.connections.get('main') ??
+										new Map<number, ConnectionTarget[]>();
+									const outputConns: ConnectionTarget[] = mainConns.get(outputIndex) ?? [];
+									if (!outputConns.some((c) => c.node === targetName)) {
 										outputConns.push({
 											node: targetName,
 											type: 'main',

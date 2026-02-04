@@ -11,6 +11,12 @@ import type { SDKFunctions } from './interpreter';
 import { interpretSDKCode } from './interpreter';
 import { parseSDKCode } from './parser';
 
+/** Helper to get the first call argument from a Jest mock with proper typing */
+function getFirstCallArg<T>(mockFn: jest.Mock): T {
+	const calls = mockFn.mock.calls as unknown[][];
+	return calls[0][0] as T;
+}
+
 // Mock SDK functions for testing
 const createMockSDKFunctions = (): SDKFunctions => ({
 	workflow: jest.fn((id: string, name: string) => ({
@@ -522,10 +528,9 @@ describe('AST Interpreter', () => {
 			});
 			// Verify node was called with the subnode
 			expect(sdkFunctions.node).toHaveBeenCalled();
-			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access -- Jest mock.calls returns any[]
-			const nodeCallArgs = (sdkFunctions.node as jest.Mock).mock.calls[0][0] as {
-				config: { subnodes: { model: unknown } };
-			};
+			const nodeCallArgs = getFirstCallArg<{ config: { subnodes: { model: unknown } } }>(
+				sdkFunctions.node as jest.Mock,
+			);
 			expect(nodeCallArgs.config.subnodes.model).toBeDefined();
 		});
 
@@ -542,10 +547,9 @@ describe('AST Interpreter', () => {
 			expect(sdkFunctions.fromAi).toHaveBeenCalledWith('email', 'Recipient email');
 			// Verify tool was called with the fromAi result
 			expect(sdkFunctions.tool).toHaveBeenCalled();
-			// eslint-disable-next-line @typescript-eslint/no-unsafe-member-access -- Jest mock.calls returns any[]
-			const toolCallArgs = (sdkFunctions.tool as jest.Mock).mock.calls[0][0] as {
-				config: { parameters: { sendTo: string } };
-			};
+			const toolCallArgs = getFirstCallArg<{ config: { parameters: { sendTo: string } } }>(
+				sdkFunctions.tool as jest.Mock,
+			);
 			expect(toolCallArgs.config.parameters.sendTo).toContain('$fromAI');
 		});
 	});

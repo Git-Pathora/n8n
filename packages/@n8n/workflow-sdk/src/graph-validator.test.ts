@@ -11,8 +11,7 @@ describe('graph validation', () => {
 			expect(result.errors).toContainEqual(
 				expect.objectContaining({
 					code: 'NO_NODES',
-					// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Jest asymmetric matcher returns any
-					message: expect.stringContaining('no nodes'),
+					message: expect.stringContaining('no nodes') as unknown as string,
 				}),
 			);
 		});
@@ -48,8 +47,7 @@ describe('graph validation', () => {
 			expect(result.warnings).toContainEqual(
 				expect.objectContaining({
 					code: 'MISSING_TRIGGER',
-					// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Jest asymmetric matcher returns any
-					message: expect.stringContaining('trigger'),
+					message: expect.stringContaining('trigger') as unknown as string,
 				}),
 			);
 		});
@@ -983,8 +981,7 @@ describe('graph validation', () => {
 			expect(result.warnings).toContainEqual(
 				expect.objectContaining({
 					code: 'MISSING_EXPRESSION_PREFIX',
-					// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Jest asymmetric matcher returns any
-					message: expect.stringContaining('options.systemMessage'),
+					message: expect.stringContaining('options.systemMessage') as unknown as string,
 				}),
 			);
 		});
@@ -1220,8 +1217,7 @@ describe('graph validation', () => {
 			expect(result.errors).toContainEqual(
 				expect.objectContaining({
 					code: 'SUBNODE_NOT_CONNECTED',
-					// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Jest asymmetric matcher returns any
-					message: expect.stringContaining('as embedding'),
+					message: expect.stringContaining('as embedding') as unknown as string,
 				}),
 			);
 		});
@@ -1254,8 +1250,7 @@ describe('graph validation', () => {
 			expect(result.errors).toContainEqual(
 				expect.objectContaining({
 					code: 'SUBNODE_NOT_CONNECTED',
-					// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Jest asymmetric matcher returns any
-					message: expect.stringContaining('as model'),
+					message: expect.stringContaining('as model') as unknown as string,
 				}),
 			);
 		});
@@ -1456,8 +1451,7 @@ describe('graph validation', () => {
 			expect(result.errors).toContainEqual(
 				expect.objectContaining({
 					code: 'MAX_NODES_EXCEEDED',
-					// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Jest asymmetric matcher returns any
-					message: expect.stringContaining('2'),
+					message: expect.stringContaining('2') as unknown as string,
 				}),
 			);
 		});
@@ -1566,8 +1560,7 @@ describe('graph validation', () => {
 			expect(result.errors).toContainEqual(
 				expect.objectContaining({
 					code: 'MAX_NODES_EXCEEDED',
-					// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Jest asymmetric matcher returns any
-					message: expect.stringContaining('3'),
+					message: expect.stringContaining('3') as unknown as string,
 				}),
 			);
 		});

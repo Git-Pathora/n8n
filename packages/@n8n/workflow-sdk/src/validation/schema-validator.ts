@@ -138,7 +138,7 @@ function buildExpectedFactoryName(
  */
 function tryLoadSchemaModule(schemaPath: string): Record<string, unknown> | null {
 	try {
-		// eslint-disable-next-line @typescript-eslint/no-require-imports
+		// eslint-disable-next-line @typescript-eslint/no-require-imports -- Dynamic module loading requires CommonJS require
 		return require(schemaPath) as Record<string, unknown>;
 	} catch {
 		return null;

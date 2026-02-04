@@ -769,8 +769,8 @@ describe('code-generator', () => {
 				expect(code).toContain('\\u2019'); // Unicode escape sequence in generated code
 
 				// When eval'd, should produce the original character
-				// eslint-disable-next-line @typescript-eslint/no-unsafe-assignment -- Testing eval behavior for unicode
-				const evalResult = eval("'What\\u2019s the weather in Paris?'");
+				// eslint-disable-next-line no-eval -- Testing eval behavior for unicode escaping
+				const evalResult = eval("'What\\u2019s the weather in Paris?'") as string;
 				expect(evalResult).toBe(originalName);
 			});
 

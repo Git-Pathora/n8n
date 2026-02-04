@@ -8,7 +8,6 @@ import {
 	FIX_AND_FINALIZE_INSTRUCTION,
 	TEXT_EDITOR_TOOL,
 	VALIDATE_TOOL,
-	SONNET_4_5_PRICING,
 } from '../constants';
 
 describe('code-builder constants', () => {
@@ -44,13 +43,6 @@ describe('code-builder constants', () => {
 			expect(VALIDATE_TOOL.function.name).toBe('validate_workflow');
 			expect(VALIDATE_TOOL.function.description).toContain('Validate');
 			expect(VALIDATE_TOOL.function.parameters.required).toContain('path');
-		});
-	});
-
-	describe('SONNET_4_5_PRICING', () => {
-		it('should have correct pricing values', () => {
-			expect(SONNET_4_5_PRICING.inputPerMillion).toBe(3);
-			expect(SONNET_4_5_PRICING.outputPerMillion).toBe(15);
 		});
 	});
 });

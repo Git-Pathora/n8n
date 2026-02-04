@@ -14,7 +14,6 @@ export {
 	FIX_AND_FINALIZE_INSTRUCTION,
 	TEXT_EDITOR_TOOL,
 	VALIDATE_TOOL,
-	SONNET_4_5_PRICING,
 } from './constants';
 
 // Types
@@ -26,7 +25,6 @@ export type {
 } from './types';
 
 // Utilities
-export { calculateCost } from './utils/cost-calculator';
 export { extractTextContent, extractThinkingContent } from './utils/content-extractors';
 export { processLlmResponse } from './utils/llm-response-processor';
 export type { LlmResponseResult, ToolCall } from './utils/llm-response-processor';

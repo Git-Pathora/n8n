@@ -47,12 +47,6 @@ export const VALIDATE_TOOL = {
 	},
 };
 
-/** Claude Sonnet 4.5 pricing per million tokens (USD) */
-export const SONNET_4_5_PRICING = {
-	inputPerMillion: 3,
-	outputPerMillion: 15,
-};
-
 /**
  * CodeBuilderAgent tools for display when session is loaded
  */

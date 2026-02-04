@@ -34,7 +34,6 @@ import { TextEditorToolHandler } from './handlers/text-editor-tool-handler';
 import { ValidateToolHandler } from './handlers/validate-tool-handler';
 import { WarningTracker } from './state/warning-tracker';
 import type { CodeBuilderAgentConfig } from './types';
-import { calculateCost } from './utils/cost-calculator';
 export type { CodeBuilderAgentConfig } from './types';
 import { buildCodeBuilderPrompt, type HistoryContext } from './prompts';
 import { createCodeBuilderGetTool } from './tools/code-builder-get.tool';
@@ -606,15 +605,11 @@ ${'='.repeat(50)}
 
 			// Calculate stats
 			const totalDuration = Date.now() - startTime;
-			const totalTokens = totalInputTokens + totalOutputTokens;
-			const estimatedCost = calculateCost(totalInputTokens, totalOutputTokens);
 
 			this.debugLog('CHAT', 'Request stats', {
 				totalDurationMs: totalDuration,
 				totalInputTokens,
 				totalOutputTokens,
-				totalTokens,
-				estimatedCostUsd: estimatedCost,
 			});
 
 			// Stream workflow update (includes source code for evaluation artifacts)
@@ -650,7 +645,6 @@ ${'='.repeat(50)}
 				totalDurationMs: totalDuration,
 				totalInputTokens,
 				totalOutputTokens,
-				estimatedCostUsd: estimatedCost,
 				parseDurationMs: parseDuration,
 				nodeCount: workflow.nodes.length,
 				iterations: iteration,

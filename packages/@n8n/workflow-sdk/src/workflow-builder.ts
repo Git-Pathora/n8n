@@ -697,41 +697,6 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 			}
 		}
 
-		// Check: Disconnected nodes (non-trigger nodes without incoming connections)
-		if (!options.allowDisconnectedNodes) {
-			const nodesWithIncoming = this.findNodesWithIncomingConnections();
-			for (const [mapKey, graphNode] of this._nodes) {
-				const originalName = graphNode.instance.name;
-				// Skip trigger nodes - they don't need incoming connections
-				if (isTriggerNode(graphNode.instance.type)) {
-					continue;
-				}
-				// Skip sticky notes - they don't participate in data flow
-				if (graphNode.instance.type === 'n8n-nodes-base.stickyNote') {
-					continue;
-				}
-				// Skip subnodes - they connect TO their parent via AI connections
-				if (this.isConnectedSubnode(graphNode)) {
-					continue;
-				}
-				// Check if this node has any incoming connection (use mapKey, not originalName)
-				if (!nodesWithIncoming.has(mapKey)) {
-					const isRenamed = this.isAutoRenamed(mapKey, originalName);
-					const displayName = isRenamed ? mapKey : originalName;
-					const origForWarning = isRenamed ? originalName : undefined;
-					warnings.push(
-						new ValidationWarning(
-							'DISCONNECTED_NODE',
-							`${this.formatNodeRef(displayName, origForWarning, graphNode.instance.type)} is not connected to any input. It will not receive data.`,
-							displayName,
-							undefined, // parameterPath
-							origForWarning,
-						),
-					);
-				}
-			}
-		}
-
 		// Check: maxNodes constraint
 		if (options.nodeTypesProvider) {
 			// Group nodes by type
@@ -772,6 +737,9 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 			workflowName: this.name,
 			settings: this._settings,
 			pinData: this._pinData,
+			validationOptions: {
+				allowDisconnectedNodes: options.allowDisconnectedNodes,
+			},
 		};
 
 		// Run validators for each node
@@ -798,27 +766,6 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 			errors,
 			warnings,
 		};
-	}
-
-	/**
-	 * Check if a node was auto-renamed (pattern: "Name" -> "Name 1", "Name 2", etc.)
-	 */
-	private isAutoRenamed(mapKey: string, originalName: string): boolean {
-		if (mapKey === originalName) return false;
-		if (!mapKey.startsWith(originalName + ' ')) return false;
-		const suffix = mapKey.slice(originalName.length + 1);
-		return /^\d+$/.test(suffix);
-	}
-
-	/**
-	 * Format a node reference for warning messages, including node type and original name if renamed
-	 */
-	private formatNodeRef(displayName: string, originalName?: string, nodeType?: string): string {
-		const typeSuffix = nodeType ? ` [${nodeType}]` : '';
-		if (originalName && originalName !== displayName) {
-			return `'${displayName}' (originally '${originalName}')${typeSuffix}`;
-		}
-		return `'${displayName}'${typeSuffix}`;
 	}
 
 	/**
@@ -849,83 +796,6 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 				);
 			}
 		}
-	}
-
-	/**
-	 * Find all nodes that have incoming connections from other nodes
-	 */
-	private findNodesWithIncomingConnections(): Set<string> {
-		const nodesWithIncoming = new Set<string>();
-
-		for (const [_name, graphNode] of this._nodes) {
-			// Check connections stored in graphNode.connections (from workflow builder's .then())
-			const mainConns = graphNode.connections.get('main');
-			if (mainConns) {
-				for (const [_outputIndex, targets] of mainConns) {
-					for (const target of targets) {
-						if (typeof target === 'object' && 'node' in target) {
-							nodesWithIncoming.add(target.node as string);
-						}
-					}
-				}
-			}
-
-			// Check connections declared via node's .then() (instance-level connections)
-			if (typeof graphNode.instance.getConnections === 'function') {
-				const registry = this._registry ?? pluginRegistry;
-				const connections = graphNode.instance.getConnections();
-				for (const conn of connections) {
-					// Get the target node name
-					// For NodeChains, use head.name (entry point of the chain)
-					if (isNodeChain(conn.target)) {
-						nodesWithIncoming.add(conn.target.head.name);
-					} else {
-						// Try composite resolution via registry
-						const compositeHeadName = registry.resolveCompositeHeadName(conn.target);
-						if (compositeHeadName !== undefined) {
-							nodesWithIncoming.add(compositeHeadName);
-						} else if (typeof conn.target === 'object' && 'name' in conn.target) {
-							nodesWithIncoming.add(conn.target.name);
-						} else {
-							nodesWithIncoming.add(String(conn.target));
-						}
-					}
-				}
-			}
-		}
-
-		return nodesWithIncoming;
-	}
-
-	/**
-	 * Check if a node is a subnode that's connected to a parent via AI connection types.
-	 * Subnodes connect outward TO their parent node (not the other way around).
-	 */
-	private isConnectedSubnode(graphNode: GraphNode): boolean {
-		const aiConnectionTypes = [
-			'ai_languageModel',
-			'ai_memory',
-			'ai_tool',
-			'ai_outputParser',
-			'ai_embedding',
-			'ai_vectorStore',
-			'ai_retriever',
-			'ai_document',
-			'ai_textSplitter',
-			'ai_reranker',
-		];
-
-		for (const [connType, outputMap] of graphNode.connections) {
-			if (aiConnectionTypes.includes(connType)) {
-				// Check if it connects to a valid parent node
-				for (const [_outputIndex, targets] of outputMap) {
-					if (targets.length > 0) {
-						return true; // Has AI connection to parent
-					}
-				}
-			}
-		}
-		return false;
 	}
 
 	toString(): string {

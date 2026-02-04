@@ -77,6 +77,14 @@ export interface ValidationIssue {
 // =============================================================================
 
 /**
+ * Validation options that can be passed to validators via PluginContext.
+ */
+export interface ValidationOptions {
+	/** If true, skip validation for disconnected nodes */
+	readonly allowDisconnectedNodes?: boolean;
+}
+
+/**
  * Read-only context passed to plugins for accessing workflow state.
  */
 export interface PluginContext {
@@ -90,6 +98,8 @@ export interface PluginContext {
 	readonly settings: Record<string, unknown>;
 	/** Optional pin data for nodes */
 	readonly pinData?: Record<string, IDataObject[]>;
+	/** Optional validation options (available during validation) */
+	readonly validationOptions?: ValidationOptions;
 }
 
 /**

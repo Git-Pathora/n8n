@@ -64,7 +64,6 @@ const props = defineProps<Props>();
 
 const i18n = useI18n();
 const modalBus = createEventBus();
-const moveToFolderDropdown = ref<InstanceType<typeof MoveToFolderDropdown>>();
 
 const foldersStore = useFoldersStore();
 const projectsStore = useProjectsStore();
@@ -338,10 +337,6 @@ const onSubmit = async () => {
 	}
 };
 
-modalBus.on('opened', () => {
-	moveToFolderDropdown.value?.focusOnInput();
-});
-
 const descriptionMessage = computed(() => {
 	let folderText = '';
 	let workflowText = '';
@@ -468,7 +463,6 @@ onMounted(async () => {
 						{{ i18n.baseText('folders.move.modal.folder.label') }}
 					</N8nText>
 					<MoveToFolderDropdown
-						ref="moveToFolderDropdown"
 						:selected-location="selectedFolder"
 						:selected-project-id="selectedProject.id"
 						:current-project-id="currentResourceProjectId"

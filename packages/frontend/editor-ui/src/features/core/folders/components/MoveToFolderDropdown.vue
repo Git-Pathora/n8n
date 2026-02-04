@@ -36,7 +36,6 @@ const i18n = useI18n();
 const foldersStore = useFoldersStore();
 
 const availableLocations = ref<ChangeLocationSearchResult[]>([]);
-const moveFolderDropdown = ref<InstanceType<typeof N8nSelect>>();
 const selectedLocationId = computed<string | null>({
 	get: () => props.selectedLocation?.id ?? null,
 	set: (id) => {
@@ -92,17 +91,6 @@ watch(
 	},
 	{ immediate: true },
 );
-
-function focusOnInput() {
-	// To make the dropdown automatically open focused and positioned correctly
-	// we must wait till the modal opening animation is done. ElModal triggers an 'opened' event
-	// when the animation is done, and once that happens, we can focus on the input.
-	moveFolderDropdown.value?.focusOnInput();
-}
-
-defineExpose({
-	focusOnInput,
-});
 
 const maxPathLength = 4;
 const separator = '/';

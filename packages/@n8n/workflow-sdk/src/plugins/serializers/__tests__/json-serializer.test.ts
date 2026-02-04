@@ -1,14 +1,18 @@
 import { jsonSerializer } from '../json-serializer';
 import type { WorkflowJSON } from '../../../types/base';
-import type { PluginContext } from '../../types';
+import type { SerializerContext } from '../../types';
 
-// Helper to create a mock plugin context
-function createMockPluginContext(overrides: Partial<PluginContext> = {}): PluginContext {
+// Helper to create a mock serializer context
+function createMockSerializerContext(
+	overrides: Partial<SerializerContext> = {},
+): SerializerContext {
 	return {
 		nodes: new Map(),
 		workflowId: 'test-workflow',
 		workflowName: 'Test Workflow',
 		settings: {},
+		calculatePositions: () => new Map(),
+		resolveTargetNodeName: () => undefined,
 		...overrides,
 	};
 }
@@ -30,7 +34,7 @@ describe('jsonSerializer', () => {
 
 	describe('serialize', () => {
 		it('returns WorkflowJSON with id and name', () => {
-			const ctx = createMockPluginContext({
+			const ctx = createMockSerializerContext({
 				workflowId: 'wf-1',
 				workflowName: 'My Workflow',
 			});
@@ -42,7 +46,7 @@ describe('jsonSerializer', () => {
 		});
 
 		it('includes settings in output', () => {
-			const ctx = createMockPluginContext({
+			const ctx = createMockSerializerContext({
 				settings: { timezone: 'UTC', executionTimeout: 300 },
 			});
 
@@ -52,7 +56,7 @@ describe('jsonSerializer', () => {
 		});
 
 		it('includes pinData in output when present', () => {
-			const ctx = createMockPluginContext({
+			const ctx = createMockSerializerContext({
 				pinData: { 'Node 1': [{ key: 'value' }] },
 			});
 
@@ -62,7 +66,7 @@ describe('jsonSerializer', () => {
 		});
 
 		it('excludes pinData from output when not present', () => {
-			const ctx = createMockPluginContext({
+			const ctx = createMockSerializerContext({
 				pinData: undefined,
 			});
 
@@ -72,7 +76,7 @@ describe('jsonSerializer', () => {
 		});
 
 		it('returns empty nodes array when no nodes', () => {
-			const ctx = createMockPluginContext({
+			const ctx = createMockSerializerContext({
 				nodes: new Map(),
 			});
 
@@ -82,7 +86,7 @@ describe('jsonSerializer', () => {
 		});
 
 		it('returns empty connections object when no nodes', () => {
-			const ctx = createMockPluginContext({
+			const ctx = createMockSerializerContext({
 				nodes: new Map(),
 			});
 

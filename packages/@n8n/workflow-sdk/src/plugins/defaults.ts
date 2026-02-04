@@ -19,6 +19,8 @@ import {
 	fromAiValidator,
 	httpRequestValidator,
 	mergeNodeValidator,
+	missingTriggerValidator,
+	noNodesValidator,
 	setNodeValidator,
 	subnodeConnectionValidator,
 	toolNodeValidator,
@@ -42,6 +44,10 @@ import { jsonSerializer } from './serializers';
  * All core validators to register
  */
 const coreValidators: ValidatorPlugin[] = [
+	// Workflow-level validators (highest priority - run early)
+	noNodesValidator, // Check if workflow has any nodes
+	missingTriggerValidator, // Check if workflow has a trigger
+
 	// Node-specific validators (high priority)
 	agentValidator,
 	chainLlmValidator,
@@ -59,7 +65,7 @@ const coreValidators: ValidatorPlugin[] = [
 	expressionPathValidator, // Workflow-level validator
 
 	// Structural validators (lowest priority)
-	disconnectedNodeValidator, // Workflow-level validator (stub - inline handles options)
+	disconnectedNodeValidator, // Workflow-level validator
 	subnodeConnectionValidator, // Workflow-level validator
 ];
 

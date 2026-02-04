@@ -82,6 +82,8 @@ export interface ValidationIssue {
 export interface ValidationOptions {
 	/** If true, skip validation for disconnected nodes */
 	readonly allowDisconnectedNodes?: boolean;
+	/** If true, skip validation for missing trigger nodes */
+	readonly allowNoTrigger?: boolean;
 }
 
 /**
@@ -306,6 +308,33 @@ export interface CompositeHandlerPlugin<TInput = unknown> {
 // =============================================================================
 
 /**
+ * Extended context for serializers with helper methods for conversion.
+ *
+ * SerializerContext provides all the information needed to serialize
+ * a workflow to any output format, including access to positions,
+ * name resolution, and workflow metadata.
+ */
+export interface SerializerContext extends PluginContext {
+	/**
+	 * Get calculated positions for nodes that don't have explicit positions.
+	 * Returns a map of node name to [x, y] position tuple.
+	 */
+	calculatePositions(): Map<string, [number, number]>;
+
+	/**
+	 * Resolve a connection target to its node name.
+	 * Handles NodeInstance, NodeChain, composites (IfElse, SwitchCase, etc.),
+	 * and InputTarget types.
+	 * @param target The connection target to resolve
+	 * @returns The resolved node name, or undefined if invalid
+	 */
+	resolveTargetNodeName(target: unknown): string | undefined;
+
+	/** Workflow meta information (if set) */
+	readonly meta?: Record<string, unknown>;
+}
+
+/**
  * A plugin that serializes workflow state to a specific format.
  *
  * Serializers transform the internal workflow representation into
@@ -337,8 +366,8 @@ export interface SerializerPlugin<TOutput = unknown> {
 
 	/**
 	 * Serialize the workflow to the target format.
-	 * @param ctx Plugin context with workflow state
+	 * @param ctx Serializer context with workflow state and helper methods
 	 * @returns The serialized workflow in the target format
 	 */
-	serialize(ctx: PluginContext): TOutput;
+	serialize(ctx: SerializerContext): TOutput;
 }

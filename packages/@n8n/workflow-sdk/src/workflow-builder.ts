@@ -3,12 +3,10 @@ import type {
 	WorkflowBuilderStatic,
 	WorkflowSettings,
 	WorkflowJSON,
-	NodeJSON,
 	NodeInstance,
 	ConnectionTarget,
 	GraphNode,
 	SubnodeConfig,
-	IConnections,
 	IDataObject,
 	NodeChain,
 	CredentialReference,
@@ -18,20 +16,20 @@ import type {
 } from './types/base';
 import { pluginRegistry, type PluginRegistry } from './plugins/registry';
 import { registerDefaultPlugins } from './plugins/defaults';
-import type { PluginContext, MutablePluginContext, ValidationIssue } from './plugins/types';
+import { jsonSerializer } from './plugins/serializers';
+import type {
+	PluginContext,
+	MutablePluginContext,
+	ValidationIssue,
+	SerializerContext,
+} from './plugins/types';
 
 // Ensure default plugins are registered on module load
 registerDefaultPlugins(pluginRegistry);
 import { isNodeChain } from './types/base';
 import { isInputTarget, cloneNodeWithId } from './node-builder';
-import {
-	parseVersion,
-	normalizeResourceLocators,
-	escapeNewlinesInExpressionStrings,
-	generateDeterministicNodeId,
-} from './workflow-builder/string-utils';
+import { parseVersion, generateDeterministicNodeId } from './workflow-builder/string-utils';
 import { NODE_SPACING_X, DEFAULT_Y, START_X } from './workflow-builder/constants';
-import { isTriggerNode } from './workflow-builder/validation-helpers';
 
 /**
  * Internal workflow builder implementation
@@ -467,13 +465,30 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 	}
 
 	toJSON(): WorkflowJSON {
-		const nodes: NodeJSON[] = [];
-		const connections: IConnections = {};
+		// Merge connections declared on node instances via .then() into the graph
+		this.mergeInstanceConnections();
 
-		// Calculate positions for nodes without explicit positions
-		const nodePositions = this.calculatePositions();
+		// Create serializer context and delegate to jsonSerializer
+		const ctx: SerializerContext = {
+			nodes: this._nodes,
+			workflowId: this.id,
+			workflowName: this.name,
+			settings: this._settings,
+			pinData: this._pinData,
+			meta: this._meta,
+			calculatePositions: () => this.calculatePositions(),
+			resolveTargetNodeName: (target: unknown) => this.resolveTargetNodeName(target),
+		};
 
-		// Collect connections declared on nodes via .then()
+		return jsonSerializer.serialize(ctx);
+	}
+
+	/**
+	 * Merge connections declared on node instances via .then() into the graph connections.
+	 * This prepares the graph for serialization by ensuring all connections are stored
+	 * in graphNode.connections.
+	 */
+	private mergeInstanceConnections(): void {
 		for (const graphNode of this._nodes.values()) {
 			// Only process if the node instance has getConnections() (nodes from builder, not fromJSON)
 			if (typeof graphNode.instance.getConnections === 'function') {
@@ -498,148 +513,6 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 				}
 			}
 		}
-
-		// Convert nodes
-		for (const [mapKey, graphNode] of this._nodes) {
-			const instance = graphNode.instance;
-
-			// Skip invalid nodes (shouldn't happen, but defensive)
-			if (!instance || !instance.name || !instance.type) {
-				continue;
-			}
-
-			const config = instance.config ?? {};
-			const position = config.position ?? nodePositions.get(mapKey) ?? [START_X, DEFAULT_Y];
-
-			// Determine node name:
-			// - If config has _originalName, use that (preserves undefined for sticky notes from fromJSON)
-			// - If mapKey was auto-renamed (e.g., "Process 1" from "Process"), use mapKey
-			// - Otherwise use instance.name (preserves original name for fromJSON imports)
-			let nodeName: string | undefined;
-			if ('_originalName' in config) {
-				// Node was loaded via fromJSON - preserve original name (may be undefined)
-				nodeName = config._originalName as string | undefined;
-			} else {
-				// Node was created via builder - use auto-renamed key if applicable
-				const isAutoRenamed =
-					mapKey !== instance.name &&
-					mapKey.startsWith(instance.name + ' ') &&
-					/^\d+$/.test(mapKey.slice(instance.name.length + 1));
-				nodeName = isAutoRenamed ? mapKey : instance.name;
-			}
-			// Check if this node was loaded via fromJSON (has _originalName marker)
-			const isFromJson = '_originalName' in config;
-
-			// Serialize parameters - for SDK-created nodes, also normalize resource locators
-			// (add __rl: true if missing) and escape newlines in expression strings.
-			// For fromJSON nodes, preserve parameters as-is.
-			let serializedParams: IDataObject | undefined;
-			if (config.parameters) {
-				const parsed = JSON.parse(JSON.stringify(config.parameters));
-				if (isFromJson) {
-					serializedParams = parsed;
-				} else {
-					const normalized = normalizeResourceLocators(parsed);
-					serializedParams = escapeNewlinesInExpressionStrings(normalized) as IDataObject;
-				}
-			}
-
-			const n8nNode: NodeJSON = {
-				id: instance.id,
-				name: nodeName,
-				type: instance.type,
-				typeVersion: parseVersion(instance.version),
-				position,
-				parameters: serializedParams,
-			};
-
-			// Add optional properties
-			if (config.credentials) {
-				// Serialize credentials to ensure newCredential() markers are converted to JSON
-				n8nNode.credentials = JSON.parse(JSON.stringify(config.credentials));
-			}
-			if (config.disabled) {
-				n8nNode.disabled = config.disabled;
-			}
-			if (config.notes) {
-				n8nNode.notes = config.notes;
-			}
-			if (config.notesInFlow) {
-				n8nNode.notesInFlow = config.notesInFlow;
-			}
-			if (config.executeOnce) {
-				n8nNode.executeOnce = config.executeOnce;
-			}
-			if (config.retryOnFail) {
-				n8nNode.retryOnFail = config.retryOnFail;
-			}
-			if (config.alwaysOutputData) {
-				n8nNode.alwaysOutputData = config.alwaysOutputData;
-			}
-			if (config.onError) {
-				n8nNode.onError = config.onError;
-			}
-
-			nodes.push(n8nNode);
-
-			// Convert connections - handle all connection types
-			let hasConnections = false;
-			for (const typeConns of graphNode.connections.values()) {
-				if (typeConns.size > 0) {
-					hasConnections = true;
-					break;
-				}
-			}
-
-			if (hasConnections) {
-				const nodeConnections: IConnections[string] = {};
-
-				for (const [connType, outputMap] of graphNode.connections) {
-					if (outputMap.size === 0) continue;
-
-					// Get max output index to ensure array is properly sized
-					const maxOutput = Math.max(...outputMap.keys());
-					const outputArray: Array<Array<{ node: string; type: string; index: number }>> = [];
-
-					for (let i = 0; i <= maxOutput; i++) {
-						const targets = outputMap.get(i) || [];
-						outputArray[i] = targets.map((target) => ({
-							node: target.node,
-							type: target.type,
-							index: target.index,
-						}));
-					}
-
-					nodeConnections[connType] = outputArray;
-				}
-
-				if (Object.keys(nodeConnections).length > 0 && nodeName !== undefined) {
-					connections[nodeName] = nodeConnections;
-				}
-			}
-		}
-
-		const json: WorkflowJSON = {
-			id: this.id,
-			name: this.name,
-			nodes,
-			connections,
-		};
-
-		// Preserve settings even if empty (for round-trip fidelity)
-		if (this._settings !== undefined) {
-			json.settings = this._settings;
-		}
-
-		if (this._pinData && Object.keys(this._pinData).length > 0) {
-			json.pinData = this._pinData;
-		}
-
-		if (this._meta) {
-			json.meta = this._meta;
-		}
-
-		return json;
 	}
 
 	/**
@@ -676,26 +549,6 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 		const { ValidationError, ValidationWarning } = require('./validation/index');
 		const errors: import('./validation/index').ValidationError[] = [];
 		const warnings: import('./validation/index').ValidationWarning[] = [];
-
-		// Check: No nodes
-		if (this._nodes.size === 0) {
-			errors.push(new ValidationError('NO_NODES', 'Workflow has no nodes'));
-		}
-
-		// Check: Missing trigger
-		if (!options.allowNoTrigger) {
-			const hasTrigger = Array.from(this._nodes.values()).some((graphNode) =>
-				isTriggerNode(graphNode.instance.type),
-			);
-			if (!hasTrigger) {
-				warnings.push(
-					new ValidationWarning(
-						'MISSING_TRIGGER',
-						'Workflow has no trigger node. It will need to be started manually.',
-					),
-				);
-			}
-		}
 
 		// Check: maxNodes constraint
 		if (options.nodeTypesProvider) {
@@ -739,6 +592,7 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 			pinData: this._pinData,
 			validationOptions: {
 				allowDisconnectedNodes: options.allowDisconnectedNodes,
+				allowNoTrigger: options.allowNoTrigger,
 			},
 		};
 
@@ -814,12 +668,15 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 			throw new Error(`No serializer registered for format '${format}'`);
 		}
 
-		const ctx: PluginContext = {
+		const ctx: SerializerContext = {
 			nodes: this._nodes,
 			workflowId: this.id,
 			workflowName: this.name,
 			settings: this._settings,
 			pinData: this._pinData,
+			meta: this._meta,
+			calculatePositions: () => this.calculatePositions(),
+			resolveTargetNodeName: (target: unknown) => this.resolveTargetNodeName(target),
 		};
 
 		return serializer.serialize(ctx) as T;

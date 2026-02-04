@@ -14,5 +14,7 @@ export { expressionPrefixValidator } from './expression-prefix-validator';
 export { fromAiValidator } from './from-ai-validator';
 export { httpRequestValidator } from './http-request-validator';
 export { mergeNodeValidator } from './merge-node-validator';
+export { missingTriggerValidator } from './missing-trigger-validator';
+export { noNodesValidator } from './no-nodes-validator';
 export { setNodeValidator } from './set-node-validator';
 export { toolNodeValidator } from './tool-node-validator';

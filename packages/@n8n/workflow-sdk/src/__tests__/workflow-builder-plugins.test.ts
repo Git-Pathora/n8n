@@ -1067,17 +1067,173 @@ describe('WorkflowBuilder plugin integration', () => {
 		});
 	});
 
+	describe('Phase 11.1: noNodesValidator plugin', () => {
+		it('validateWorkflow returns error when workflow has no nodes', () => {
+			const { noNodesValidator } = require('../plugins/validators/no-nodes-validator');
+
+			// Empty nodes map
+			const ctx: PluginContext = {
+				nodes: new Map(),
+				workflowId: 'test',
+				workflowName: 'Test',
+				settings: {},
+			};
+
+			const issues = noNodesValidator.validateWorkflow!(ctx);
+
+			expect(issues.length).toBe(1);
+			expect(issues[0].code).toBe('NO_NODES');
+			expect(issues[0].severity).toBe('error');
+		});
+
+		it('validateWorkflow returns empty array when workflow has nodes', () => {
+			const { noNodesValidator } = require('../plugins/validators/no-nodes-validator');
+
+			// Non-empty nodes map
+			const nodesMap = new Map();
+			nodesMap.set('Start', {
+				instance: { name: 'Start', type: 'n8n-nodes-base.manualTrigger' },
+				connections: new Map(),
+			});
+
+			const ctx: PluginContext = {
+				nodes: nodesMap as unknown as ReadonlyMap<string, import('../types/base').GraphNode>,
+				workflowId: 'test',
+				workflowName: 'Test',
+				settings: {},
+			};
+
+			const issues = noNodesValidator.validateWorkflow!(ctx);
+
+			expect(issues.length).toBe(0);
+		});
+
+		it('integration: workflow.validate() reports NO_NODES error for empty workflow', () => {
+			const wf = workflow('test', 'Empty Workflow');
+
+			const result = wf.validate();
+
+			expect(result.valid).toBe(false);
+			expect(result.errors.some((e) => e.code === 'NO_NODES')).toBe(true);
+		});
+	});
+
+	describe('Phase 11.2: missingTriggerValidator plugin', () => {
+		it('validateWorkflow returns warning when no trigger node exists', () => {
+			const {
+				missingTriggerValidator,
+			} = require('../plugins/validators/missing-trigger-validator');
+
+			// Nodes map with only non-trigger nodes
+			const nodesMap = new Map();
+			nodesMap.set('Set', {
+				instance: { name: 'Set', type: 'n8n-nodes-base.set' },
+				connections: new Map(),
+			});
+
+			const ctx: PluginContext = {
+				nodes: nodesMap as unknown as ReadonlyMap<string, import('../types/base').GraphNode>,
+				workflowId: 'test',
+				workflowName: 'Test',
+				settings: {},
+			};
+
+			const issues = missingTriggerValidator.validateWorkflow!(ctx);
+
+			expect(issues.length).toBe(1);
+			expect(issues[0].code).toBe('MISSING_TRIGGER');
+			expect(issues[0].severity).toBe('warning');
+		});
+
+		it('validateWorkflow returns empty array when trigger node exists', () => {
+			const {
+				missingTriggerValidator,
+			} = require('../plugins/validators/missing-trigger-validator');
+
+			const nodesMap = new Map();
+			nodesMap.set('Start', {
+				instance: { name: 'Start', type: 'n8n-nodes-base.manualTrigger' },
+				connections: new Map(),
+			});
+
+			const ctx: PluginContext = {
+				nodes: nodesMap as unknown as ReadonlyMap<string, import('../types/base').GraphNode>,
+				workflowId: 'test',
+				workflowName: 'Test',
+				settings: {},
+			};
+
+			const issues = missingTriggerValidator.validateWorkflow!(ctx);
+
+			expect(issues.length).toBe(0);
+		});
+
+		it('validateWorkflow respects allowNoTrigger option', () => {
+			const {
+				missingTriggerValidator,
+			} = require('../plugins/validators/missing-trigger-validator');
+
+			const nodesMap = new Map();
+			nodesMap.set('Set', {
+				instance: { name: 'Set', type: 'n8n-nodes-base.set' },
+				connections: new Map(),
+			});
+
+			const ctx: PluginContext = {
+				nodes: nodesMap as unknown as ReadonlyMap<string, import('../types/base').GraphNode>,
+				workflowId: 'test',
+				workflowName: 'Test',
+				settings: {},
+				validationOptions: { allowNoTrigger: true },
+			};
+
+			const issues = missingTriggerValidator.validateWorkflow!(ctx);
+
+			expect(issues.length).toBe(0);
+		});
+
+		it('integration: workflow.validate() reports MISSING_TRIGGER warning', () => {
+			const setNode = node({
+				type: 'n8n-nodes-base.set',
+				version: 3.4,
+				config: { name: 'Set', parameters: {} },
+			});
+
+			const wf = workflow('test', 'No Trigger').add(setNode);
+
+			const result = wf.validate();
+
+			expect(result.warnings.some((w) => w.code === 'MISSING_TRIGGER')).toBe(true);
+		});
+
+		it('integration: workflow.validate() skips MISSING_TRIGGER when allowNoTrigger is true', () => {
+			const setNode = node({
+				type: 'n8n-nodes-base.set',
+				version: 3.4,
+				config: { name: 'Set', parameters: {} },
+			});
+
+			const wf = workflow('test', 'No Trigger').add(setNode);
+
+			const result = wf.validate({ allowNoTrigger: true });
+
+			expect(result.warnings.some((w) => w.code === 'MISSING_TRIGGER')).toBe(false);
+		});
+	});
+
 	describe('Phase 10.3: JSON serializer extraction', () => {
 		it('jsonSerializer.serialize produces basic workflow structure', () => {
 			const { jsonSerializer } = require('../plugins/serializers/json-serializer');
 
-			// Create a minimal PluginContext
-			const ctx: PluginContext = {
+			// Create a minimal SerializerContext
+			const ctx = {
 				nodes: new Map(),
 				workflowId: 'wf-123',
 				workflowName: 'Test Workflow',
 				settings: { timezone: 'UTC' },
 				pinData: { Node1: [{ item: 'data' }] },
+				calculatePositions: () => new Map(),
+				resolveTargetNodeName: () => undefined,
 			};
 
 			const result = jsonSerializer.serialize(ctx);

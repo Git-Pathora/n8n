@@ -11,6 +11,7 @@ export type {
 	MutablePluginContext,
 	ValidatorPlugin,
 	CompositeHandlerPlugin,
+	SerializerContext,
 	SerializerPlugin,
 } from './types';
 

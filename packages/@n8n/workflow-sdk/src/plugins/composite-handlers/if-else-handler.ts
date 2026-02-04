@@ -1,63 +1,79 @@
 /**
  * If/Else Composite Handler Plugin
  *
- * Handles IfElseComposite structures - if/else branching patterns.
+ * Handles IfElseComposite and IfElseBuilder structures - if/else branching patterns.
  */
 
 import type { CompositeHandlerPlugin, MutablePluginContext } from '../types';
-import type { IfElseComposite, ConnectionTarget, NodeInstance } from '../../types/base';
+import type {
+	IfElseComposite,
+	ConnectionTarget,
+	NodeInstance,
+	IfElseBuilder,
+} from '../../types/base';
 import { isIfElseComposite } from '../../workflow-builder/type-guards';
+import { isIfElseBuilder } from '../../node-builder';
+
+/**
+ * Type representing either Composite or Builder format
+ */
+type IfElseInput = IfElseComposite | IfElseBuilder<unknown>;
+
+/**
+ * Helper to process a branch (handles arrays for fan-out)
+ */
+function processBranch(
+	branch: unknown,
+	outputIndex: number,
+	ctx: MutablePluginContext,
+	ifMainConns: Map<number, ConnectionTarget[]>,
+): void {
+	if (branch === null || branch === undefined) {
+		return; // Skip null branches - no connection for this output
+	}
+
+	// Check if branch is an array (fan-out pattern)
+	if (Array.isArray(branch)) {
+		// Fan-out: multiple parallel targets from this branch
+		const targets: ConnectionTarget[] = [];
+		for (const branchNode of branch as (NodeInstance<string, string, unknown> | null)[]) {
+			if (branchNode === null) continue;
+			const branchHead = ctx.addBranchToGraph(branchNode);
+			targets.push({ node: branchHead, type: 'main', index: 0 });
+		}
+		if (targets.length > 0) {
+			ifMainConns.set(outputIndex, targets);
+		}
+	} else {
+		const branchHead = ctx.addBranchToGraph(branch);
+		ifMainConns.set(outputIndex, [{ node: branchHead, type: 'main', index: 0 }]);
+	}
+}
 
 /**
  * Handler for If/Else composite structures.
  *
- * Recognizes IfElseComposite patterns and adds the if node and its branches
- * to the workflow graph.
+ * Recognizes IfElseComposite and IfElseBuilder patterns and adds the if node
+ * and its branches to the workflow graph.
  */
-export const ifElseHandler: CompositeHandlerPlugin<IfElseComposite> = {
+export const ifElseHandler: CompositeHandlerPlugin<IfElseInput> = {
 	id: 'core:if-else',
 	name: 'If/Else Handler',
 	priority: 100,
 
-	canHandle(input: unknown): input is IfElseComposite {
-		return isIfElseComposite(input);
+	canHandle(input: unknown): input is IfElseInput {
+		return isIfElseComposite(input) || isIfElseBuilder(input);
 	},
 
-	addNodes(input: IfElseComposite, ctx: MutablePluginContext): string {
+	addNodes(input: IfElseInput, ctx: MutablePluginContext): string {
 		// Build the IF node connections to its branches
 		const ifMainConns = new Map<number, ConnectionTarget[]>();
 
-		// Add true branch (output 0)
-		if (input.trueBranch) {
-			if (Array.isArray(input.trueBranch)) {
-				// Fan-out: multiple parallel targets from trueBranch
-				const targets: ConnectionTarget[] = [];
-				for (const branchNode of input.trueBranch) {
-					const branchHead = ctx.addBranchToGraph(branchNode);
-					targets.push({ node: branchHead, type: 'main', index: 0 });
-				}
-				ifMainConns.set(0, targets);
-			} else {
-				const trueBranchHead = ctx.addBranchToGraph(input.trueBranch);
-				ifMainConns.set(0, [{ node: trueBranchHead, type: 'main', index: 0 }]);
-			}
-		}
+		// Process true branch (output 0)
+		processBranch(input.trueBranch, 0, ctx, ifMainConns);
 
-		// Add false branch (output 1)
-		if (input.falseBranch) {
-			if (Array.isArray(input.falseBranch)) {
-				// Fan-out: multiple parallel targets from falseBranch
-				const targets: ConnectionTarget[] = [];
-				for (const branchNode of input.falseBranch as NodeInstance<string, string, unknown>[]) {
-					const branchHead = ctx.addBranchToGraph(branchNode);
-					targets.push({ node: branchHead, type: 'main', index: 0 });
-				}
-				ifMainConns.set(1, targets);
-			} else {
-				const falseBranchHead = ctx.addBranchToGraph(input.falseBranch);
-				ifMainConns.set(1, [{ node: falseBranchHead, type: 'main', index: 0 }]);
-			}
-		}
+		// Process false branch (output 1)
+		processBranch(input.falseBranch, 1, ctx, ifMainConns);
 
 		// Add the IF node with connections to branches
 		const ifConns = new Map<string, Map<number, ConnectionTarget[]>>();

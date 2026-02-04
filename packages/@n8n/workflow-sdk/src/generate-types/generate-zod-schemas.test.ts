@@ -4,6 +4,7 @@ import {
 	generateSingleVersionSchemaFile,
 	stripDiscriminatorKeysFromDisplayOptions,
 	generateDiscriminatorSchemaFile,
+	generateSubnodeConfigSchemaCode,
 	mapPropertyToZodSchema,
 	mergeDisplayOptions,
 	extractDefaultsForDisplayOptions,
@@ -964,8 +965,6 @@ describe('generateSingleVersionSchemaFile', () => {
 });
 
 describe('generateSubnodeConfigSchemaCode', () => {
-	const { generateSubnodeConfigSchemaCode } = require('../generate-types/generate-zod-schemas');
-
 	it('generates static schema when AI inputs have no displayOptions', () => {
 		const aiInputTypes = [
 			{ type: 'ai_languageModel', required: true },
@@ -1066,8 +1065,6 @@ describe('generateSubnodeConfigSchemaCode', () => {
 });
 
 describe('hasRequiredSubnodeFields behavior', () => {
-	const { generateDiscriminatorSchemaFile } = require('../generate-types/generate-zod-schemas');
-
 	const baseNodeProps = {
 		group: ['transform'] as string[],
 		inputs: ['main'] as string[],

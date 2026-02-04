@@ -24,13 +24,8 @@ import type {
 	ValidationIssue,
 	SerializerContext,
 } from './workflow-builder/plugins/types';
-import type {
-	ValidationOptions,
-	ValidationResult,
-	ValidationError,
-	ValidationWarning,
-	ValidationErrorCode,
-} from './validation/index';
+import type { ValidationOptions, ValidationResult, ValidationErrorCode } from './validation/index';
+import { ValidationError, ValidationWarning } from './validation/index';
 import { generateDeterministicNodeId } from './workflow-builder/string-utils';
 import { addNodeWithSubnodes as addNodeWithSubnodesUtil } from './workflow-builder/subnode-utils';
 import { parseWorkflowJSON } from './workflow-builder/workflow-import';
@@ -495,7 +490,6 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 	}
 
 	validate(options: ValidationOptions = {}): ValidationResult {
-		const { ValidationError, ValidationWarning } = require('./validation/index');
 		const errors: Array<ValidationError> = [];
 		const warnings: Array<ValidationWarning> = [];
 

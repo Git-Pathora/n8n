@@ -1,3 +1,6 @@
+import * as fs from 'fs';
+import * as path from 'path';
+
 import { describe, it, expect } from '@jest/globals';
 
 import { generateCode } from './code-generator';
@@ -1807,8 +1810,6 @@ describe('code-generator', () => {
 
 			it('preserves IF node parameters when IF is a cycle target', () => {
 				// Read the actual workflow 5755 JSON which has IF nodes as cycle targets
-				const fs = require('fs');
-				const path = require('path');
 				const jsonPath = path.join(__dirname, '../../test-fixtures/real-workflows/5755.json');
 				// eslint-disable-next-line n8n-local-rules/no-uncaught-json-parse -- Test fixture file
 				const json = JSON.parse(fs.readFileSync(jsonPath, 'utf8'));

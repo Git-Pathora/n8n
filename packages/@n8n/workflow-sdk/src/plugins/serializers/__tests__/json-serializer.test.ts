@@ -11,7 +11,6 @@ function createMockSerializerContext(
 		workflowId: 'test-workflow',
 		workflowName: 'Test Workflow',
 		settings: {},
-		calculatePositions: () => new Map(),
 		resolveTargetNodeName: () => undefined,
 		...overrides,
 	};

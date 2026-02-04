@@ -1232,7 +1232,6 @@ describe('WorkflowBuilder plugin integration', () => {
 				workflowName: 'Test Workflow',
 				settings: { timezone: 'UTC' },
 				pinData: { Node1: [{ item: 'data' }] },
-				calculatePositions: () => new Map(),
 				resolveTargetNodeName: () => undefined,
 			};
 

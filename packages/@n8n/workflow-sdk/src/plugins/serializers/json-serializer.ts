@@ -18,6 +18,7 @@ import {
 	parseVersion,
 } from '../../workflow-builder/string-utils';
 import { START_X, DEFAULT_Y } from '../../workflow-builder/constants';
+import { calculateNodePositions } from '../../workflow-builder/layout-utils';
 
 /**
  * Serialize a single node to NodeJSON format.
@@ -173,7 +174,7 @@ export const jsonSerializer: SerializerPlugin<WorkflowJSON> = {
 		const connections: IConnections = {};
 
 		// Calculate positions for nodes without explicit positions
-		const nodePositions = ctx.calculatePositions();
+		const nodePositions = calculateNodePositions(ctx.nodes);
 
 		// Convert nodes and connections
 		for (const [mapKey, graphNode] of ctx.nodes) {

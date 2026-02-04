@@ -330,16 +330,10 @@ export interface CompositeHandlerPlugin<TInput = unknown> {
  * Extended context for serializers with helper methods for conversion.
  *
  * SerializerContext provides all the information needed to serialize
- * a workflow to any output format, including access to positions,
- * name resolution, and workflow metadata.
+ * a workflow to any output format, including name resolution
+ * and workflow metadata.
  */
 export interface SerializerContext extends PluginContext {
-	/**
-	 * Get calculated positions for nodes that don't have explicit positions.
-	 * Returns a map of node name to [x, y] position tuple.
-	 */
-	calculatePositions(): Map<string, [number, number]>;
-
 	/**
 	 * Resolve a connection target to its node name.
 	 * Handles NodeInstance, NodeChain, composites (IfElse, SwitchCase, etc.),

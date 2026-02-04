@@ -143,8 +143,14 @@ export class ErrorReporter {
 		Error.stackTraceLimit = 50;
 
 		const sentry = await import('@sentry/node');
-		const { init, captureException, setTag, requestDataIntegration, rewriteFramesIntegration } =
-			sentry;
+		const {
+			init,
+			captureException,
+			setTag,
+			setUser,
+			requestDataIntegration,
+			rewriteFramesIntegration,
+		} = sentry;
 
 		// Most of the integrations are listed here:
 		// https://docs.sentry.io/platforms/javascript/guides/node/configuration/integrations/
@@ -210,6 +216,10 @@ export class ErrorReporter {
 		});
 
 		setTag('server_type', serverType);
+
+		if (serverName) {
+			setUser({ id: serverName });
+		}
 
 		this.report = (error, options) => captureException(error, options);
 		this.beforeSendFilter = beforeSendFilter;

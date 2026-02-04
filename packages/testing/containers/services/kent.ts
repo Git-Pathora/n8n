@@ -65,7 +65,7 @@ export const kent: Service<KentResult> = {
 			N8N_FRONTEND_SENTRY_DSN: result.meta.frontendDsn,
 			N8N_SENTRY_TRACES_SAMPLE_RATE: '1.0',
 			ENVIRONMENT: 'test',
-			N8N_SENTRY_DISABLE_FILTERING: 'true',
+			DEPLOYMENT_NAME: 'e2e-test-deployment',
 		};
 	},
 };
@@ -74,6 +74,12 @@ export const kent: Service<KentResult> = {
 
 export type EventSource = 'backend' | 'frontend' | 'task_runner' | 'unknown';
 export type EventType = 'error' | 'transaction' | 'session' | 'unknown';
+
+export interface KentEventFilter {
+	source?: EventSource;
+	type?: EventType;
+	messageContains?: string;
+}
 
 export interface KentEvent {
 	event_id: string;
@@ -85,6 +91,7 @@ export interface KentEvent {
 			type?: string;
 			transaction?: string;
 			tags?: Record<string, string>;
+			user?: { id?: string; email?: string; username?: string; ip_address?: string };
 			exception?: { values: Array<{ type: string; value: string }> };
 			spans?: unknown[];
 			[key: string]: unknown;
@@ -92,26 +99,33 @@ export interface KentEvent {
 	};
 }
 
-// ==================== Helper (thin API client) ====================
+// ==================== Helper ====================
 
 export class KentHelper {
 	constructor(private readonly apiUrl: string) {}
 
-	/** Clear all captured events */
 	async clear(): Promise<void> {
 		const res = await fetch(`${this.apiUrl}/api/flush/`, { method: 'POST' });
 		if (!res.ok) throw new Error(`Kent API error: ${res.status}`);
 	}
 
-	/** Get all captured events */
-	async getEvents(): Promise<KentEvent[]> {
+	async getEvents(filter?: KentEventFilter): Promise<KentEvent[]> {
 		const res = await fetch(`${this.apiUrl}/api/eventlist/`);
 		if (!res.ok) throw new Error(`Kent API error: ${res.status}`);
 		const { events } = (await res.json()) as { events: Array<{ event_id: string }> };
-		return await Promise.all(events.map(async (e) => await this.getEvent(e.event_id)));
+		const allEvents = await Promise.all(events.map(async (e) => await this.getEvent(e.event_id)));
+
+		if (!filter) return allEvents;
+
+		return allEvents.filter((event) => {
+			if (filter.source && this.getSource(event) !== filter.source) return false;
+			if (filter.type && this.getType(event) !== filter.type) return false;
+			if (filter.messageContains && !this.getErrorMessage(event).includes(filter.messageContains))
+				return false;
+			return true;
+		});
 	}
 
-	/** Get event source (frontend/backend/task_runner) */
 	getSource(event: KentEvent): EventSource {
 		const sdk = event.payload.body.sdk?.name ?? '';
 		if (sdk.includes('vue') || sdk.includes('browser')) return 'frontend';
@@ -122,7 +136,6 @@ export class KentHelper {
 		return 'unknown';
 	}
 
-	/** Get event type (error/transaction/session) */
 	getType(event: KentEvent): EventType {
 		const body = event.payload.body;
 		if ('sid' in body) return 'session';
@@ -131,9 +144,16 @@ export class KentHelper {
 		return 'unknown';
 	}
 
-	/** Get error message from event */
 	getErrorMessage(event: KentEvent): string {
 		return event.payload.body.exception?.values?.[0]?.value ?? '';
+	}
+
+	getTags(event: KentEvent): Record<string, string> | undefined {
+		return event.payload.body.tags;
+	}
+
+	getUser(event: KentEvent): KentEvent['payload']['body']['user'] {
+		return event.payload.body.user;
 	}
 
 	private async getEvent(eventId: string): Promise<KentEvent> {

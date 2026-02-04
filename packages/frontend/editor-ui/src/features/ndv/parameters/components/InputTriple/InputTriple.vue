@@ -14,7 +14,7 @@ withDefaults(defineProps<Props>(), { middleWidth: '160px' });
 			<div
 				v-if="$slots.middle"
 				:class="[$style.item, $style.itemMiddle]"
-				:style="{ '--middle-width': middleWidth }"
+				:style="{ '--input-triple--width': middleWidth }"
 			>
 				<slot name="middle"></slot>
 			</div>
@@ -57,7 +57,7 @@ withDefaults(defineProps<Props>(), { middleWidth: '160px' });
 
 .itemMiddle {
 	margin: 0 -1px;
-	flex-basis: 160px;
+	flex-basis: var(--input-triple--width, 160px);
 	flex-grow: 0;
 }
 

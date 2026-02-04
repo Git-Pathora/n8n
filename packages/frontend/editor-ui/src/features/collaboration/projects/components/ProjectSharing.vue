@@ -6,7 +6,6 @@ import type { AllRolesMap } from '@n8n/permissions';
 import orderBy from 'lodash/orderBy';
 import { computed, ref, watch } from 'vue';
 import { ProjectTypes, type ProjectListItem, type ProjectSharingData } from '../projects.types';
-import { splitName } from '../projects.utils';
 import ProjectSharingInfo from './ProjectSharingInfo.vue';
 
 import { N8nBadge, N8nButton, N8nIcon, N8nOption, N8nSelect, N8nText } from '@n8n/design-system';
@@ -101,15 +100,6 @@ const setFilter = (query: string) => {
 	filter.value = query;
 };
 
-const getProjectLabel = (project: ProjectListItem): string => {
-	if (project.type === ProjectTypes.Personal) {
-		const { name } = splitName(project.name ?? '');
-		const personalSpaceText = locale.baseText('projects.sharing.personalSpace');
-		return name ? `${name} (${personalSpaceText})` : personalSpaceText;
-	}
-	return project.name ?? '';
-};
-
 const onProjectSelected = (projectId: string) => {
 	if (projectId === GLOBAL_GROUP.id) {
 		emit('update:shareWithAllUsers', true);
@@ -192,7 +182,7 @@ watch(
 				v-for="project in sortedProjects"
 				:key="project.id"
 				:value="project.id"
-				:label="getProjectLabel(project)"
+				:label="project.name ?? ''"
 			>
 				<ProjectSharingInfo :project="project" />
 			</N8nOption>

@@ -1,20 +1,15 @@
 <script lang="ts" setup>
 import { computed } from 'vue';
-import { ProjectTypes, type ProjectListItem, type ProjectSharingData } from '../projects.types';
+import type { ProjectListItem, ProjectSharingData } from '../projects.types';
 import { splitName } from '../projects.utils';
 import { isIconOrEmoji } from '@n8n/design-system/components/N8nIconPicker/types';
-import { useI18n } from '@n8n/i18n';
 import ProjectIcon from './ProjectIcon.vue';
 import { N8nAvatar } from '@n8n/design-system';
-
 type Props = {
 	project: ProjectListItem | ProjectSharingData;
 };
 
 const props = defineProps<Props>();
-const i18n = useI18n();
-
-const isPersonalProject = computed(() => props.project.type === ProjectTypes.Personal);
 
 const processedName = computed(() => {
 	const { name, email } = splitName(props.project.name ?? '');
@@ -25,13 +20,6 @@ const processedName = computed(() => {
 		lastName,
 		email,
 	};
-});
-
-const subtitle = computed(() => {
-	if (isPersonalProject.value) {
-		return i18n.baseText('projects.sharing.personalSpace');
-	}
-	return processedName.value.email;
 });
 
 const projectIcon = computed(() => {
@@ -50,7 +38,7 @@ const projectIcon = computed(() => {
 				<p v-if="processedName.firstName || processedName.lastName">
 					{{ processedName.firstName }} {{ processedName.lastName }}
 				</p>
-				<small v-if="subtitle">{{ subtitle }}</small>
+				<small>{{ processedName.email }}</small>
 			</div>
 		</div>
 		<slot></slot>

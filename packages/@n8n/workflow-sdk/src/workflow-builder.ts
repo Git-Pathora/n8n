@@ -11,15 +11,15 @@ import type {
 	GeneratePinDataOptions,
 	WorkflowBuilderOptions,
 } from './types/base';
-import { pluginRegistry, type PluginRegistry } from './plugins/registry';
-import { registerDefaultPlugins } from './plugins/defaults';
-import { jsonSerializer } from './plugins/serializers';
+import { pluginRegistry, type PluginRegistry } from './workflow-builder/plugins/registry';
+import { registerDefaultPlugins } from './workflow-builder/plugins/defaults';
+import { jsonSerializer } from './workflow-builder/plugins/serializers';
 import type {
 	PluginContext,
 	MutablePluginContext,
 	ValidationIssue,
 	SerializerContext,
-} from './plugins/types';
+} from './workflow-builder/plugins/types';
 
 // Ensure default plugins are registered on module load
 registerDefaultPlugins(pluginRegistry);

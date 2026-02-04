@@ -5,7 +5,7 @@
  */
 
 import type { GraphNode, NodeInstance, NodeChain } from '../types/base';
-import type { PluginRegistry } from '../plugins/registry';
+import type { PluginRegistry } from './plugins/registry';
 import { isNodeChain } from '../types/base';
 import { isInputTarget } from './node-builders/node-builder';
 

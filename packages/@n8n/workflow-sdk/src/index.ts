@@ -186,7 +186,7 @@ export {
 	type ValidatorPlugin,
 	type CompositeHandlerPlugin,
 	type SerializerPlugin,
-} from './plugins';
+} from './workflow-builder/plugins';
 
 // Node type constants
 export {

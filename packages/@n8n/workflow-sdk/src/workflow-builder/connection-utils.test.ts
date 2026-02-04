@@ -4,7 +4,7 @@
 
 import { findMapKeyForNodeId, resolveTargetNodeName } from './connection-utils';
 import type { GraphNode, NodeInstance, NodeChain } from '../types/base';
-import type { PluginRegistry } from '../plugins/registry';
+import type { PluginRegistry } from './plugins/registry';
 
 // Helper to create a minimal node instance
 function createNode(

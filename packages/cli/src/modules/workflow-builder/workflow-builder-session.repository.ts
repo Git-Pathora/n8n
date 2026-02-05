@@ -2,7 +2,6 @@ import {
 	mapChatMessagesToStoredMessages,
 	mapStoredMessagesToChatMessages,
 } from '@langchain/core/messages';
-import type { StoredMessage } from '@langchain/core/messages';
 import type { ISessionStorage, LangchainMessage, StoredSession } from '@n8n/ai-workflow-builder';
 import { Service } from '@n8n/di';
 import { DataSource, Repository } from '@n8n/typeorm';
@@ -25,9 +24,7 @@ export class WorkflowBuilderSessionRepository
 		if (!entity) return null;
 
 		return {
-			messages: mapStoredMessagesToChatMessages(
-				entity.messages as StoredMessage[],
-			) as LangchainMessage[],
+			messages: mapStoredMessagesToChatMessages(entity.messages) as LangchainMessage[],
 			previousSummary: entity.previousSummary ?? undefined,
 			updatedAt: entity.updatedAt,
 		};
@@ -40,7 +37,7 @@ export class WorkflowBuilderSessionRepository
 			{
 				workflowId,
 				userId,
-				messages: mapChatMessagesToStoredMessages(data.messages) as object[],
+				messages: mapChatMessagesToStoredMessages(data.messages),
 				previousSummary: data.previousSummary ?? null,
 			},
 			['workflowId', 'userId'],

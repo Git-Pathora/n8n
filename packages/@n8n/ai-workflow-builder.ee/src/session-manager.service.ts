@@ -8,6 +8,7 @@ import type { INodeTypeDescription } from 'n8n-workflow';
 import { getBuilderToolsForDisplay } from '@/tools/builder-tools';
 import { ISessionStorage } from '@/types/session-storage';
 import { isLangchainMessagesArray, LangchainMessage, Session } from '@/types/sessions';
+import { stripAllCacheControlMarkers } from '@/utils/cache-control/helpers';
 import { formatMessages } from '@/utils/stream-processor';
 
 @Service()
@@ -63,44 +64,29 @@ export class SessionManagerService {
 	}
 
 	/**
-	 * Load session from persistent storage and seed the MemorySaver.
-	 * Called before starting a chat to ensure LangGraph has the latest state.
+	 * Load session messages from persistent storage.
+	 * Called before starting a chat to get historical messages to include in the initial state.
+	 * Returns the messages so they can be passed explicitly to the stream's initial state.
+	 *
+	 * Note: Strips all cache_control markers from loaded messages to prevent exceeding
+	 * Anthropic's 4 cache_control block limit when combined with fresh system prompts.
 	 */
-	async loadSessionIntoCheckpointer(threadId: string): Promise<void> {
-		if (!this.storage) return;
+	async loadSessionMessages(threadId: string): Promise<LangchainMessage[]> {
+		if (!this.storage) return [];
 
 		const stored = await this.storage.getSession(threadId);
-		if (!stored || stored.messages.length === 0) return;
+		if (!stored || stored.messages.length === 0) return [];
 
-		const threadConfig: RunnableConfig = {
-			configurable: { thread_id: threadId },
-		};
+		// Strip cache_control markers from historical messages to prevent exceeding
+		// Anthropic's 4 cache_control block limit when combined with new system prompts
+		stripAllCacheControlMarkers(stored.messages);
 
-		// Create a checkpoint with the stored messages
-		const checkpoint: Checkpoint = {
-			v: 1,
-			id: crypto.randomUUID(),
-			ts: stored.updatedAt.toISOString(),
-			channel_values: {
-				messages: stored.messages,
-			},
-			channel_versions: {},
-			versions_seen: {},
-		};
-
-		const metadata = {
-			source: 'input' as const,
-			step: -1,
-			writes: null,
-			parents: {},
-		};
-
-		await this.checkpointer.put(threadConfig, checkpoint, metadata);
-
-		this.logger?.debug('Loaded session into checkpointer', {
+		this.logger?.debug('Loaded session messages from storage', {
 			threadId,
 			messageCount: stored.messages.length,
 		});
+
+		return stored.messages;
 	}
 
 	/**

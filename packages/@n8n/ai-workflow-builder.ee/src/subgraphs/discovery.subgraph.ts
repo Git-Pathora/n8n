@@ -29,7 +29,11 @@ import type { WorkflowMetadata } from '../types/tools';
 import { applySubgraphCacheMarkers } from '../utils/cache-control';
 import { buildWorkflowSummary, createContextMessage } from '../utils/context-builders';
 import { appendArrayReducer, cachedTemplatesReducer } from '../utils/state-reducers';
-import { executeSubgraphTools, extractUserRequest } from '../utils/subgraph-helpers';
+import {
+	executeSubgraphTools,
+	extractUserRequest,
+	extractToolMessagesForPersistence,
+} from '../utils/subgraph-helpers';
 
 /**
  * Strict Output Schema for Discovery
@@ -433,6 +437,10 @@ export class DiscoverySubgraph extends BaseSubgraph<
 			}),
 		};
 
+		// Extract tool-related messages for persistence (skip the first context message).
+		// This allows the frontend to restore UI state after page refresh.
+		const toolMessages = extractToolMessagesForPersistence(subgraphOutput.messages);
+
 		return {
 			discoveryContext,
 			coordinationLog: [logEntry],
@@ -440,6 +448,8 @@ export class DiscoverySubgraph extends BaseSubgraph<
 			templateIds,
 			// Propagate cached templates back to parent
 			cachedTemplates: subgraphOutput.cachedTemplates,
+			// Include tool messages for persistence to restore frontend state on refresh
+			messages: toolMessages,
 		};
 	}
 }

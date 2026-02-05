@@ -1,3 +1,4 @@
+import type { StoredMessage } from '@langchain/core/messages';
 import { JsonColumn, WithTimestamps } from '@n8n/db';
 import { Column, Entity, Index, PrimaryGeneratedColumn, Unique } from '@n8n/typeorm';
 
@@ -5,7 +6,8 @@ export interface IWorkflowBuilderSession {
 	id: string;
 	workflowId: string;
 	userId: string;
-	messages: object[];
+	/** Serialized LangChain messages in StoredMessage format */
+	messages: StoredMessage[];
 	previousSummary: string | null;
 	createdAt: Date;
 	updatedAt: Date;
@@ -24,8 +26,9 @@ export class WorkflowBuilderSession extends WithTimestamps implements IWorkflowB
 	@Column({ type: 'varchar', length: 36 })
 	userId: string;
 
+	/** Serialized LangChain messages in StoredMessage format */
 	@JsonColumn({ default: '[]' })
-	messages: object[];
+	messages: StoredMessage[];
 
 	@Column({ type: 'text', nullable: true, default: null })
 	previousSummary: string | null;

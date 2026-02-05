@@ -183,6 +183,7 @@ describe('AiWorkflowBuilderService', () => {
 		// Mock SessionManagerService
 		mockSessionManager = mock<SessionManagerService>();
 		(mockSessionManager.getCheckpointer as jest.Mock).mockReturnValue(mockMemorySaver);
+		(mockSessionManager.loadSessionMessages as jest.Mock).mockResolvedValue([]);
 		MockedSessionManagerService.mockImplementation(() => mockSessionManager);
 
 		// Mock WorkflowBuilderAgent - capture config and call onGenerationSuccess
@@ -342,6 +343,8 @@ describe('AiWorkflowBuilderService', () => {
 				mockPayload,
 				'test-user-id',
 				abortController.signal,
+				undefined, // externalCallbacks
+				[], // historicalMessages (empty from loadSessionMessages mock)
 			);
 		});
 

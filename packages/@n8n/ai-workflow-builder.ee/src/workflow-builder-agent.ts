@@ -1,6 +1,6 @@
 import type { Callbacks } from '@langchain/core/callbacks/manager';
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
-import type { ToolMessage } from '@langchain/core/messages';
+import type { BaseMessage, ToolMessage } from '@langchain/core/messages';
 import { AIMessage, HumanMessage } from '@langchain/core/messages';
 import type { RunnableConfig } from '@langchain/core/runnables';
 import type { LangChainTracer } from '@langchain/core/tracers/tracer_langchain';
@@ -154,6 +154,7 @@ export class WorkflowBuilderAgent {
 		userId?: string,
 		abortSignal?: AbortSignal,
 		externalCallbacks?: Callbacks,
+		historicalMessages?: BaseMessage[],
 	) {
 		this.validateMessageLength(payload.message);
 
@@ -165,7 +166,7 @@ export class WorkflowBuilderAgent {
 		);
 
 		try {
-			const stream = await this.createAgentStream(payload, streamConfig, agent);
+			const stream = await this.createAgentStream(payload, streamConfig, agent, historicalMessages);
 			yield* this.processAgentStream(stream, agent, threadConfig);
 		} catch (error: unknown) {
 			this.handleStreamError(error);
@@ -221,6 +222,7 @@ export class WorkflowBuilderAgent {
 		payload: ChatPayload,
 		streamConfig: RunnableConfig,
 		agent: ReturnType<typeof this.createWorkflow>,
+		historicalMessages?: BaseMessage[],
 	): Promise<AsyncIterable<StreamEvent>> {
 		const humanMessage = new HumanMessage({
 			content: payload.message,
@@ -229,9 +231,14 @@ export class WorkflowBuilderAgent {
 				...(payload.id && { messageId: payload.id }),
 			},
 		});
+
+		// Include historical messages (from persistent storage) along with the new message.
+		// The messagesStateReducer will properly merge these with any existing checkpoint state.
+		const messages = [...(historicalMessages ?? []), humanMessage];
+
 		const stream = await agent.stream(
 			{
-				messages: [humanMessage],
+				messages,
 				workflowJSON: this.getDefaultWorkflowJSON(payload),
 				workflowOperations: [],
 				workflowContext: payload.workflowContext,

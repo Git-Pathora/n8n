@@ -241,10 +241,16 @@ export class AiWorkflowBuilderService {
 		const workflowId = payload.workflowContext?.currentWorkflow?.id;
 		const threadId = SessionManagerService.generateThreadId(workflowId, userId);
 
-		// Load session from persistent storage into checkpointer before chat starts
-		await this.sessionManager.loadSessionIntoCheckpointer(threadId);
+		// Load historical messages from persistent storage to include in initial state
+		const historicalMessages = await this.sessionManager.loadSessionMessages(threadId);
 
-		for await (const output of agent.chat(payload, userId, abortSignal)) {
+		for await (const output of agent.chat(
+			payload,
+			userId,
+			abortSignal,
+			undefined,
+			historicalMessages,
+		)) {
 			yield output;
 		}
 

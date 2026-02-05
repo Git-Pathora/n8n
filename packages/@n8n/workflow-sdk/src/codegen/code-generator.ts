@@ -378,9 +378,8 @@ function generateNodeConfig(node: SemanticNode, ctx: GenerationContext): string 
 	// Always include config (required by parser), even if empty
 	if (configParts.length > 0) {
 		const configStr = configParts.join(', ');
-		// If config contains @example comments (expression annotations) OR multi-line content, use multi-line format
-		// Note: Only match '// @example' specifically, not any '//' (which could be inside string values like jsCode)
-		const hasExpressionAnnotations = configStr.includes('// @example');
+		// If config contains @example block comments (expression annotations) OR multi-line content, use multi-line format
+		const hasExpressionAnnotations = configStr.includes('/** @example');
 		const hasMultiline = configParts.some((entry) => entry.includes('\n'));
 		if (hasExpressionAnnotations || hasMultiline) {
 			const configIndent = getIndent({ ...ctx, indent: ctx.indent + 2 });
@@ -396,11 +395,6 @@ function generateNodeConfig(node: SemanticNode, ctx: GenerationContext): string 
 
 				// If last line already has comma (from formatValue's multi-line handling), no change needed
 				if (lastLine.trimEnd().endsWith(',')) {
-					return entry;
-				}
-
-				// If last line has a comma before @example comment, no change needed
-				if (lastLine.includes(',  // @example')) {
 					return entry;
 				}
 

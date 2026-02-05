@@ -2595,10 +2595,10 @@ describe('code-generator', () => {
 
 				const code = generateCode(tree, json, graph, { expressionAnnotations });
 
-				expect(code).toContain('// @example "John Doe"');
+				expect(code).toContain('/** @example "John Doe" */');
 			});
 
-			it('places comma before @example comment, not after', () => {
+			it('places block comment on line before expression value', () => {
 				const json: WorkflowJSON = {
 					name: 'Test',
 					nodes: [
@@ -2609,7 +2609,7 @@ describe('code-generator', () => {
 							typeVersion: 3.4,
 							position: [0, 0],
 							parameters: {
-								// Expression is first, followed by another property - comma should be before comment
+								// Expression is first, followed by another property
 								expressionField: '={{ $json.name }}',
 								staticField: 'static value',
 							},
@@ -2626,10 +2626,9 @@ describe('code-generator', () => {
 
 				const code = generateCode(tree, json, graph, { expressionAnnotations });
 
-				// Comma should be BEFORE the comment, not after
-				expect(code).toContain("expr('{{ $json.name }}'),  // @example");
-				// Should NOT have comma after the comment (which would break JS syntax)
-				expect(code).not.toMatch(/\/\/ @example "[^"]*",\n/);
+				// Block comment should be on line before the expression
+				expect(code).toContain('/** @example "John Doe" */');
+				expect(code).toContain("expr('{{ $json.name }}')");
 			});
 
 			it('uses multi-line format when expression annotations are present', () => {

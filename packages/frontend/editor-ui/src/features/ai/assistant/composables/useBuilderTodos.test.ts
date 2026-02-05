@@ -781,5 +781,90 @@ describe('useBuilderTodos', () => {
 			expect(workflowTodos.value).toHaveLength(1);
 			expect(workflowTodos.value[0].node).toBe('Enabled Node');
 		});
+
+		describe('reactivity for subnode todos', () => {
+			it('shows subnode todos when parent node is unpinned', async () => {
+				const workflowsStore = useWorkflowsStore();
+
+				const subnodeWithPlaceholder = createMockNode({
+					name: 'OpenAI Model',
+					type: '@n8n/n8n-nodes-langchain.lmChatOpenAi',
+					parameters: {
+						prompt: '<__PLACEHOLDER_VALUE__Enter prompt__>',
+					},
+				});
+
+				const parentNode = createMockNode({
+					id: 'parent-1',
+					name: 'AI Agent',
+					type: '@n8n/n8n-nodes-langchain.agent',
+				});
+
+				workflowsStore.workflow.nodes = [subnodeWithPlaceholder, parentNode];
+				workflowsStore.workflow.connections = {
+					'OpenAI Model': {
+						ai_languageModel: [[{ node: 'AI Agent', type: 'ai_languageModel' as const, index: 0 }]],
+					},
+				};
+
+				// Initially parent is pinned - no todos expected
+				workflowsStore.workflow.pinData = {
+					'AI Agent': [{ json: { response: 'pinned' } }],
+				};
+
+				const { workflowTodos } = useBuilderTodos();
+				expect(workflowTodos.value).toHaveLength(0);
+
+				// Unpin the parent
+				workflowsStore.workflow.pinData = {};
+
+				// Should now show the subnode's placeholder todo
+				expect(workflowTodos.value).toHaveLength(1);
+				expect(workflowTodos.value[0].node).toBe('OpenAI Model');
+			});
+
+			it('shows subnode todos when parent node is enabled', () => {
+				const workflowsStore = useWorkflowsStore();
+
+				const subnodeWithPlaceholder = createMockNode({
+					name: 'OpenAI Model',
+					type: '@n8n/n8n-nodes-langchain.lmChatOpenAi',
+					parameters: {
+						prompt: '<__PLACEHOLDER_VALUE__Enter prompt__>',
+					},
+				});
+
+				const parentNode = createMockNode({
+					id: 'parent-1',
+					name: 'AI Agent',
+					type: '@n8n/n8n-nodes-langchain.agent',
+					disabled: true,
+				});
+
+				workflowsStore.workflow.nodes = [subnodeWithPlaceholder, parentNode];
+				workflowsStore.workflow.connections = {
+					'OpenAI Model': {
+						ai_languageModel: [[{ node: 'AI Agent', type: 'ai_languageModel' as const, index: 0 }]],
+					},
+				};
+				workflowsStore.workflow.pinData = {};
+
+				const { workflowTodos } = useBuilderTodos();
+
+				// Initially parent is disabled - no todos expected
+				expect(workflowTodos.value).toHaveLength(0);
+
+				// Enable the parent by updating the node
+				const parentIndex = workflowsStore.workflow.nodes.findIndex((n) => n.name === 'AI Agent');
+				workflowsStore.workflow.nodes[parentIndex] = {
+					...workflowsStore.workflow.nodes[parentIndex],
+					disabled: false,
+				};
+
+				// Should now show the subnode's placeholder todo
+				expect(workflowTodos.value).toHaveLength(1);
+				expect(workflowTodos.value[0].node).toBe('OpenAI Model');
+			});
+		});
 	});
 });

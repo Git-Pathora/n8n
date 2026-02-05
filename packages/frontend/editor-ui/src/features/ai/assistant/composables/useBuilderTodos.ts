@@ -210,14 +210,22 @@ export function useBuilderTodos() {
 	 * Base workflow validation issues filtered to only credentials and parameters types.
 	 * Excludes issues from nodes that have pinned data or are disabled (including parent disabled).
 	 */
-	const baseWorkflowIssues = computed(() =>
-		workflowsStore.workflowValidationIssues.filter(
+	const baseWorkflowIssues = computed(() => {
+		// Explicit dependencies to ensure reactivity when parent node state changes.
+		// Vue's computed may not track dependencies accessed in recursive helper functions,
+		// so we access pinData and nodes here to register them as dependencies.
+		const _pinData = workflowsStore.workflow.pinData;
+		const _nodes = workflowsStore.workflow.nodes;
+		void _pinData;
+		void _nodes;
+
+		return workflowsStore.workflowValidationIssues.filter(
 			(issue) =>
 				['credentials', 'parameters'].includes(issue.type) &&
 				!nodeHasPinnedData(issue.node) &&
 				!nodeIsDisabled(issue.node),
-		),
-	);
+		);
+	});
 
 	/**
 	 * Placeholder issues detected in workflow node parameters.
@@ -225,6 +233,11 @@ export function useBuilderTodos() {
 	 * Excludes issues from nodes that have pinned data or are disabled (including parent disabled).
 	 */
 	const placeholderIssues = computed(() => {
+		// Explicit dependency to ensure reactivity when parent node state changes.
+		// Vue's computed may not track pinData accessed in recursive helper functions.
+		const _pinData = workflowsStore.workflow.pinData;
+		void _pinData;
+
 		const issues: WorkflowValidationIssue[] = [];
 		const seen = new Set<string>();
 

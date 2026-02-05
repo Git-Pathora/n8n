@@ -428,10 +428,8 @@ function generateNodeConfig(node: SemanticNode, ctx: GenerationContext): string 
 				parts.push(`${innerIndent}// Output values redacted`);
 			}
 			parts.push(`${innerIndent}output: [${formatValue(outputSample, ctx)}]`);
-		} else {
-			// Schema exists but is empty - show output: [{}]
-			parts.push(`${innerIndent}output: [{}]`);
 		}
+		// If schema exists but is empty, don't show output: [{}] - it's not useful
 	}
 
 	return `{\n${parts.join(',\n')}\n${indent}}`;

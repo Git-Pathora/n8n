@@ -1,6 +1,7 @@
 import type { LogLevel, WorkflowSettings } from 'n8n-workflow';
 
 import type { ChatHubLLMProvider, ChatProviderSettingsDto } from './chat-hub';
+import type { QuickConnectModuleSettings } from './quick-connect';
 import type { InsightsDateRange } from './schemas/insights.schema';
 
 export interface IVersionNotificationSettings {
@@ -257,6 +258,12 @@ export type FrontendModuleSettings = {
 		enabled: boolean;
 		providers: Record<ChatHubLLMProvider, ChatProviderSettingsDto>;
 	};
+
+	/**
+	 * Client settings for quick-connect module.
+	 * Configured via N8N_QUICK_CONNECT_OPTIONS environment variable.
+	 */
+	'quick-connect'?: QuickConnectModuleSettings;
 };
 
 export type N8nEnvFeatFlagValue = boolean | string | number | undefined;

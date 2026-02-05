@@ -202,7 +202,7 @@ describe('codegen index', () => {
 
 				const code = generateWorkflowCode({ workflow: json, expressionValues });
 
-				expect(code).toContain('// @example "John Doe"');
+				expect(code).toContain('/** @example "John Doe" */');
 			});
 
 			it('accepts options object with execution data for status', () => {

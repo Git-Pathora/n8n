@@ -293,4 +293,36 @@ describe('formatValue', () => {
 
 		expect(result).toBe("'Hello World'");
 	});
+
+	describe('expression annotations', () => {
+		it('renders @example as block comment on line before expression', () => {
+			const expression = '={{ $json.name }}';
+			const annotations = new Map([[expression, '"John Doe"']]);
+
+			const result = formatValue(expression, { expressionAnnotations: annotations });
+
+			expect(result).toBe(`/** @example "John Doe" */\nexpr('{{ $json.name }}')`);
+		});
+
+		it('renders @example with newlines in block comment', () => {
+			const expression = '={{ $json.weather }}';
+			const annotationWithNewlines = `"Today's weather:\nTemperature: 20°C"`;
+			const annotations = new Map([[expression, annotationWithNewlines]]);
+
+			const result = formatValue(expression, { expressionAnnotations: annotations });
+
+			expect(result).toBe(
+				`/** @example "Today's weather:\nTemperature: 20°C" */\nexpr('{{ $json.weather }}')`,
+			);
+		});
+
+		it('renders @example for regular strings with annotations', () => {
+			const regularString = 'static value';
+			const annotations = new Map([[regularString, '"resolved"']]);
+
+			const result = formatValue(regularString, { expressionAnnotations: annotations });
+
+			expect(result).toBe(`/** @example "resolved" */\n'static value'`);
+		});
+	});
 });

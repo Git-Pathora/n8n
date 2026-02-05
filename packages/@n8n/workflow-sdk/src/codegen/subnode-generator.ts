@@ -75,8 +75,8 @@ function containsExpressionAnnotation(value: unknown, ctx?: FormatValueContext):
 
 /**
  * Format a value for code output.
- * When expression annotations are present in an object, uses multi-line formatting
- * to ensure // @example comments don't break JavaScript syntax.
+ * When expression annotations are present in an object, uses multi-line formatting.
+ * Expression annotations use block comments (/** @example *​/) on the line before the value.
  */
 export function formatValue(value: unknown, ctx?: FormatValueContext): string {
 	if (value === null) return 'null';
@@ -91,13 +91,15 @@ export function formatValue(value: unknown, ctx?: FormatValueContext): string {
 			const inner = value.slice(1);
 			const formatted = `expr('${escapeString(inner)}')`;
 			if (ctx?.expressionAnnotations?.has(value)) {
-				return `${formatted}  // @example ${ctx.expressionAnnotations.get(value)}`;
+				const annotation = ctx.expressionAnnotations.get(value)!;
+				return `/** @example ${annotation} */\n${formatted}`;
 			}
 			return formatted;
 		}
 		const formatted = `'${escapeString(value)}'`;
 		if (ctx?.expressionAnnotations?.has(value)) {
-			return `${formatted}  // @example ${ctx.expressionAnnotations.get(value)}`;
+			const annotation = ctx.expressionAnnotations.get(value)!;
+			return `/** @example ${annotation} */\n${formatted}`;
 		}
 		return formatted;
 	}
@@ -129,32 +131,34 @@ export function formatValue(value: unknown, ctx?: FormatValueContext): string {
 			const propIndent = '  '.repeat((ctx?.indent ?? 0) + 1);
 			const lines = formattedEntries.map((e, i) => {
 				const isLast = i === formattedEntries.length - 1;
+				const valueLines = e.value.split('\n');
+
+				// Check if this is a block comment before a value (not a nested object/array)
+				// Block comments start with /** and the last line is the actual value
+				const isBlockCommentPrefixed =
+					valueLines.length > 1 &&
+					valueLines[0].trim().startsWith('/**') &&
+					!valueLines[valueLines.length - 1].trim().match(/^[}\]]$/);
+
+				if (isBlockCommentPrefixed) {
+					// Comment lines get property indent, last line is key: value
+					const commentLines = valueLines.slice(0, -1).map((l) => `${propIndent}${l}`);
+					const valueLine = `${propIndent}${e.key}: ${valueLines[valueLines.length - 1]}`;
+					return [...commentLines, isLast ? valueLine : `${valueLine},`].join('\n');
+				}
+
+				// For nested objects/arrays or single-line values, add proper indentation
+				if (valueLines.length > 1) {
+					// Multi-line nested object/array - indent each line properly
+					const indentedValue = valueLines
+						.map((line, lineIdx) => (lineIdx === 0 ? line : `${propIndent}${line}`))
+						.join('\n');
+					const propLine = `${propIndent}${e.key}: ${indentedValue}`;
+					return isLast ? propLine : `${propLine},`;
+				}
+
 				const propLine = `${propIndent}${e.key}: ${e.value}`;
-
-				if (isLast) {
-					return propLine;
-				}
-
-				// Check if the LAST LINE of propLine needs a comma
-				// (for multi-line values, only the last line matters for comma placement)
-				const lastNewline = propLine.lastIndexOf('\n');
-				const lastLine = lastNewline >= 0 ? propLine.substring(lastNewline + 1) : propLine;
-
-				// If last line already ends with comma (from nested formatting), no change needed
-				if (lastLine.trimEnd().endsWith(',')) {
-					return propLine;
-				}
-
-				// If last line has // @example comment without comma before it, add comma
-				if (lastLine.includes('  // @example') && !lastLine.includes(',  // @example')) {
-					// Replace only in the LAST LINE, not throughout the string
-					const beforeLastLine = lastNewline >= 0 ? propLine.substring(0, lastNewline + 1) : '';
-					const fixedLastLine = lastLine.replace('  // @example', ',  // @example');
-					return beforeLastLine + fixedLastLine;
-				}
-
-				// Otherwise add comma at end
-				return `${propLine},`;
+				return isLast ? propLine : `${propLine},`;
 			});
 			return `{\n${lines.join('\n')}\n${baseIndent}}`;
 		}

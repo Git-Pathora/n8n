@@ -444,10 +444,52 @@ function getVarRefOrInlineNode(node: SemanticNode, ctx: GenerationContext): stri
 }
 
 /**
- * Generate sticky note call
+ * Get variable names of nodes whose top-left corner is inside a sticky note's bounds.
+ * Excludes other sticky notes from the result.
  */
-function generateStickyCall(node: SemanticNode): string {
+function getNodesInsideSticky(stickyNode: SemanticNode, ctx: GenerationContext): string[] {
+	const pos = stickyNode.json.position ?? [0, 0];
+	const params = stickyNode.json.parameters;
+	const width = Number(params?.width) || 0;
+	const height = Number(params?.height) || 0;
+
+	// If sticky has no dimensions, return empty array
+	if (width === 0 || height === 0) return [];
+
+	const containedNodes: string[] = [];
+
+	for (const [nodeName, node] of ctx.graph.nodes) {
+		// Skip other sticky notes
+		if (isStickyNote(node.type)) continue;
+
+		const nodePos = node.json.position ?? [0, 0];
+
+		// Check if node's top-left corner is inside the sticky bounds
+		if (
+			nodePos[0] >= pos[0] &&
+			nodePos[0] <= pos[0] + width &&
+			nodePos[1] >= pos[1] &&
+			nodePos[1] <= pos[1] + height
+		) {
+			const varName = ctx.nodeNameToVarName.get(nodeName);
+			if (varName) containedNodes.push(varName);
+		}
+	}
+
+	return containedNodes;
+}
+
+/**
+ * Generate sticky note call
+ * New signature: sticky(content, nodes, config?)
+ */
+function generateStickyCall(node: SemanticNode, ctx: GenerationContext): string {
 	const content = escapeString((node.json.parameters?.content as string) ?? '');
+
+	// Get nodes inside this sticky's bounds
+	const nodesInside = getNodesInsideSticky(node, ctx);
+	const nodesStr = `[${nodesInside.join(', ')}]`;
+
 	const options: string[] = [];
 
 	// Only include name if it's truthy - parser will generate unique names for unnamed sticky notes
@@ -473,7 +515,7 @@ function generateStickyCall(node: SemanticNode): string {
 	}
 
 	const optionsStr = options.length > 0 ? `, { ${options.join(', ')} }` : '';
-	return `sticky('${content}'${optionsStr})`;
+	return `sticky('${content}', ${nodesStr}${optionsStr})`;
 }
 
 /**
@@ -526,7 +568,7 @@ function generateMergeCall(node: SemanticNode, ctx: GenerationContext): string {
  */
 function generateNodeCall(node: SemanticNode, ctx: GenerationContext): string {
 	if (isStickyNote(node.type)) {
-		return generateStickyCall(node);
+		return generateStickyCall(node, ctx);
 	}
 
 	if (isMergeType(node.type)) {

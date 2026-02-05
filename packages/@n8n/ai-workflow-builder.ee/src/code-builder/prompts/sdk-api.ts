@@ -175,8 +175,6 @@ export interface StickyNoteConfig {
 	width?: number;
 	/** Height in pixels */
 	height?: number;
-	/** Nodes to wrap - auto-positions sticky around these nodes */
-	nodes?: NodeInstance[];
 }
 
 /**
@@ -521,17 +519,22 @@ export type TriggerFn = <TTrigger extends TriggerInput>(
 ) => TriggerInstance<TTrigger['type'], \`\${TTrigger['version']}\`, unknown>;
 
 /**
- * sticky(content, config?) - Creates a sticky note
+ * sticky(content, nodes?, config?) - Creates a sticky note
+ *
+ * @param content - Markdown content for the sticky note
+ * @param nodes - Optional array of nodes to wrap (auto-positions sticky around them)
+ * @param config - Optional configuration (color, position, size)
  *
  * @example
  * // Auto-position around nodes
- * sticky('## Data Processing', { nodes: [httpNode, setNode], color: 2 });
+ * sticky('## Data Processing', [httpNode, setNode], { color: 2 });
  *
- * // Manual positioning
- * sticky('## API Integration', { color: 4, position: [80, -176] });
+ * // Manual positioning (no nodes)
+ * sticky('## API Integration', [], { color: 4, position: [80, -176] });
  */
 export type StickyFn = (
 	content: string,
+	nodes?: NodeInstance[],
 	config?: StickyNoteConfig,
 ) => NodeInstance<'n8n-nodes-base.stickyNote', 'v1', unknown>;
 

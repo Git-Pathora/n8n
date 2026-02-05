@@ -204,7 +204,7 @@ describe('Node Builder', () => {
 			expect(s.config.parameters?.height).toBe(200);
 		});
 
-		it('should auto-position around nodes when nodes option is provided', () => {
+		it('should auto-position around nodes when nodes array is provided as second parameter', () => {
 			const n1 = node({
 				type: 'n8n-nodes-base.httpRequest',
 				version: 4.2,
@@ -216,7 +216,8 @@ describe('Node Builder', () => {
 				config: { name: 'Set', position: [700, 300] },
 			});
 
-			const s = sticky('## API Section', { nodes: [n1, n2], color: 2 });
+			// New signature: sticky(content, nodes?, config?)
+			const s = sticky('## API Section', [n1, n2], { color: 2 });
 
 			// Should calculate bounding box around nodes with padding (50px)
 			// minX = 400, maxX = 700 + 200 = 900, minY = 300, maxY = 300 + 100 = 400
@@ -228,6 +229,16 @@ describe('Node Builder', () => {
 			expect(s.config.parameters?.color).toBe(2);
 		});
 
+		it('should work with empty nodes array as second parameter', () => {
+			const s = sticky('## Note', [], { color: 4 });
+
+			expect(s.type).toBe('n8n-nodes-base.stickyNote');
+			expect(s.config.parameters?.content).toBe('## Note');
+			expect(s.config.parameters?.color).toBe(4);
+			// No nodes means no auto-positioning
+			expect(s.config.position).toBeUndefined();
+		});
+
 		it('should allow manual position to override nodes bounding box', () => {
 			const n1 = node({
 				type: 'n8n-nodes-base.httpRequest',
@@ -235,10 +246,21 @@ describe('Node Builder', () => {
 				config: { name: 'HTTP', position: [400, 300] },
 			});
 
-			const s = sticky('## Note', { nodes: [n1], position: [100, 100] });
+			// New signature: sticky(content, nodes?, config?)
+			const s = sticky('## Note', [n1], { position: [100, 100] });
 
 			// Manual position should override calculated position
 			expect(s.config.position).toEqual([100, 100]);
+		});
+
+		it('should work with config only (no nodes) when second param is object', () => {
+			// When second param is an object (config), not an array (nodes),
+			// it should be treated as config for backward compatibility
+			const s = sticky('## Note', { color: 4, position: [50, 50] });
+
+			expect(s.config.parameters?.content).toBe('## Note');
+			expect(s.config.parameters?.color).toBe(4);
+			expect(s.config.position).toEqual([50, 50]);
 		});
 
 		it('should generate unique default names for multiple stickies', () => {

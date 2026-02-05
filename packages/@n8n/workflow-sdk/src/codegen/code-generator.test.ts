@@ -1013,6 +1013,188 @@ describe('code-generator', () => {
 
 				expect(code).toContain("name: 'My Custom Note'");
 			});
+
+			it('generates sticky with empty nodes array when sticky has no dimensions', () => {
+				const json: WorkflowJSON = {
+					id: 'sticky-no-dimensions-test',
+					name: 'Test',
+					nodes: [
+						{
+							id: '1',
+							name: 'My Sticky',
+							type: 'n8n-nodes-base.stickyNote',
+							typeVersion: 1,
+							position: [0, 0],
+							parameters: {
+								content: 'Note content',
+								// No width or height
+							},
+						},
+						{
+							id: '2',
+							name: 'HTTP Request',
+							type: 'n8n-nodes-base.httpRequest',
+							typeVersion: 4.2,
+							position: [50, 50],
+						},
+					],
+					connections: {},
+				};
+
+				const code = generateFromWorkflow(json);
+
+				// Sticky should have empty nodes array since it has no dimensions
+				expect(code).toContain("sticky('Note content', []");
+			});
+
+			it('generates sticky with empty nodes array when no nodes inside bounds', () => {
+				const json: WorkflowJSON = {
+					id: 'sticky-no-nodes-inside-test',
+					name: 'Test',
+					nodes: [
+						{
+							id: '1',
+							name: 'My Sticky',
+							type: 'n8n-nodes-base.stickyNote',
+							typeVersion: 1,
+							position: [0, 0],
+							parameters: {
+								content: 'Note content',
+								width: 200,
+								height: 100,
+							},
+						},
+						{
+							id: '2',
+							name: 'HTTP Request',
+							type: 'n8n-nodes-base.httpRequest',
+							typeVersion: 4.2,
+							position: [500, 500], // Outside sticky bounds
+						},
+					],
+					connections: {},
+				};
+
+				const code = generateFromWorkflow(json);
+
+				// Sticky should have empty nodes array since HTTP is outside bounds
+				expect(code).toContain("sticky('Note content', []");
+			});
+
+			it('generates sticky with node varname when node top-left is inside bounds', () => {
+				const json: WorkflowJSON = {
+					id: 'sticky-node-inside-test',
+					name: 'Test',
+					nodes: [
+						{
+							id: '1',
+							name: 'My Sticky',
+							type: 'n8n-nodes-base.stickyNote',
+							typeVersion: 1,
+							position: [0, 0],
+							parameters: {
+								content: 'API Section',
+								width: 300,
+								height: 200,
+							},
+						},
+						{
+							id: '2',
+							name: 'HTTP Request',
+							type: 'n8n-nodes-base.httpRequest',
+							typeVersion: 4.2,
+							position: [50, 50], // Inside sticky bounds
+						},
+					],
+					connections: {},
+				};
+
+				const code = generateFromWorkflow(json);
+
+				// Sticky should include the HTTP node's variable name (hTTP_Request is generated variable name)
+				expect(code).toContain("sticky('API Section', [hTTP_Request]");
+			});
+
+			it('generates sticky with multiple node varnames when multiple nodes inside bounds', () => {
+				const json: WorkflowJSON = {
+					id: 'sticky-multiple-nodes-test',
+					name: 'Test',
+					nodes: [
+						{
+							id: '1',
+							name: 'My Sticky',
+							type: 'n8n-nodes-base.stickyNote',
+							typeVersion: 1,
+							position: [0, 0],
+							parameters: {
+								content: 'Data Processing',
+								width: 500,
+								height: 400,
+							},
+						},
+						{
+							id: '2',
+							name: 'HTTP Request',
+							type: 'n8n-nodes-base.httpRequest',
+							typeVersion: 4.2,
+							position: [50, 50], // Inside sticky
+						},
+						{
+							id: '3',
+							name: 'Set',
+							type: 'n8n-nodes-base.set',
+							typeVersion: 3.4,
+							position: [100, 100], // Inside sticky
+						},
+					],
+					connections: {},
+				};
+
+				const code = generateFromWorkflow(json);
+
+				// Sticky should include both nodes' variable names
+				expect(code).toContain("sticky('Data Processing', [hTTP_Request, set]");
+			});
+
+			it('excludes other sticky notes from nodes array', () => {
+				const json: WorkflowJSON = {
+					id: 'sticky-excludes-stickies-test',
+					name: 'Test',
+					nodes: [
+						{
+							id: '1',
+							name: 'Outer Sticky',
+							type: 'n8n-nodes-base.stickyNote',
+							typeVersion: 1,
+							position: [0, 0],
+							parameters: {
+								content: 'Outer',
+								width: 500,
+								height: 400,
+							},
+						},
+						{
+							id: '2',
+							name: 'Inner Sticky',
+							type: 'n8n-nodes-base.stickyNote',
+							typeVersion: 1,
+							position: [50, 50], // Inside outer sticky bounds
+							parameters: {
+								content: 'Inner',
+								width: 100,
+								height: 50,
+							},
+						},
+					],
+					connections: {},
+				};
+
+				const code = generateFromWorkflow(json);
+
+				// Outer sticky should NOT include inner sticky in nodes array
+				// It should have empty nodes array
+				expect(code).toContain("sticky('Outer', []");
+			});
 		});
 
 		describe('AI subnodes', () => {

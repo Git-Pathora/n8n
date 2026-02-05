@@ -358,7 +358,7 @@ export interface NodeConfig<TParams = IDataObject> {
 }
 
 /**
- * Configuration for sticky notes (with nodes for wrapping)
+ * Configuration for sticky notes
  */
 export interface StickyNoteConfig {
 	color?: number;
@@ -366,7 +366,6 @@ export interface StickyNoteConfig {
 	width?: number;
 	height?: number;
 	name?: string;
-	nodes?: Array<NodeInstance<string, string, unknown>>;
 }
 
 // =============================================================================
@@ -1010,6 +1009,7 @@ export type TriggerFn = <TTrigger extends TriggerInput>(
 
 export type StickyFn = (
 	content: string,
+	nodes?: Array<NodeInstance<string, string, unknown>>,
 	config?: StickyNoteConfig,
 ) => NodeInstance<'n8n-nodes-base.stickyNote', 'v1', void>;
 

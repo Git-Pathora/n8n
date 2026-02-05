@@ -971,14 +971,18 @@ class StickyNoteInstance implements NodeInstance<'n8n-nodes-base.stickyNote', 'v
 	readonly id: string;
 	readonly name: string;
 
-	constructor(content: string, stickyConfig: StickyNoteConfig = {}) {
+	constructor(
+		content: string,
+		nodes: Array<NodeInstance<string, string, unknown>> = [],
+		stickyConfig: StickyNoteConfig = {},
+	) {
 		this.id = uuid();
 		// Use a unique default name to prevent multiple stickies from overwriting each other
 		// when added to a workflow (Map uses name as key)
 		this.name = stickyConfig.name ?? `Sticky Note ${this.id.slice(0, 8)}`;
 
 		// If nodes are provided, calculate bounding box to wrap around them
-		const boundingBox = stickyConfig.nodes ? calculateNodesBoundingBox(stickyConfig.nodes) : null;
+		const boundingBox = nodes.length > 0 ? calculateNodesBoundingBox(nodes) : null;
 
 		this.config = {
 			name: this.name,
@@ -1005,7 +1009,8 @@ class StickyNoteInstance implements NodeInstance<'n8n-nodes-base.stickyNote', 'v
 			height: (config.parameters?.height as number) ?? (this.config.parameters?.height as number),
 			name: config.name ?? this.name,
 		};
-		return new StickyNoteInstance(newContent, newConfig);
+		// Pass empty nodes array since update doesn't recalculate bounding box
+		return new StickyNoteInstance(newContent, [], newConfig);
 	}
 
 	input(_index: number): InputTarget {
@@ -1036,13 +1041,14 @@ class StickyNoteInstance implements NodeInstance<'n8n-nodes-base.stickyNote', 'v
  * Create a sticky note for workflow documentation
  *
  * @param content - Markdown content for the sticky note
- * @param config - Optional configuration (color, position, size, nodes to wrap)
+ * @param nodesOrConfig - Optional nodes to wrap (auto-positions sticky around them), or config for backward compatibility
+ * @param config - Optional configuration (color, position, size)
  * @returns A sticky note node instance
  *
  * @example
  * ```typescript
  * // Manual positioning
- * const note = sticky('## API Integration\nThis section handles API calls', {
+ * const note = sticky('## API Integration\nThis section handles API calls', [], {
  *   color: 4,
  *   position: [80, -176]
  * });
@@ -1050,14 +1056,26 @@ class StickyNoteInstance implements NodeInstance<'n8n-nodes-base.stickyNote', 'v
  * // Auto-position around nodes
  * const httpNode = node({ type: 'n8n-nodes-base.httpRequest', ... });
  * const setNode = node({ type: 'n8n-nodes-base.set', ... });
- * const note = sticky('## Data Processing', { nodes: [httpNode, setNode], color: 2 });
+ * const note = sticky('## Data Processing', [httpNode, setNode], { color: 2 });
+ *
+ * // Backward compatible: config as second param (no nodes)
+ * const note = sticky('## Note', { color: 4 });
  * ```
  */
 export function sticky(
 	content: string,
-	config: StickyNoteConfig = {},
+	nodesOrConfig?: Array<NodeInstance<string, string, unknown>> | StickyNoteConfig,
+	config?: StickyNoteConfig,
 ): NodeInstance<'n8n-nodes-base.stickyNote', 'v1', void> {
-	return new StickyNoteInstance(content, config);
+	// Handle backward compatibility: sticky(content, config)
+	// If second param is an object but not an array, treat it as config
+	if (nodesOrConfig !== undefined && !Array.isArray(nodesOrConfig)) {
+		return new StickyNoteInstance(content, [], nodesOrConfig);
+	}
+
+	// New signature: sticky(content, nodes?, config?)
+	const nodes = nodesOrConfig ?? [];
+	return new StickyNoteInstance(content, nodes, config ?? {});
 }
 
 /**

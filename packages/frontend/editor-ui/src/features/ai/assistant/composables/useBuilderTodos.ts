@@ -144,16 +144,17 @@ export function useBuilderTodos() {
 			return true;
 		}
 
-		// Check if any ancestor node (nodes this one outputs to) is disabled
-		// Sub-nodes output to their parent, so recursively check up the chain
+		// Check if any parent node (via sub-node connections) is disabled.
+		// Sub-nodes output to their parent via non-main connection types (ai_languageModel, ai_tool, etc).
+		// Skip "main" connections — those are regular workflow links, not sub-node → parent links.
 		const outgoingConnections = workflowsStore.outgoingConnectionsByNodeName(nodeName);
 		for (const connectionType of Object.keys(outgoingConnections)) {
+			if (connectionType === 'main') continue;
 			const connections = outgoingConnections[connectionType];
 			if (connections) {
 				for (const connectionGroup of connections) {
 					if (!connectionGroup) continue;
 					for (const connection of connectionGroup) {
-						// Recursively check if the parent or any of its ancestors is disabled
 						if (nodeIsDisabled(connection.node, visited)) {
 							return true;
 						}
@@ -185,16 +186,17 @@ export function useBuilderTodos() {
 			return true;
 		}
 
-		// Check if any ancestor node (nodes this one outputs to) has pinned data
-		// Sub-nodes output to their parent, so recursively check up the chain
+		// Check if any parent node (via sub-node connections) has pinned data.
+		// Sub-nodes output to their parent via non-main connection types (ai_languageModel, ai_tool, etc).
+		// Skip "main" connections — those are regular workflow links, not sub-node → parent links.
 		const outgoingConnections = workflowsStore.outgoingConnectionsByNodeName(nodeName);
 		for (const connectionType of Object.keys(outgoingConnections)) {
+			if (connectionType === 'main') continue;
 			const connections = outgoingConnections[connectionType];
 			if (connections) {
 				for (const connectionGroup of connections) {
 					if (!connectionGroup) continue;
 					for (const connection of connectionGroup) {
-						// Recursively check if the parent or any of its ancestors has pinned data
 						if (nodeHasPinnedData(connection.node, visited)) {
 							return true;
 						}

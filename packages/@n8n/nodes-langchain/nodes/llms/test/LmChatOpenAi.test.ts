@@ -13,9 +13,6 @@ import { LmChatOpenAi } from '../LMChatOpenAi/LmChatOpenAi.node';
 jest.mock('@langchain/openai');
 jest.mock('@n8n/ai-utilities');
 jest.mock('../LMChatOpenAi/common');
-jest.mock('@utils/httpProxyAgent', () => ({
-	getProxyAgent: jest.fn().mockReturnValue({}),
-}));
 
 const MockedChatOpenAI = jest.mocked(ChatOpenAI);
 const MockedN8nLlmTracing = jest.mocked(N8nLlmTracing);

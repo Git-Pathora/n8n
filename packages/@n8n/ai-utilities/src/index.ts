@@ -17,6 +17,12 @@ export {
 } from './utils/tokenizer/token-estimator';
 export { encodingForModel, getEncoding } from './utils/tokenizer/tiktoken';
 export { makeN8nLlmFailedAttemptHandler } from './utils/failed-attempt-handler/n8nLlmFailedAttemptHandler';
+export {
+	getProxyAgent,
+	getNodeProxyAgent,
+	proxyFetch,
+	type AgentTimeoutOptions,
+} from './utils/http-proxy-agent';
 
 // Type guards
 export {
@@ -29,7 +35,7 @@ export {
 // Types
 export type { ChatModel, ChatModelConfig } from './types/chat-model';
 export type { GenerateResult, StreamChunk, TokenUsage, FinishReason } from './types/output';
-export type { Tool, ToolResult, ToolCall } from './types/tool';
+export type { Tool, ToolResult, ToolCall, ProviderTool } from './types/tool';
 export type {
 	Message,
 	ContentFile,

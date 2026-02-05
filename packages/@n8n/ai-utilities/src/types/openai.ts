@@ -1,13 +1,33 @@
+import type { ProviderTool } from './tool';
+
 export type ReasoningEffort = 'none' | 'minimal' | 'low' | 'medium' | 'high' | null;
 export type VerbosityParam = 'low' | 'medium' | 'high' | null;
 
 export interface OpenAIModelOptions {
+	baseUrl: string;
 	/** Model name to use */
 	model: string;
 	/**
 	 * API key to use when making requests to OpenAI.
 	 */
 	apiKey: string;
+	/**
+	 * Provider-specific tools to use.
+	 * @example
+	 * {
+	 *   type: 'provider',
+	 *   name: 'web_search',
+	 *   args: {
+	 *     search_context_size: 'medium',
+	 *     userLocation: {
+	 *       type: "approximate",
+	 *       country: "US"
+	 *     },
+	 *   },
+	 * }
+	 */
+	providerTools?: ProviderTool[];
+	defaultHeaders?: Record<string, string>;
 	/**
 	 * Whether to use the responses API for all requests. If `false` the responses API will be used
 	 * only when required in order to fulfill the request.

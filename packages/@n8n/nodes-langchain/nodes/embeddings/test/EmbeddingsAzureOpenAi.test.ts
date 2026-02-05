@@ -10,7 +10,7 @@ jest.mock('@langchain/openai');
 
 class MockProxyAgent {}
 
-jest.mock('@utils/httpProxyAgent', () => ({
+jest.mock('@n8n/ai-utilities', () => ({
 	getProxyAgent: jest.fn().mockImplementation(() => new MockProxyAgent()),
 }));
 

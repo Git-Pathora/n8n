@@ -1,5 +1,6 @@
 import type { ChatOllamaInput } from '@langchain/ollama';
 import { ChatOllama } from '@langchain/ollama';
+import { makeN8nLlmFailedAttemptHandler, N8nLlmTracing, proxyFetch } from '@n8n/ai-utilities';
 import {
 	NodeConnectionTypes,
 	type INodeType,
@@ -9,10 +10,8 @@ import {
 } from 'n8n-workflow';
 
 import { getConnectionHintNoticeField } from '@utils/sharedFields';
-import { proxyFetch } from '@utils/httpProxyAgent';
 
 import { ollamaModel, ollamaOptions, ollamaDescription } from '../LMOllama/description';
-import { makeN8nLlmFailedAttemptHandler, N8nLlmTracing } from '@n8n/ai-utilities';
 
 export class LmChatOllama implements INodeType {
 	description: INodeTypeDescription = {

@@ -10,9 +10,6 @@ import { LmChatAnthropic } from '../LmChatAnthropic.node';
 
 jest.mock('@langchain/anthropic');
 jest.mock('@n8n/ai-utilities');
-jest.mock('@utils/httpProxyAgent', () => ({
-	getProxyAgent: jest.fn().mockReturnValue({}),
-}));
 
 const MockedChatAnthropic = jest.mocked(ChatAnthropic);
 const MockedN8nLlmTracing = jest.mocked(N8nLlmTracing);

@@ -4,6 +4,7 @@ import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { InstanceSettings } from 'n8n-core';
+import { jsonParse } from 'n8n-workflow';
 
 import {
 	generateSingleVersionTypeFile,
@@ -104,7 +105,7 @@ export class NodeTypeGeneratorService {
 
 		// Read and parse nodes.json
 		const content = await fs.promises.readFile(nodesJsonPath, 'utf-8');
-		const nodes = JSON.parse(content) as NodeTypeDescription[];
+		const nodes = jsonParse<NodeTypeDescription[]>(content);
 
 		// Group nodes by package
 		const nodesByPackage = new Map<string, Map<string, NodeTypeDescription[]>>();
@@ -196,7 +197,9 @@ export class NodeTypeGeneratorService {
 					// Add first node variant for main index
 					allNodes.push(nodeVariants[0]);
 				} catch (error) {
-					this.logger.error(`Error generating types for ${nodeName}:`, error);
+					this.logger.error(`Error generating types for ${nodeName}:`, {
+						error: error instanceof Error ? error.message : String(error),
+					});
 				}
 			}
 		}

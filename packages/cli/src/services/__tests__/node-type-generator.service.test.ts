@@ -80,10 +80,10 @@ describe('NodeTypeGeneratorService', () => {
 
 			// Hash file exists with matching hash
 			(fs.existsSync as jest.Mock).mockReturnValue(true);
-			(fs.promises.readFile as jest.Mock).mockImplementation((filePath: string) => {
-				if (filePath === nodesJsonPath) return Promise.resolve(content);
-				if (filePath === hashFilePath) return Promise.resolve(expectedHash);
-				return Promise.reject(new Error('Unexpected file'));
+			(fs.promises.readFile as jest.Mock).mockImplementation(async (filePath: string) => {
+				if (filePath === nodesJsonPath) return content;
+				if (filePath === hashFilePath) return expectedHash;
+				throw new Error('Unexpected file');
 			});
 
 			const result = await service.generateIfNeeded(nodesJsonPath);
@@ -96,10 +96,10 @@ describe('NodeTypeGeneratorService', () => {
 
 			// Hash file exists but with different hash
 			(fs.existsSync as jest.Mock).mockReturnValue(true);
-			(fs.promises.readFile as jest.Mock).mockImplementation((filePath: string) => {
-				if (filePath === nodesJsonPath) return Promise.resolve(content);
-				if (filePath === hashFilePath) return Promise.resolve('old-different-hash');
-				return Promise.reject(new Error('Unexpected file'));
+			(fs.promises.readFile as jest.Mock).mockImplementation(async (filePath: string) => {
+				if (filePath === nodesJsonPath) return content;
+				if (filePath === hashFilePath) return 'old-different-hash';
+				throw new Error('Unexpected file');
 			});
 			(fs.promises.mkdir as jest.Mock).mockResolvedValue(undefined);
 			(fs.promises.writeFile as jest.Mock).mockResolvedValue(undefined);

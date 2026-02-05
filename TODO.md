@@ -10,19 +10,19 @@
 - [ ] remove agent check in req
 - [ ] get nodes should fail if search was not done for the same node type
 - [ ] "Workflow generated" -> to something else if code building
+- [ ] move nodes in sticky out of config
 
 ## clean up
 - [ ] maybe don't write to .n8n folder? move to /tmp/
 - [ ] extract thinking only if codeBuilder is enabled
 - [ ] remove workflow settings
-- [ ] wrap prompt sectinos in xml?
+- [ ] wrap prompt sections in xml?
+- [ ] print the prompt again reread
+- [ ] how are settings handled?
 
 ## ready to release
 - [ ] Get PR reviewed
-
 - [ ] rerun evals comparing - Fri
-- [ ] legal concerns around templates
-
 - [ ] credit tracking
 - [ ] Remove logging from agent. also remove the generated log files.
 - [ ] Add sentry tracking if workflow code generation step fails in prod.

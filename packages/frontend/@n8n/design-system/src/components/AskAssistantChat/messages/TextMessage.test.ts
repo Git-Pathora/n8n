@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia';
 import { nextTick } from 'vue';
 
 import TextMessage from './TextMessage.vue';
+import type * as UseMarkdownModule from './useMarkdown';
 import { parseThinkingSegments } from './useMarkdown';
 import type { ChatUI } from '../../../types/assistant';
 
@@ -15,7 +16,7 @@ vi.mock('@n8n/design-system/composables/useI18n', () => ({
 
 // Mock useMarkdown but not parseThinkingSegments
 vi.mock('./useMarkdown', async (importOriginal) => {
-	const original = await importOriginal<typeof import('./useMarkdown')>();
+	const original = await importOriginal<typeof UseMarkdownModule>();
 	return {
 		...original,
 		useMarkdown: () => ({

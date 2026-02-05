@@ -5,8 +5,7 @@
 import {
 	MAX_AGENT_ITERATIONS,
 	MAX_VALIDATE_ATTEMPTS,
-	FIX_AND_FINALIZE_INSTRUCTION,
-	FIX_ISSUES_INSTRUCTION,
+	FIX_VALIDATION_ERRORS_INSTRUCTION,
 	TEXT_EDITOR_TOOL,
 	VALIDATE_TOOL,
 } from '../constants';
@@ -22,22 +21,25 @@ describe('code-builder constants', () => {
 		});
 	});
 
-	describe('FIX_ISSUES_INSTRUCTION', () => {
-		it('should mention both str_replace and insert as fix options', () => {
-			expect(FIX_ISSUES_INSTRUCTION).toContain('str_replace');
-			expect(FIX_ISSUES_INSTRUCTION).toContain('insert');
-		});
-	});
-
-	describe('FIX_AND_FINALIZE_INSTRUCTION', () => {
-		it('should contain instruction to validate or stop calling tools', () => {
-			expect(FIX_AND_FINALIZE_INSTRUCTION).toContain('validate_workflow');
-			expect(FIX_AND_FINALIZE_INSTRUCTION).toContain('auto-finalize');
+	describe('FIX_VALIDATION_ERRORS_INSTRUCTION', () => {
+		it('should include numbered steps for fixing errors', () => {
+			expect(FIX_VALIDATION_ERRORS_INSTRUCTION).toContain('1.');
+			expect(FIX_VALIDATION_ERRORS_INSTRUCTION).toContain('2.');
+			expect(FIX_VALIDATION_ERRORS_INSTRUCTION).toContain('3.');
+			expect(FIX_VALIDATION_ERRORS_INSTRUCTION).toContain('4.');
 		});
 
-		it('should use positive guardrail wording instead of negative', () => {
-			expect(FIX_AND_FINALIZE_INSTRUCTION).not.toContain('Do NOT');
-			expect(FIX_AND_FINALIZE_INSTRUCTION).not.toContain('Do not');
+		it('should remind agent to use get_node_types first', () => {
+			expect(FIX_VALIDATION_ERRORS_INSTRUCTION).toContain('get_node_types');
+		});
+
+		it('should mention str_replace and insert as fix options', () => {
+			expect(FIX_VALIDATION_ERRORS_INSTRUCTION).toContain('str_replace');
+			expect(FIX_VALIDATION_ERRORS_INSTRUCTION).toContain('insert');
+		});
+
+		it('should instruct to validate after fixing', () => {
+			expect(FIX_VALIDATION_ERRORS_INSTRUCTION).toContain('validate_workflow');
 		});
 	});
 

@@ -11,7 +11,7 @@ export { CodeBuilderAgent } from './code-builder-agent';
 export {
 	MAX_AGENT_ITERATIONS,
 	MAX_VALIDATE_ATTEMPTS,
-	FIX_AND_FINALIZE_INSTRUCTION,
+	FIX_VALIDATION_ERRORS_INSTRUCTION,
 	TEXT_EDITOR_TOOL,
 	VALIDATE_TOOL,
 } from './constants';

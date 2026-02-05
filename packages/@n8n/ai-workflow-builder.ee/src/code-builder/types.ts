@@ -78,6 +78,14 @@ export interface ParseAndValidateResult {
 }
 
 /**
+ * Token usage data reported by callback
+ */
+export interface TokenUsage {
+	inputTokens: number;
+	outputTokens: number;
+}
+
+/**
  * Configuration for the code builder agent
  */
 export interface CodeBuilderAgentConfig {
@@ -99,4 +107,9 @@ export interface CodeBuilderAgentConfig {
 	 * If not specified, auto-enabled for Claude 4.x models.
 	 */
 	enableTextEditor?: boolean;
+	/**
+	 * Optional callback to receive token usage data from each LLM invocation.
+	 * Called after each LLM call completes. Callers can accumulate for totals.
+	 */
+	onTokenUsage?: (usage: TokenUsage) => void;
 }

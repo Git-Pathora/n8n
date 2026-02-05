@@ -174,18 +174,25 @@ function createCodeWorkflowBuilderGenerator(
 	llms: ResolvedStageLLMs,
 	timeoutMs?: number,
 ): (prompt: string, collectors?: GenerationCollectors) => Promise<GenerationResult> {
-	// TODO: Token usage tracking is not yet implemented for CodeWorkflowBuilder.
-	// The CodeWorkflowBuilder doesn't support external callbacks like the multi-agent system.
-	// To add token tracking, CodeWorkflowBuilder.chat() would need to accept callback handlers.
-	// Subgraph metrics are also not applicable since CodeWorkflowBuilder doesn't use coordination logs.
-	return async (prompt: string, _collectors?: GenerationCollectors): Promise<GenerationResult> => {
+	// Subgraph metrics are not applicable since CodeWorkflowBuilder doesn't use coordination logs.
+	return async (prompt: string, collectors?: GenerationCollectors): Promise<GenerationResult> => {
 		const runId = generateRunId();
 		const evalLogger = new EvaluationLogger();
+
+		// Accumulate token usage across all LLM calls
+		let totalInputTokens = 0;
+		let totalOutputTokens = 0;
 
 		const builder = new CodeWorkflowBuilder({
 			llm: llms.builder,
 			nodeTypes: parsedNodeTypes,
 			evalLogger,
+			onTokenUsage: collectors?.tokenUsage
+				? (usage) => {
+						totalInputTokens += usage.inputTokens;
+						totalOutputTokens += usage.outputTokens;
+					}
+				: undefined,
 		});
 
 		const payload = getChatPayload({
@@ -234,6 +241,11 @@ function createCodeWorkflowBuilderGenerator(
 
 		if (!workflow) {
 			throw new WorkflowGenerationError('CodeWorkflowBuilder did not produce a workflow');
+		}
+
+		// Report accumulated token usage
+		if (collectors?.tokenUsage && (totalInputTokens > 0 || totalOutputTokens > 0)) {
+			collectors.tokenUsage({ inputTokens: totalInputTokens, outputTokens: totalOutputTokens });
 		}
 
 		return { workflow, generatedCode };

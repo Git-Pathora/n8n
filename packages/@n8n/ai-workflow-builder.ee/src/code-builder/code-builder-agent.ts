@@ -106,6 +106,7 @@ export class CodeBuilderAgent {
 		// Initialize iteration handler
 		this.iterationHandler = new AgentIterationHandler({
 			debugLog: (ctx, msg, data) => this.debugLog(ctx, msg, data),
+			onTokenUsage: config.onTokenUsage,
 		});
 
 		// Initialize final response handler

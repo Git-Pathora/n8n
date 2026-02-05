@@ -22,7 +22,10 @@ import type { StreamOutput } from '../types/streaming';
 import type { ChatPayload } from '../workflow-builder-agent';
 import { CodeBuilderAgent } from './code-builder-agent';
 import { SessionChatHandler } from './handlers/session-chat-handler';
+import type { TokenUsage } from './types';
 import type { EvaluationLogger } from './utils/evaluation-logger';
+
+export type { TokenUsage };
 
 /**
  * Configuration for CodeWorkflowBuilder
@@ -51,6 +54,11 @@ export interface CodeWorkflowBuilderConfig {
 	 * Used for credit deduction and UI updates.
 	 */
 	onGenerationSuccess?: () => Promise<void>;
+	/**
+	 * Optional callback to receive token usage data from each LLM invocation.
+	 * Called after each LLM call completes. Callers can accumulate for totals.
+	 */
+	onTokenUsage?: (usage: TokenUsage) => void;
 }
 
 /**
@@ -76,6 +84,7 @@ export class CodeWorkflowBuilder {
 			generatedTypesDir: config.generatedTypesDir,
 			evalLogger: config.evalLogger,
 			enableTextEditor: true,
+			onTokenUsage: config.onTokenUsage,
 		});
 
 		this.logger = config.logger;

@@ -22,6 +22,7 @@ export type {
 	ParseAndValidateResult,
 	ValidationWarning,
 	CodeBuilderAgentConfig,
+	TokenUsage,
 } from './types';
 
 // Utilities

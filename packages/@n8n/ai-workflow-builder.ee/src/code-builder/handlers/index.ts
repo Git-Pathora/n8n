@@ -3,6 +3,7 @@
  */
 
 export { AgentIterationHandler } from './agent-iteration-handler';
+export type { AgentIterationHandlerConfig } from './agent-iteration-handler';
 export { AutoFinalizeHandler } from './auto-finalize-handler';
 export { ChatSetupHandler } from './chat-setup-handler';
 export type {

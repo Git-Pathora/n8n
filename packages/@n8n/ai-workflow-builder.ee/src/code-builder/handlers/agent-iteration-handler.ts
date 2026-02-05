@@ -10,6 +10,7 @@ import type { BaseMessage, AIMessage } from '@langchain/core/messages';
 import type { Runnable } from '@langchain/core/runnables';
 
 import type { StreamOutput, AgentMessageChunk } from '../../types/streaming';
+import type { TokenUsage } from '../types';
 import { extractTextContent, extractThinkingContent } from '../utils/content-extractors';
 
 /** Type guard for response metadata with usage info */
@@ -36,6 +37,7 @@ type DebugLogFn = (context: string, message: string, data?: Record<string, unkno
  */
 export interface AgentIterationHandlerConfig {
 	debugLog?: DebugLogFn;
+	onTokenUsage?: (usage: TokenUsage) => void;
 }
 
 /**
@@ -87,9 +89,11 @@ export interface LlmInvocationResult {
  */
 export class AgentIterationHandler {
 	private debugLog: DebugLogFn;
+	private onTokenUsage?: (usage: TokenUsage) => void;
 
 	constructor(config: AgentIterationHandlerConfig = {}) {
 		this.debugLog = config.debugLog ?? (() => {});
+		this.onTokenUsage = config.onTokenUsage;
 	}
 
 	/**
@@ -140,6 +144,11 @@ export class AgentIterationHandler {
 		const outputTokens = hasUsageMetadata(responseMetadata)
 			? (responseMetadata.usage.output_tokens ?? 0)
 			: 0;
+
+		// Report token usage via callback (fire and forget)
+		if (this.onTokenUsage && (inputTokens > 0 || outputTokens > 0)) {
+			this.onTokenUsage({ inputTokens, outputTokens });
+		}
 
 		this.debugLog('ITERATION', 'LLM response received', {
 			llmDurationMs,

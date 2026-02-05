@@ -4,10 +4,10 @@
 - [ ] add more tests with output data / expression evals
 
 ## agent
-- [ ] for webhook path should not use placeholder
 - [ ] remove agent check in req
-- [ ] "Use str_replace to fix these issues." or insert
+- [ ] "Use str_replace to fix these issues." or insert. Also update message to be more positive guardrail
 - [ ] skipping validation issues in nodes the builder did not touch
+- [ ] "Please use the text editor tool to create or edit the workflow code" no create. review other validation messages
 
 ## clean up
 - [ ] maybe don't write to .n8n folder? move to /tmp/
@@ -25,6 +25,8 @@
 - [ ] caching the tool requests? talk to oleg
 
 ## manual testing
+- [ ] test webhook path
+- [ ] langsmith
 - [ ] test hard prompts
 - [ ] credit tracking
 - [ ] revert to previous version etc?

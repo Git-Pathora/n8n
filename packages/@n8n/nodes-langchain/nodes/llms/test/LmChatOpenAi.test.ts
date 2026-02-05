@@ -1,7 +1,7 @@
 /* eslint-disable n8n-nodes-base/node-filename-against-convention */
 /* eslint-disable @typescript-eslint/unbound-method */
 import { ChatOpenAI } from '@langchain/openai';
-import { makeN8nLlmFailedAttemptHandler, N8nLlmTracing } from '@n8n/ai-utilities';
+import { makeN8nLlmFailedAttemptHandler, N8nLlmTracing, getProxyAgent } from '@n8n/ai-utilities';
 import { AiConfig } from '@n8n/config';
 import { Container } from '@n8n/di';
 import { createMockExecuteFunction } from 'n8n-nodes-base/test/nodes/Helpers';
@@ -18,6 +18,7 @@ const MockedChatOpenAI = jest.mocked(ChatOpenAI);
 const MockedN8nLlmTracing = jest.mocked(N8nLlmTracing);
 const mockedMakeN8nLlmFailedAttemptHandler = jest.mocked(makeN8nLlmFailedAttemptHandler);
 const mockedCommon = jest.mocked(common);
+const mockedGetProxyAgent = jest.mocked(getProxyAgent);
 const { openAiDefaultHeaders: defaultHeaders } = Container.get(AiConfig);
 
 describe('LmChatOpenAi', () => {
@@ -50,7 +51,7 @@ describe('LmChatOpenAi', () => {
 		// Mock the constructors/functions properly
 		MockedN8nLlmTracing.mockImplementation(() => ({}) as any);
 		mockedMakeN8nLlmFailedAttemptHandler.mockReturnValue(jest.fn());
-
+		mockedGetProxyAgent.mockReturnValue({} as any);
 		return mockContext;
 	};
 

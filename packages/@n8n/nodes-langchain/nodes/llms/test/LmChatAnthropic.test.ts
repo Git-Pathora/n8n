@@ -1,7 +1,7 @@
 /* eslint-disable n8n-nodes-base/node-filename-against-convention */
 /* eslint-disable @typescript-eslint/unbound-method */
 import { ChatAnthropic } from '@langchain/anthropic';
-import { N8nLlmTracing, makeN8nLlmFailedAttemptHandler } from '@n8n/ai-utilities';
+import { N8nLlmTracing, makeN8nLlmFailedAttemptHandler, getProxyAgent } from '@n8n/ai-utilities';
 import { createMockExecuteFunction } from 'n8n-nodes-base/test/nodes/Helpers';
 import type { ILoadOptionsFunctions, INode, ISupplyDataFunctions } from 'n8n-workflow';
 
@@ -13,6 +13,7 @@ jest.mock('@n8n/ai-utilities');
 const MockedChatAnthropic = jest.mocked(ChatAnthropic);
 const MockedN8nLlmTracing = jest.mocked(N8nLlmTracing);
 const mockedMakeN8nLlmFailedAttemptHandler = jest.mocked(makeN8nLlmFailedAttemptHandler);
+const mockedGetProxyAgent = jest.mocked(getProxyAgent);
 
 describe('LmChatAnthropic', () => {
 	let lmChatAnthropic: LmChatAnthropic;
@@ -44,7 +45,7 @@ describe('LmChatAnthropic', () => {
 		// Mock the constructors/functions properly
 		MockedN8nLlmTracing.mockImplementation(() => ({}) as any);
 		mockedMakeN8nLlmFailedAttemptHandler.mockReturnValue(jest.fn());
-
+		mockedGetProxyAgent.mockReturnValue({} as any);
 		return mockContext;
 	};
 

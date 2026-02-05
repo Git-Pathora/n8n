@@ -200,6 +200,7 @@ export class FinalResponseHandler {
 			this.debugLog('FINAL_RESPONSE', 'Workflow parsing failed', {
 				parseDurationMs: parseDuration,
 				errorMessage,
+				stack: errorStack,
 			});
 
 			// Log error

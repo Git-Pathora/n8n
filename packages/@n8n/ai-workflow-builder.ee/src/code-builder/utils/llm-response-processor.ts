@@ -12,6 +12,20 @@ import type { AIMessage } from '@langchain/core/messages';
 
 import { extractTextContent, extractThinkingContent } from './content-extractors';
 
+/** Type guard for response metadata with usage info */
+interface ResponseMetadataWithUsage {
+	usage: { input_tokens?: number; output_tokens?: number };
+}
+
+function hasUsageMetadata(metadata: unknown): metadata is ResponseMetadataWithUsage {
+	return (
+		typeof metadata === 'object' &&
+		metadata !== null &&
+		'usage' in metadata &&
+		typeof (metadata as ResponseMetadataWithUsage).usage === 'object'
+	);
+}
+
 /**
  * Tool call data extracted from LLM response
  */
@@ -49,12 +63,14 @@ export interface LlmResponseResult {
  * @returns Processed response data
  */
 export function processLlmResponse(response: AIMessage): LlmResponseResult {
-	// Extract token usage from response metadata
-	const responseMetadata = response.response_metadata as
-		| { usage?: { input_tokens?: number; output_tokens?: number } }
-		| undefined;
-	const inputTokens = responseMetadata?.usage?.input_tokens ?? 0;
-	const outputTokens = responseMetadata?.usage?.output_tokens ?? 0;
+	// Extract token usage from response metadata using type guard
+	const responseMetadata = response.response_metadata;
+	const inputTokens = hasUsageMetadata(responseMetadata)
+		? (responseMetadata.usage.input_tokens ?? 0)
+		: 0;
+	const outputTokens = hasUsageMetadata(responseMetadata)
+		? (responseMetadata.usage.output_tokens ?? 0)
+		: 0;
 
 	// Extract thinking content
 	const thinkingContent = extractThinkingContent(response);

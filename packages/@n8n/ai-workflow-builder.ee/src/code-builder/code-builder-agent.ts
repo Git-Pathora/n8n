@@ -151,7 +151,8 @@ export class CodeBuilderAgent {
 	/**
 	 * Initialize a log file for the current chat session.
 	 * Creates a file with timestamp, workflow ID, and prompt snippet in the name.
-	 * @TODO remove before merge. Temporary helper for quick local debugging.
+	 * @TODO SECURITY: Remove debug logging before merge or guard behind environment flag.
+	 * Files in tmpdir are world-readable and may contain sensitive user data.
 	 */
 	private initLogFile(workflowId: string | undefined, prompt: string): void {
 		const logDir = join(tmpdir(), 'n8n-code-builder-logs');
@@ -370,6 +371,7 @@ ${'='.repeat(50)}
 			this.logger?.error('Code builder agent failed', {
 				userId,
 				error: errorMessage,
+				stack: errorStack,
 			});
 
 			// Stream error message

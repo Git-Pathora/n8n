@@ -13,6 +13,25 @@ import { extractModeDiscriminator, type ModeInfo } from './discriminator-utils';
 import { NodeSearchEngine } from '../../tools/engines/node-search-engine';
 import { extractResourceOperations } from '../../utils/resource-operation-extractor';
 
+/**
+ * Common core nodes that should be easily accessible in the prompt
+ * These are fundamental workflow building blocks
+ */
+const CORE_NODE_NAMES = new Set([
+	'n8n-nodes-base.httpRequest',
+	'n8n-nodes-base.set',
+	'n8n-nodes-base.code',
+	'n8n-nodes-base.if',
+	'n8n-nodes-base.switch',
+	'n8n-nodes-base.merge',
+	'n8n-nodes-base.splitInBatches',
+	'n8n-nodes-base.function',
+	'n8n-nodes-base.functionItem',
+	'n8n-nodes-base.wait',
+	'n8n-nodes-base.noOp',
+	'n8n-nodes-base.respondToWebhook',
+]);
+
 export interface ParsedNodeType {
 	id: string;
 	displayName: string;
@@ -43,6 +62,7 @@ export interface NodeWithDiscriminators {
 /**
  * Node Type Parser class
  * Provides efficient access to node type data for the code builder
+ * @TODO clean up/review this
  */
 export class NodeTypeParser {
 	private nodeTypes: INodeTypeDescription[];
@@ -72,13 +92,17 @@ export class NodeTypeParser {
 
 	/**
 	 * Check if a node type is a trigger
+	 * Uses the 'group' property which is the reliable way to identify triggers
 	 */
 	private isTriggerNode(nodeType: INodeTypeDescription): boolean {
+		// Primary check: use the group property (most reliable)
+		if (nodeType.group.includes('trigger')) {
+			return true;
+		}
+		// Fallback for any nodes that might not have group set correctly
 		return (
 			nodeType.name.toLowerCase().includes('trigger') ||
-			nodeType.name.toLowerCase().includes('webhook') ||
-			nodeType.name.toLowerCase().includes('schedule') ||
-			nodeType.name.toLowerCase().includes('poll')
+			nodeType.name.toLowerCase().includes('webhook')
 		);
 	}
 
@@ -97,22 +121,6 @@ export class NodeTypeParser {
 		const ai: string[] = [];
 		const other: string[] = [];
 
-		// Common core nodes that should be in prompt cache
-		const coreNodeNames = new Set([
-			'n8n-nodes-base.httpRequest',
-			'n8n-nodes-base.set',
-			'n8n-nodes-base.code',
-			'n8n-nodes-base.if',
-			'n8n-nodes-base.switch',
-			'n8n-nodes-base.merge',
-			'n8n-nodes-base.splitInBatches',
-			'n8n-nodes-base.function',
-			'n8n-nodes-base.functionItem',
-			'n8n-nodes-base.wait',
-			'n8n-nodes-base.noOp',
-			'n8n-nodes-base.respondToWebhook',
-		]);
-
 		// Process each unique node name (take latest version)
 		const seenNodes = new Set<string>();
 
@@ -130,7 +138,7 @@ export class NodeTypeParser {
 				triggers.push(nodeId);
 			} else if (nodeId.startsWith('@n8n/n8n-nodes-langchain')) {
 				ai.push(nodeId);
-			} else if (coreNodeNames.has(nodeId)) {
+			} else if (CORE_NODE_NAMES.has(nodeId)) {
 				core.push(nodeId);
 			} else {
 				other.push(nodeId);
@@ -194,22 +202,6 @@ export class NodeTypeParser {
 		const ai: NodeWithDiscriminators[] = [];
 		const other: NodeWithDiscriminators[] = [];
 
-		// Common core nodes that should be in prompt cache
-		const coreNodeNames = new Set([
-			'n8n-nodes-base.httpRequest',
-			'n8n-nodes-base.set',
-			'n8n-nodes-base.code',
-			'n8n-nodes-base.if',
-			'n8n-nodes-base.switch',
-			'n8n-nodes-base.merge',
-			'n8n-nodes-base.splitInBatches',
-			'n8n-nodes-base.function',
-			'n8n-nodes-base.functionItem',
-			'n8n-nodes-base.wait',
-			'n8n-nodes-base.noOp',
-			'n8n-nodes-base.respondToWebhook',
-		]);
-
 		// Process each unique node name (take latest version)
 		const seenNodes = new Set<string>();
 
@@ -234,7 +226,7 @@ export class NodeTypeParser {
 				triggers.push(nodeWithDisc);
 			} else if (nodeId.startsWith('@n8n/n8n-nodes-langchain')) {
 				ai.push(nodeWithDisc);
-			} else if (coreNodeNames.has(nodeId)) {
+			} else if (CORE_NODE_NAMES.has(nodeId)) {
 				core.push(nodeWithDisc);
 			} else {
 				other.push(nodeWithDisc);

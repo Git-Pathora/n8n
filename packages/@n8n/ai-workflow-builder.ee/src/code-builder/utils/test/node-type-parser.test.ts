@@ -127,6 +127,19 @@ const mockAgentNode: INodeTypeDescription = {
 	properties: [],
 };
 
+// Mock interval node - trigger node without 'trigger' in name (uses group: ['trigger'])
+const mockIntervalNode: INodeTypeDescription = {
+	name: 'n8n-nodes-base.interval',
+	displayName: 'Interval',
+	description: 'Triggers the workflow at a regular interval',
+	group: ['trigger'],
+	version: 1,
+	defaults: { name: 'Interval' },
+	inputs: [],
+	outputs: ['main'],
+	properties: [],
+};
+
 // Mock node with array version (like OpenAI V2) and resource/operation pattern
 const mockOpenAiNode: INodeTypeDescription = {
 	name: '@n8n/n8n-nodes-langchain.openAi',
@@ -267,6 +280,17 @@ describe('NodeTypeParser', () => {
 			const trigger = result.triggers.find((n) => n.id === 'n8n-nodes-base.manualTrigger');
 			expect(trigger).toBeDefined();
 			expect(trigger?.discriminators).toBeUndefined();
+		});
+
+		it('should detect trigger nodes by group property, not just by name', () => {
+			// The interval node has group: ['trigger'] but does NOT have 'trigger' in its name
+			const parser = new NodeTypeParser([mockIntervalNode, mockHttpRequestNode]);
+
+			const result = parser.getNodeIdsByCategoryWithDiscriminators();
+
+			// Interval should be categorized as a trigger (not 'other')
+			expect(result.triggers.some((n) => n.id === 'n8n-nodes-base.interval')).toBe(true);
+			expect(result.other.some((n) => n.id === 'n8n-nodes-base.interval')).toBe(false);
 		});
 	});
 

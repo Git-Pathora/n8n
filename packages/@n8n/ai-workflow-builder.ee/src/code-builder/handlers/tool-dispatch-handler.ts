@@ -314,7 +314,11 @@ export class ToolDispatchHandler {
 			};
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
-			this.debugLog('TOOL_CALL', `Tool ${toolCall.name} failed`, { error: errorMessage });
+			const errorStack = error instanceof Error ? error.stack : undefined;
+			this.debugLog('TOOL_CALL', `Tool ${toolCall.name} failed`, {
+				error: errorMessage,
+				stack: errorStack,
+			});
 
 			messages.push(
 				new ToolMessage({

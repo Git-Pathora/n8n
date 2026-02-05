@@ -2,7 +2,11 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 
-import { createCodeBuilderGetTool } from '../code-builder-get.tool';
+import {
+	createCodeBuilderGetTool,
+	isValidPathComponent,
+	validatePathWithinBase,
+} from '../code-builder-get.tool';
 
 describe('CodeBuilderGetTool', () => {
 	describe('createCodeBuilderGetTool', () => {
@@ -272,6 +276,169 @@ describe('CodeBuilderGetTool', () => {
 			expect(result).toContain('splitFileMarker');
 			expect(result).not.toContain('flatFileMarker');
 			expect(result).toContain('OpenAIV21VideoGenerateConfig');
+		});
+	});
+
+	describe('path traversal security', () => {
+		describe('isValidPathComponent', () => {
+			it('should accept valid alphanumeric components', () => {
+				expect(isValidPathComponent('httpRequest')).toBe(true);
+				expect(isValidPathComponent('n8n-nodes-base')).toBe(true);
+				expect(isValidPathComponent('googleCalendar')).toBe(true);
+				expect(isValidPathComponent('v1')).toBe(true);
+				expect(isValidPathComponent('run_once_for_all_items')).toBe(true);
+			});
+
+			it('should reject path traversal sequences', () => {
+				expect(isValidPathComponent('..')).toBe(false);
+				expect(isValidPathComponent('../')).toBe(false);
+				expect(isValidPathComponent('..\\foo')).toBe(false);
+				expect(isValidPathComponent('foo/../bar')).toBe(false);
+				expect(isValidPathComponent('foo/../../etc/passwd')).toBe(false);
+			});
+
+			it('should reject absolute paths', () => {
+				expect(isValidPathComponent('/etc/passwd')).toBe(false);
+				expect(isValidPathComponent('/foo')).toBe(false);
+			});
+
+			it('should reject path separator injection', () => {
+				expect(isValidPathComponent('foo/bar')).toBe(false);
+				expect(isValidPathComponent('foo\\bar')).toBe(false);
+			});
+
+			it('should reject empty or whitespace-only values', () => {
+				expect(isValidPathComponent('')).toBe(false);
+				expect(isValidPathComponent('   ')).toBe(false);
+			});
+
+			it('should reject null bytes', () => {
+				expect(isValidPathComponent('foo\0bar')).toBe(false);
+			});
+		});
+
+		describe('validatePathWithinBase', () => {
+			const baseDir = '/home/user/.n8n/generated-types/nodes';
+
+			it('should allow paths within base directory', () => {
+				const validPath = path.join(baseDir, 'n8n-nodes-base', 'httpRequest', 'v1.ts');
+				expect(validatePathWithinBase(validPath, baseDir)).toBe(true);
+			});
+
+			it('should allow nested paths within base directory', () => {
+				const validPath = path.join(
+					baseDir,
+					'n8n-nodes-base',
+					'freshservice',
+					'v1',
+					'resource_ticket',
+					'operation_get.ts',
+				);
+				expect(validatePathWithinBase(validPath, baseDir)).toBe(true);
+			});
+
+			it('should reject paths outside base directory via traversal', () => {
+				const maliciousPath = path.resolve(baseDir, '..', '..', 'etc', 'passwd');
+				expect(validatePathWithinBase(maliciousPath, baseDir)).toBe(false);
+			});
+
+			it('should reject paths that are parents of base directory', () => {
+				const parentPath = path.resolve(baseDir, '..');
+				expect(validatePathWithinBase(parentPath, baseDir)).toBe(false);
+			});
+
+			it('should handle symbolic path tricks', () => {
+				// Even if someone tries baseDir + /../../foo, resolve should catch it
+				const trickyPath = path.join(baseDir, 'package', '..', '..', '..', 'etc', 'passwd');
+				expect(validatePathWithinBase(path.resolve(trickyPath), baseDir)).toBe(false);
+			});
+		});
+
+		describe('tool invocation with malicious inputs', () => {
+			let tempDir: string;
+
+			beforeAll(() => {
+				tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'path-traversal-test-'));
+
+				// Create a node with resource/operation split structure for testing
+				const splitResourceNodeDir = path.join(
+					tempDir,
+					'nodes/n8n-nodes-base/splitResourceNode/v1',
+				);
+				fs.mkdirSync(splitResourceNodeDir, { recursive: true });
+				fs.writeFileSync(
+					path.join(splitResourceNodeDir, '_shared.ts'),
+					'export interface SharedBase { type: string; }',
+				);
+				// Create a valid resource directory so the structure is recognized
+				const ticketDir = path.join(splitResourceNodeDir, 'resource_ticket');
+				fs.mkdirSync(ticketDir, { recursive: true });
+				fs.writeFileSync(
+					path.join(ticketDir, 'operation_get.ts'),
+					'export type Config = { valid: true };',
+				);
+
+				// Create a node with mode split structure for testing
+				const splitModeNodeDir = path.join(tempDir, 'nodes/n8n-nodes-base/splitModeNode/v1');
+				fs.mkdirSync(splitModeNodeDir, { recursive: true });
+				fs.writeFileSync(
+					path.join(splitModeNodeDir, '_shared.ts'),
+					'export interface SharedBase { type: string; }',
+				);
+				// Create a valid mode file so the structure is recognized
+				fs.writeFileSync(
+					path.join(splitModeNodeDir, 'mode_run_once.ts'),
+					'export type Config = { valid: true };',
+				);
+			});
+
+			afterAll(() => {
+				fs.rmSync(tempDir, { recursive: true, force: true });
+			});
+
+			it('should reject nodeId with path traversal', async () => {
+				const tool = createCodeBuilderGetTool({ generatedTypesDir: tempDir });
+
+				const result = await tool.invoke({
+					nodeIds: ['n8n-nodes-base.../../../etc/passwd'],
+				});
+
+				expect(result).toContain('Error');
+				expect(result).not.toContain('root:');
+			});
+
+			it('should reject resource discriminator with path traversal', async () => {
+				const tool = createCodeBuilderGetTool({ generatedTypesDir: tempDir });
+
+				const result = await tool.invoke({
+					nodeIds: [
+						{
+							nodeId: 'n8n-nodes-base.splitResourceNode',
+							resource: '../../../etc/passwd',
+							operation: 'get',
+						},
+					],
+				});
+
+				expect(result).toContain('Error');
+				expect(result).not.toContain('root:');
+			});
+
+			it('should reject mode discriminator with path traversal', async () => {
+				const tool = createCodeBuilderGetTool({ generatedTypesDir: tempDir });
+
+				const result = await tool.invoke({
+					nodeIds: [
+						{
+							nodeId: 'n8n-nodes-base.splitModeNode',
+							mode: '../../etc/passwd',
+						},
+					],
+				});
+
+				expect(result).toContain('Error');
+				expect(result).not.toContain('root:');
+			});
 		});
 	});
 });

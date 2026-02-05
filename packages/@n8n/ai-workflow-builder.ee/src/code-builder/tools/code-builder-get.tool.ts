@@ -10,9 +10,48 @@
 import { tool } from '@langchain/core/tools';
 import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { inspect } from 'node:util';
 import { z } from 'zod';
+
+/**
+ * Validate a path component to prevent path traversal attacks.
+ * Rejects empty values, path separators, traversal sequences, and null bytes.
+ */
+export function isValidPathComponent(component: string): boolean {
+	if (!component || component.trim() === '') {
+		return false;
+	}
+
+	// Reject null bytes
+	if (component.includes('\0')) {
+		return false;
+	}
+
+	// Reject path separators
+	if (component.includes('/') || component.includes('\\')) {
+		return false;
+	}
+
+	// Reject parent directory traversal
+	if (component === '..' || component.startsWith('..')) {
+		return false;
+	}
+
+	return true;
+}
+
+/**
+ * Validate that a resolved path is within the expected base directory.
+ * Prevents path traversal even if components pass basic validation.
+ */
+export function validatePathWithinBase(filePath: string, baseDir: string): boolean {
+	const resolvedPath = resolve(filePath);
+	const resolvedBase = resolve(baseDir);
+
+	// Path must start with base directory (with trailing separator to prevent prefix attacks)
+	return resolvedPath.startsWith(resolvedBase + '/') || resolvedPath === resolvedBase;
+}
 
 /**
  * Debug logging helper for get tool
@@ -235,6 +274,18 @@ function resolveResourceOperationPath(
 		};
 	}
 
+	// Security: Validate discriminator values to prevent path traversal
+	if (!isValidPathComponent(discriminators.resource)) {
+		return {
+			error: `Error: Invalid resource value '${discriminators.resource}' - contains invalid characters`,
+		};
+	}
+	if (!isValidPathComponent(discriminators.operation)) {
+		return {
+			error: `Error: Invalid operation value '${discriminators.operation}' - contains invalid characters`,
+		};
+	}
+
 	// Validate resource
 	const resourcePath = `resource_${toSnakeCase(discriminators.resource)}`;
 	const resourceDir = join(nodeDir, targetVersion, resourcePath);
@@ -247,6 +298,14 @@ function resolveResourceOperationPath(
 	// Validate operation
 	const operationFile = `operation_${toSnakeCase(discriminators.operation)}.ts`;
 	const filePath = join(resourceDir, operationFile);
+
+	// Security: Final path validation - ensure we're still within nodeDir
+	if (!validatePathWithinBase(filePath, nodeDir)) {
+		return {
+			error: `Error: Invalid path - path traversal detected`,
+		};
+	}
+
 	if (!existsSync(filePath)) {
 		try {
 			const ops = readdirSync(resourceDir)
@@ -284,9 +343,24 @@ function resolveModePath(
 		};
 	}
 
+	// Security: Validate mode value to prevent path traversal
+	if (!isValidPathComponent(mode)) {
+		return {
+			error: `Error: Invalid mode value '${mode}' - contains invalid characters`,
+		};
+	}
+
 	// Validate mode
 	const modeFile = `mode_${toSnakeCase(mode)}.ts`;
 	const filePath = join(nodeDir, targetVersion, modeFile);
+
+	// Security: Final path validation - ensure we're still within nodeDir
+	if (!validatePathWithinBase(filePath, nodeDir)) {
+		return {
+			error: `Error: Invalid path - path traversal detected`,
+		};
+	}
+
 	if (!existsSync(filePath)) {
 		return {
 			error: `Error: Invalid mode '${mode}' for node '${nodeId}'. Available: ${available.modes?.join(', ')}`,
@@ -313,8 +387,25 @@ function tryGetNodeFilePath(
 		return { error: `Invalid node ID format: '${nodeId}'` };
 	}
 
+	// Security: Validate parsed components to prevent path traversal
+	if (!isValidPathComponent(parsed.packageName)) {
+		return {
+			error: `Error: Invalid package name in node ID '${nodeId}' - contains invalid characters`,
+		};
+	}
+	if (!isValidPathComponent(parsed.nodeName)) {
+		return {
+			error: `Error: Invalid node name in node ID '${nodeId}' - contains invalid characters`,
+		};
+	}
+
 	const nodesPath = getGeneratedNodesPath(generatedTypesDir);
 	const nodeDir = join(nodesPath, parsed.packageName, parsed.nodeName);
+
+	// Security: Final path validation - ensure we're still within nodesPath
+	if (!validatePathWithinBase(nodeDir, nodesPath)) {
+		return { error: `Error: Invalid path - path traversal detected` };
+	}
 
 	if (!existsSync(nodeDir)) {
 		debugLog('Node directory does not exist', { nodeDir });

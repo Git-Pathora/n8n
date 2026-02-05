@@ -15,6 +15,17 @@ import type { StreamChunk, WorkflowUpdateChunk } from '@/types/streaming';
 import type { SimpleWorkflow } from '@/types/workflow';
 import type { BuilderFeatureFlags } from '@/workflow-builder-agent';
 
+/** Type guard for SimpleWorkflow */
+function isSimpleWorkflow(value: unknown): value is SimpleWorkflow {
+	return (
+		typeof value === 'object' &&
+		value !== null &&
+		'name' in value &&
+		'nodes' in value &&
+		'connections' in value
+	);
+}
+
 import {
 	argsToStageModels,
 	getDefaultDatasetName,
@@ -203,8 +214,11 @@ function createCodeWorkflowBuilderGenerator(
 			)) {
 				for (const message of output.messages) {
 					if (isWorkflowUpdateChunk(message)) {
-						workflow = JSON.parse(message.codeSnippet) as SimpleWorkflow;
-						generatedCode = message.sourceCode;
+						const parsed: unknown = JSON.parse(message.codeSnippet);
+						if (isSimpleWorkflow(parsed)) {
+							workflow = parsed;
+							generatedCode = message.sourceCode;
+						}
 					}
 				}
 			}

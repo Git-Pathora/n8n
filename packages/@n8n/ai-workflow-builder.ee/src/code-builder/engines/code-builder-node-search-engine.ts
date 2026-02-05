@@ -15,6 +15,11 @@ import { NodeConnectionTypes } from 'n8n-workflow';
 
 import type { CodeBuilderNodeSearchResult, SubnodeRequirement } from '../types';
 
+/** Type guard for NodeConnectionType */
+function isNodeConnectionType(value: string): value is NodeConnectionType {
+	return Object.values(NodeConnectionTypes).includes(value as NodeConnectionType);
+}
+
 /**
  * Default subnodes for each connection type
  * These are sensible defaults shown in search results
@@ -358,8 +363,9 @@ export class CodeBuilderNodeSearchEngine {
 	 * @returns Array of AI connection types
 	 */
 	static getAiConnectionTypes(): NodeConnectionType[] {
-		return Object.values(NodeConnectionTypes).filter((type) =>
-			CodeBuilderNodeSearchEngine.isAiConnectionType(type),
-		) as NodeConnectionType[];
+		return Object.values(NodeConnectionTypes).filter(
+			(type): type is NodeConnectionType =>
+				isNodeConnectionType(type) && CodeBuilderNodeSearchEngine.isAiConnectionType(type),
+		);
 	}
 }

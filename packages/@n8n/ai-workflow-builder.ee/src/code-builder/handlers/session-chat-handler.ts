@@ -9,7 +9,12 @@ import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { MemorySaver } from '@langchain/langgraph';
 import type { Logger } from '@n8n/backend-common';
 
-import type { StreamOutput } from '../../types/streaming';
+import type { SessionMessagesChunk, StreamChunk, StreamOutput } from '../../types/streaming';
+
+/** Type guard for SessionMessagesChunk */
+function isSessionMessagesChunk(chunk: StreamChunk): chunk is SessionMessagesChunk {
+	return chunk.type === 'session-messages' && 'messages' in chunk;
+}
 import type { ChatPayload } from '../../workflow-builder-agent';
 import type { HistoryContext } from '../prompts';
 import {
@@ -103,8 +108,8 @@ export class SessionChatHandler {
 		}
 
 		for (const msg of chunk.messages ?? []) {
-			if (msg.type === 'session-messages') {
-				sessionMessages = (msg as { type: 'session-messages'; messages: unknown[] }).messages;
+			if (isSessionMessagesChunk(msg)) {
+				sessionMessages = msg.messages;
 			}
 		}
 

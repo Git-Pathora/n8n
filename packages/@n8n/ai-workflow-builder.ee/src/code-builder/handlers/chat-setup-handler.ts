@@ -274,6 +274,8 @@ export class ChatSetupHandler {
 			messageCount: messages.length,
 		});
 
+		// @TODO SECURITY: Avoid logging message content previews - they may contain
+		// credentials or sensitive workflow execution data. Remove or redact before merge.
 		for (let i = 0; i < formattedMessages.length; i++) {
 			const msg = formattedMessages[i];
 			const msgType = msg._getType();

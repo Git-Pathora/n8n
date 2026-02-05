@@ -30,6 +30,28 @@ return workflow('test', 'Test').add(start);
 		expect(code).not.toContain('```');
 	});
 
+	it('should extract code from javascript code block', () => {
+		const response = `\`\`\`javascript
+const start = trigger({...});
+return workflow('test', 'Test').add(start);
+\`\`\``;
+
+		const code = extractWorkflowCode(response);
+		expect(code).toContain('const start = trigger');
+		expect(code).not.toContain('```');
+	});
+
+	it('should extract code from js code block', () => {
+		const response = `\`\`\`js
+const start = trigger({...});
+return workflow('test', 'Test').add(start);
+\`\`\``;
+
+		const code = extractWorkflowCode(response);
+		expect(code).toContain('const start = trigger');
+		expect(code).not.toContain('```');
+	});
+
 	it('should extract code from code block without language tag', () => {
 		const response = `\`\`\`
 const start = trigger({...});

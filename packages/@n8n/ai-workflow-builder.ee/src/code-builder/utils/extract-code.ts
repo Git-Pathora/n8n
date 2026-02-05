@@ -35,9 +35,9 @@ export function stripImportStatements(code: string): string {
  * @returns The extracted code, trimmed
  */
 export function extractWorkflowCode(response: string): string {
-	// Match ```typescript, ```ts, or ``` code blocks
+	// Match ```typescript, ```ts, ```javascript, ```js, or ``` code blocks
 	// Use non-greedy match to get first code block
-	const codeBlockRegex = /```(?:typescript|ts)?\n([\s\S]*?)```/;
+	const codeBlockRegex = /```(?:typescript|ts|javascript|js)?\n([\s\S]*?)```/;
 	const match = response.match(codeBlockRegex);
 
 	if (match) {

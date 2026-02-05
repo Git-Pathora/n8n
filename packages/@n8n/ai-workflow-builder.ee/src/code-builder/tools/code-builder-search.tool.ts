@@ -264,7 +264,7 @@ function formatModeForDisplay(mode: ModeInfo, showSdkMapping: boolean): string {
 	// Add SDK mapping if applicable
 	if (showSdkMapping) {
 		const sdkMapping = mode.outputConnectionType
-			? CONNECTION_TYPE_TO_SDK[mode.outputConnectionType as string]
+			? CONNECTION_TYPE_TO_SDK[mode.outputConnectionType]
 			: undefined;
 
 		if (sdkMapping) {

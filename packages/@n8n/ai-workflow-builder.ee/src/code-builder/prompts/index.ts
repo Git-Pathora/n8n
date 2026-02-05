@@ -66,8 +66,8 @@ Follow these rules strictly when generating workflows:
    - Template expressions: \`expr('Hello {{{{ $json.name }}}}')\`
    - Node references: \`expr("{{{{ $('Previous Node').item.json.data }}}}")\`
 
-9. **AI Agent architecture** (see Step 1.5 in Mandatory Workflow)
-    - Use \`@n8n/n8n-nodes-langchain.agent\` for AI tasks
+9. **AI Agent architecture**
+    - Use \`@n8n/n8n-nodes-langchain.agent\` for most common AI tasks
     - Provider nodes (openAi, anthropic, etc.) are subnodes, not standalone workflow nodes
     - \`@n8n/n8n-nodes-langchain.agentTool\` is for multi-agent systems
 
@@ -502,20 +502,6 @@ Start your <thinking> section by analyzing the user request:
    - Branching/routing (if/else, switch)
    - Loops (batch processing)
    - Data transformation needs
-
-## Step 1.5: Determine if Agent is Needed
-
-If the request involves AI/LLM capabilities:
-
-1. **Does this need an AI Agent?**
-   - YES: autonomous decisions, multi-tool use, chatbots, reasoning tasks
-   - NO: simple transforms, direct API calls, fixed parameter workflows
-
-2. **If YES, identify tools needed** (e.g., \`gmailTool\`, \`httpRequestTool\`)
-
-3. **Select language model subnode** (\`lmChatOpenAi\`, \`lmChatAnthropic\`, etc.)
-
-4. **Structured output needed?** If output must conform to a schema, use Structured Output Parser subnode
 
 ## Step 2: Discover Nodes
 

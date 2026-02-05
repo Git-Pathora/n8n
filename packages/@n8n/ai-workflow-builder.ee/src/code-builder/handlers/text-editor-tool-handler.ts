@@ -149,9 +149,11 @@ export class TextEditorToolHandler {
 			return undefined;
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
+			const errorStack = error instanceof Error ? error.stack : undefined;
 
 			this.debugLog('TEXT_EDITOR_TOOL', `Command ${command} failed`, {
 				errorMessage,
+				stack: errorStack,
 			});
 
 			// Add error message to messages
@@ -219,10 +221,12 @@ export class TextEditorToolHandler {
 			};
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
+			const errorStack = error instanceof Error ? error.stack : undefined;
 			const errorContext = this.getErrorContext(code, errorMessage);
 
 			this.debugLog('TEXT_EDITOR_TOOL', 'Auto-validate parse error', {
 				errorMessage,
+				stack: errorStack,
 			});
 
 			// Add human message with error feedback

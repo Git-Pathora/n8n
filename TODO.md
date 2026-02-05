@@ -15,10 +15,9 @@
 ## clean up
 - [ ] maybe don't write to .n8n folder? move to /tmp/
 - [ ] extract thinking only if codeBuilder is enabled
-- [ ] remove workflow settings
+- [ ] remove workflow settings from workflow-sdk
 - [ ] wrap prompt sections in xml?
 - [ ] print the prompt again reread
-- [ ] how are settings handled?
 
 ## ready to release
 - [ ] Get PR reviewed

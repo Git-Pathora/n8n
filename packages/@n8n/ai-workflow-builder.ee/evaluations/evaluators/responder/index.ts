@@ -1,12 +1,18 @@
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { HumanMessage } from '@langchain/core/messages';
 
-import { runWithOptionalLimiter, withTimeout } from '../../harness/evaluation-helpers';
-import type { EvaluationContext, Evaluator, Feedback } from '../../harness/harness-types';
 import type { ResponderEvalCriteria } from './responder-judge.prompt';
 import { buildResponderJudgePrompt } from './responder-judge.prompt';
+import { runWithOptionalLimiter, withTimeout } from '../../harness/evaluation-helpers';
+import type { EvaluationContext, Evaluator, Feedback } from '../../harness/harness-types';
+import { DEFAULTS } from '../../support/constants';
 
 const EVALUATOR_NAME = 'responder-judge';
+
+export interface ResponderEvaluatorOptions {
+	/** Number of judges to run in parallel (default: DEFAULTS.NUM_JUDGES) */
+	numJudges?: number;
+}
 
 interface ResponderJudgeDimension {
 	score: number;
@@ -34,6 +40,8 @@ export interface ResponderEvaluationContext extends EvaluationContext {
 	responderOutput: string;
 	/** Per-example evaluation criteria from the dataset */
 	responderEvals: ResponderEvalCriteria;
+	/** The actual workflow JSON for accuracy verification */
+	workflowJSON?: unknown;
 }
 
 function isResponderContext(ctx: EvaluationContext): ctx is ResponderEvaluationContext {
@@ -49,8 +57,24 @@ function parseJudgeResponse(content: string): ResponderJudgeResult {
 	// Extract JSON from markdown code block if present
 	const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)```/);
 	const jsonStr = jsonMatch ? jsonMatch[1].trim() : content.trim();
-	return JSON.parse(jsonStr) as ResponderJudgeResult;
+	try {
+		return JSON.parse(jsonStr) as ResponderJudgeResult;
+	} catch {
+		throw new Error(`Failed to parse judge response as JSON: ${jsonStr.slice(0, 100)}...`);
+	}
 }
+
+const DIMENSION_KEYS = [
+	'relevance',
+	'accuracy',
+	'completeness',
+	'clarity',
+	'tone',
+	'criteriaMatch',
+	'forbiddenPhrases',
+] as const;
+
+type DimensionKey = (typeof DIMENSION_KEYS)[number];
 
 const fb = (metric: string, score: number, kind: Feedback['kind'], comment?: string): Feedback => ({
 	evaluator: EVALUATOR_NAME,
@@ -60,6 +84,68 @@ const fb = (metric: string, score: number, kind: Feedback['kind'], comment?: str
 	...(comment ? { comment } : {}),
 });
 
+/** Run a single judge invocation and return the parsed result. */
+async function runSingleJudge(
+	llm: BaseChatModel,
+	ctx: ResponderEvaluationContext,
+	judgeIndex: number,
+): Promise<ResponderJudgeResult> {
+	const judgePrompt = buildResponderJudgePrompt({
+		userPrompt: ctx.prompt,
+		responderOutput: ctx.responderOutput,
+		evalCriteria: ctx.responderEvals,
+		workflowJSON: ctx.workflowJSON,
+	});
+
+	return runWithOptionalLimiter(async () => {
+		const response = await withTimeout({
+			promise: llm.invoke([new HumanMessage(judgePrompt)], {
+				runName: `responder_judge_${judgeIndex + 1}`,
+			}),
+			timeoutMs: ctx.timeoutMs,
+			label: `responder-judge:evaluate:judge_${judgeIndex + 1}`,
+		});
+
+		const content =
+			typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
+
+		return parseJudgeResponse(content);
+	}, ctx.llmCallLimiter);
+}
+
+/** Aggregate results from multiple judges into feedback items. */
+function aggregateResults(results: ResponderJudgeResult[], numJudges: number): Feedback[] {
+	const feedback: Feedback[] = [];
+
+	// Per-dimension averaged metrics
+	for (const key of DIMENSION_KEYS) {
+		const avgScore = results.reduce((sum, r) => sum + r[key as DimensionKey].score, 0) / numJudges;
+		const comments = results
+			.map((r, i) => `[Judge ${i + 1}] ${r[key as DimensionKey].comment}`)
+			.join(' | ');
+		feedback.push(fb(key, avgScore, 'metric', comments));
+	}
+
+	// Aggregated overall score
+	const avgOverall = results.reduce((sum, r) => sum + r.overallScore, 0) / numJudges;
+	feedback.push(
+		fb(
+			'overallScore',
+			avgOverall,
+			'score',
+			`${numJudges}/${numJudges} judges averaged ${avgOverall.toFixed(2)}`,
+		),
+	);
+
+	// Per-judge detail items
+	for (let i = 0; i < results.length; i++) {
+		const r = results[i];
+		feedback.push(fb(`judge${i + 1}`, r.overallScore, 'detail', `Judge ${i + 1}: ${r.summary}`));
+	}
+
+	return feedback;
+}
+
 /**
  * Create a responder LLM-judge evaluator.
  *
@@ -67,10 +153,19 @@ const fb = (metric: string, score: number, kind: Feedback['kind'], comment?: str
  * from the dataset. The evaluator expects a ResponderEvaluationContext
  * with `responderOutput` and `responderEvals` fields.
  *
+ * When `numJudges > 1`, runs multiple judge calls in parallel and aggregates
+ * dimension scores (averaged) and per-judge detail feedback.
+ *
  * @param llm - The LLM to use for judging
+ * @param options - Optional configuration (e.g. numJudges)
  * @returns An evaluator that produces feedback for responder output
  */
-export function createResponderEvaluator(llm: BaseChatModel): Evaluator<EvaluationContext> {
+export function createResponderEvaluator(
+	llm: BaseChatModel,
+	options?: ResponderEvaluatorOptions,
+): Evaluator<EvaluationContext> {
+	const numJudges = options?.numJudges ?? DEFAULTS.NUM_JUDGES;
+
 	return {
 		name: EVALUATOR_NAME,
 
@@ -86,42 +181,11 @@ export function createResponderEvaluator(llm: BaseChatModel): Evaluator<Evaluati
 				];
 			}
 
-			const judgePrompt = buildResponderJudgePrompt({
-				userPrompt: ctx.prompt,
-				responderOutput: ctx.responderOutput,
-				evalCriteria: ctx.responderEvals,
-			});
+			const results = await Promise.all(
+				Array.from({ length: numJudges }, (_, i) => runSingleJudge(llm, ctx, i)),
+			);
 
-			const result = await runWithOptionalLimiter(async () => {
-				const response = await withTimeout({
-					promise: llm.invoke([new HumanMessage(judgePrompt)]),
-					timeoutMs: ctx.timeoutMs,
-					label: 'responder-judge:evaluate',
-				});
-
-				const content =
-					typeof response.content === 'string'
-						? response.content
-						: JSON.stringify(response.content);
-
-				return parseJudgeResponse(content);
-			}, ctx.llmCallLimiter);
-
-			return [
-				fb('relevance', result.relevance.score, 'metric', result.relevance.comment),
-				fb('accuracy', result.accuracy.score, 'metric', result.accuracy.comment),
-				fb('completeness', result.completeness.score, 'metric', result.completeness.comment),
-				fb('clarity', result.clarity.score, 'metric', result.clarity.comment),
-				fb('tone', result.tone.score, 'metric', result.tone.comment),
-				fb('criteriaMatch', result.criteriaMatch.score, 'metric', result.criteriaMatch.comment),
-				fb(
-					'forbiddenPhrases',
-					result.forbiddenPhrases.score,
-					'metric',
-					result.forbiddenPhrases.comment,
-				),
-				fb('overallScore', result.overallScore, 'score', result.summary),
-			];
+			return aggregateResults(results, numJudges);
 		},
 	};
 }

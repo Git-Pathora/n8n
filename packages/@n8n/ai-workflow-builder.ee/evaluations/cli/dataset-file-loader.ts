@@ -1,5 +1,11 @@
 import * as fs from 'fs';
+import { jsonParse } from 'n8n-workflow';
 import * as path from 'path';
+
+import type { CoordinationLogEntry } from '@/types/coordination';
+import type { SimpleWorkflow } from '@/types/workflow';
+
+import type { SerializedMessage } from '../harness/workflow-regenerator';
 
 interface DatasetExample {
 	prompt: string;
@@ -75,4 +81,31 @@ export function loadSubgraphDatasetFile(
 			},
 		};
 	});
+}
+
+/** Entry for write-back operations */
+export interface DatasetWriteBackEntry {
+	index: number;
+	messages: SerializedMessage[];
+	coordinationLog: CoordinationLogEntry[];
+	workflowJSON: SimpleWorkflow;
+}
+
+/**
+ * Write regenerated state back to the dataset file.
+ * Preserves existing fields (prompt, responderEvals) and updates state fields.
+ */
+export function writeBackToDatasetFile(filePath: string, updates: DatasetWriteBackEntry[]): void {
+	const resolved = path.resolve(filePath);
+	const content = fs.readFileSync(resolved, 'utf-8');
+	const dataset = jsonParse<unknown[]>(content);
+
+	for (const update of updates) {
+		const example = dataset[update.index] as Record<string, unknown>;
+		example.messages = update.messages;
+		example.coordinationLog = update.coordinationLog;
+		example.workflowJSON = update.workflowJSON;
+	}
+
+	fs.writeFileSync(resolved, JSON.stringify(dataset, null, '\t') + '\n', 'utf-8');
 }

@@ -5,10 +5,11 @@
  * using pre-computed state from LangSmith dataset examples.
  */
 
+import type { Client as LangsmithClient } from 'langsmith/client';
 import { evaluate } from 'langsmith/evaluation';
 import type { Run, Example } from 'langsmith/schemas';
 import { traceable } from 'langsmith/traceable';
-import type { Client as LangsmithClient } from 'langsmith/client';
+import type { INodeTypeDescription } from 'n8n-workflow';
 import pLimit from 'p-limit';
 
 import { runWithOptionalLimiter, withTimeout } from './evaluation-helpers';
@@ -22,6 +23,10 @@ import type {
 	LangsmithOptions,
 	ExampleResult,
 } from './harness-types';
+import {
+	writeBackToLangSmithDataset,
+	type LangSmithWriteBackEntry,
+} from './langsmith-dataset-writer';
 import type { EvalLogger } from './logger';
 import { createArtifactSaver } from './output';
 import {
@@ -29,14 +34,18 @@ import {
 	selectScoringItems,
 	calculateFiniteAverage,
 } from './score-calculator';
-import type { SubgraphName } from './subgraph-runner';
 import {
 	extractPreComputedState,
+	deserializeMessages,
 	type SubgraphRunFn,
 	type SubgraphResult,
+	type PreComputedState,
+	type SubgraphName,
 } from './subgraph-runner';
-import type { ResponderEvalCriteria } from '../evaluators/responder/responder-judge.prompt';
+import { regenerateWorkflowState } from './workflow-regenerator';
 import type { SimpleWorkflow } from '../../src/types/workflow';
+import type { ResponderEvalCriteria } from '../evaluators/responder/responder-judge.prompt';
+import type { ResolvedStageLLMs } from '../support/environment';
 
 const DEFAULT_PASS_THRESHOLD = 0.7;
 
@@ -52,6 +61,14 @@ interface SubgraphEvaluationConfig {
 	outputDir?: string;
 	timeoutMs?: number;
 	passThreshold?: number;
+	/** Run full workflow generation from prompt instead of using pre-computed state */
+	regenerate?: boolean;
+	/** Write regenerated state back to LangSmith dataset */
+	writeBack?: boolean;
+	/** LLMs for regeneration (required if regenerate is true) */
+	llms?: ResolvedStageLLMs;
+	/** Parsed node types for regeneration (required if regenerate is true) */
+	parsedNodeTypes?: INodeTypeDescription[];
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -77,7 +94,7 @@ function isUnknownArray(value: unknown): value is unknown[] {
 function extractPromptFromInputs(inputs: Record<string, unknown>): string {
 	if (typeof inputs.prompt === 'string') return inputs.prompt;
 	if (Array.isArray(inputs.messages) && inputs.messages.length > 0) {
-		const first = inputs.messages[0];
+		const first: unknown = inputs.messages[0];
 		if (isRecord(first) && typeof first.content === 'string') return first.content;
 	}
 	throw new Error('No prompt found in inputs');
@@ -95,6 +112,8 @@ interface SubgraphTargetOutput {
 	workflow?: SimpleWorkflow;
 	prompt: string;
 	feedback: Feedback[];
+	/** Example ID for write-back (only present when regenerate is used) */
+	exampleId?: string;
 }
 
 /**
@@ -113,7 +132,15 @@ export async function runSubgraphEvaluation(config: SubgraphEvaluationConfig): P
 		outputDir,
 		timeoutMs,
 		passThreshold = DEFAULT_PASS_THRESHOLD,
+		regenerate,
+		writeBack,
+		llms,
+		parsedNodeTypes,
 	} = config;
+
+	if (regenerate && (!llms || !parsedNodeTypes)) {
+		throw new Error('`regenerate` mode requires `llms` and `parsedNodeTypes`');
+	}
 
 	process.env.LANGSMITH_TRACING = 'true';
 
@@ -130,6 +157,7 @@ export async function runSubgraphEvaluation(config: SubgraphEvaluationConfig): P
 	const llmCallLimiter = pLimit(langsmithOptions.concurrency);
 	const artifactSaver = outputDir ? createArtifactSaver({ outputDir, logger }) : null;
 	const capturedResults: ExampleResult[] = [];
+	const writeBackEntries: LangSmithWriteBackEntry[] = [];
 
 	let targetCallCount = 0;
 	const stats = {
@@ -143,14 +171,13 @@ export async function runSubgraphEvaluation(config: SubgraphEvaluationConfig): P
 
 	const traceableSubgraphRun = traceable(
 		async (args: {
-			inputs: Record<string, unknown>;
+			state: PreComputedState;
 			runner: SubgraphRunFn;
 			genTimeoutMs?: number;
 		}): Promise<SubgraphResult> => {
-			const state = extractPreComputedState(args.inputs);
 			return await runWithOptionalLimiter(async () => {
 				return await withTimeout({
-					promise: args.runner(state),
+					promise: args.runner(args.state),
 					timeoutMs: args.genTimeoutMs,
 					label: `subgraph:${subgraph}`,
 				});
@@ -163,16 +190,68 @@ export async function runSubgraphEvaluation(config: SubgraphEvaluationConfig): P
 		},
 	);
 
+	// Pre-load examples if write-back is needed (to get example IDs)
+	const exampleIdMap = new Map<string, string>(); // prompt -> exampleId
+
+	if (writeBack) {
+		logger.verbose('Pre-loading examples for write-back tracking...');
+		const dataset = await lsClient.readDataset({ datasetName });
+		const examples = lsClient.listExamples({ datasetId: dataset.id });
+		for await (const example of examples) {
+			const prompt = extractPromptFromInputs(example.inputs);
+			exampleIdMap.set(prompt, example.id);
+		}
+		logger.verbose(`Loaded ${exampleIdMap.size} example IDs for write-back`);
+	}
+
 	const target = async (inputs: Record<string, unknown>): Promise<SubgraphTargetOutput> => {
 		targetCallCount++;
 		const index = targetCallCount;
 		const prompt = extractPromptFromInputs(inputs);
+		const exampleId = exampleIdMap.get(prompt);
 		const startTime = Date.now();
 
 		try {
+			let state: PreComputedState;
+
+			if (regenerate && llms && parsedNodeTypes) {
+				// Regenerate state from prompt
+				logger.verbose(`[${index}] Regenerating workflow state from prompt...`);
+				const regenStart = Date.now();
+				const regenerated = await regenerateWorkflowState({
+					prompt,
+					llms,
+					parsedNodeTypes,
+					timeoutMs,
+					logger,
+				});
+				const regenDurationMs = Date.now() - regenStart;
+				logger.verbose(`[${index}] Regeneration completed in ${regenDurationMs}ms`);
+
+				state = {
+					messages: deserializeMessages(regenerated.messages),
+					coordinationLog: regenerated.coordinationLog,
+					workflowJSON: regenerated.workflowJSON,
+					discoveryContext: regenerated.discoveryContext,
+					previousSummary: regenerated.previousSummary,
+				};
+
+				if (writeBack && exampleId) {
+					writeBackEntries.push({
+						exampleId,
+						messages: regenerated.messages,
+						coordinationLog: regenerated.coordinationLog,
+						workflowJSON: regenerated.workflowJSON,
+					});
+				}
+			} else {
+				// Use pre-computed state from dataset
+				state = extractPreComputedState(inputs);
+			}
+
 			const genStart = Date.now();
 			const subgraphResult = await traceableSubgraphRun({
-				inputs,
+				state,
 				runner: subgraphRunner,
 				genTimeoutMs: timeoutMs,
 			});
@@ -187,6 +266,7 @@ export async function runSubgraphEvaluation(config: SubgraphEvaluationConfig): P
 
 			if (subgraph === 'responder' && subgraphResult.response) {
 				context.responderOutput = subgraphResult.response;
+				context.workflowJSON = state.workflowJSON;
 				const evalCriteria = extractResponderEvals(inputs);
 				if (evalCriteria) {
 					context.responderEvals = evalCriteria;
@@ -260,6 +340,7 @@ export async function runSubgraphEvaluation(config: SubgraphEvaluationConfig): P
 				workflow: subgraphResult.workflow,
 				prompt,
 				feedback,
+				exampleId,
 			};
 		} catch (error) {
 			const errorMessage = error instanceof Error ? error.message : String(error);
@@ -286,7 +367,7 @@ export async function runSubgraphEvaluation(config: SubgraphEvaluationConfig): P
 			capturedResults.push(result);
 			lifecycle?.onExampleComplete?.(index, result);
 
-			return { prompt, feedback };
+			return { prompt, feedback, exampleId };
 		}
 	};
 
@@ -384,6 +465,11 @@ export async function runSubgraphEvaluation(config: SubgraphEvaluationConfig): P
 
 	if (artifactSaver) {
 		artifactSaver.saveSummary(summary, capturedResults);
+	}
+
+	// Write back regenerated state if requested
+	if (writeBack && writeBackEntries.length > 0) {
+		await writeBackToLangSmithDataset(lsClient, writeBackEntries, logger);
 	}
 
 	lifecycle?.onEnd?.(summary);

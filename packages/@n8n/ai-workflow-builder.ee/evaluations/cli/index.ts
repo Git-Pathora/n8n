@@ -12,25 +12,6 @@ import type { CoordinationLogEntry } from '@/types/coordination';
 import type { SimpleWorkflow } from '@/types/workflow';
 import type { BuilderFeatureFlags } from '@/workflow-builder-agent';
 
-import { consumeGenerator, getChatPayload } from '../harness/evaluation-helpers';
-import { createLogger } from '../harness/logger';
-import {
-	runEvaluation,
-	createConsoleLifecycle,
-	createLLMJudgeEvaluator,
-	createProgrammaticEvaluator,
-	createPairwiseEvaluator,
-	createSimilarityEvaluator,
-	type RunConfig,
-	type TestCase,
-	type Evaluator,
-	type EvaluationContext,
-} from '../index';
-import { createResponderEvaluator } from '../evaluators/responder';
-import { createSubgraphRunner } from '../harness/subgraph-runner';
-import { runSubgraphEvaluation } from '../harness/subgraph-evaluation';
-import { runLocalSubgraphEvaluation } from '../harness/subgraph-evaluation-local';
-import { loadSubgraphDatasetFile } from './dataset-file-loader';
 import {
 	argsToStageModels,
 	getDefaultDatasetName,
@@ -43,6 +24,7 @@ import {
 	loadDefaultTestCases,
 	getDefaultTestCaseIds,
 } from './csv-prompt-loader';
+import { loadSubgraphDatasetFile } from './dataset-file-loader';
 import { sendWebhookNotification } from './webhook';
 import {
 	consumeGenerator,
@@ -236,7 +218,7 @@ export async function runV2Evaluation(): Promise<void> {
 
 		const evaluators: Array<Evaluator<EvaluationContext>> = [];
 		if (args.subgraph === 'responder') {
-			evaluators.push(createResponderEvaluator(env.llms.judge));
+			evaluators.push(createResponderEvaluator(env.llms.judge, { numJudges: args.numJudges }));
 		}
 
 		let summary: Awaited<ReturnType<typeof runSubgraphEvaluation>>;
@@ -257,6 +239,11 @@ export async function runV2Evaluation(): Promise<void> {
 				logger,
 				outputDir: args.outputDir,
 				timeoutMs: args.timeoutMs,
+				regenerate: args.regenerate,
+				writeBack: args.writeBack,
+				datasetFilePath: args.datasetFile,
+				llms: args.regenerate ? env.llms : undefined,
+				parsedNodeTypes: args.regenerate ? env.parsedNodeTypes : undefined,
 			});
 		} else {
 			// LangSmith dataset mode
@@ -288,6 +275,10 @@ export async function runV2Evaluation(): Promise<void> {
 				logger,
 				outputDir: args.outputDir,
 				timeoutMs: args.timeoutMs,
+				regenerate: args.regenerate,
+				writeBack: args.writeBack,
+				llms: args.regenerate ? env.llms : undefined,
+				parsedNodeTypes: args.regenerate ? env.parsedNodeTypes : undefined,
 			});
 		}
 

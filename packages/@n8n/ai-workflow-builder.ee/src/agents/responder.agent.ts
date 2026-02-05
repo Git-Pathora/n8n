@@ -99,7 +99,8 @@ export class ResponderAgent {
 		const errorsCleared = hasRecursionErrorsCleared(context.coordinationLog);
 
 		if (errorEntry && !errorsCleared) {
-			const hasWorkflow = context.workflowJSON.nodes.length > 0;
+			const nodes = context.workflowJSON?.nodes ?? [];
+			const hasWorkflow = nodes.length > 0;
 			const errorMessage = errorEntry.summary.toLowerCase();
 			const isRecursionError =
 				errorMessage.includes('recursion') ||
@@ -113,7 +114,7 @@ export class ResponderAgent {
 			// AI-1812: Provide better guidance based on workflow state and error type
 			if (isRecursionError && hasWorkflow) {
 				// Recursion error but workflow was created
-				const guidance = buildRecursionErrorWithWorkflowGuidance(context.workflowJSON.nodes.length);
+				const guidance = buildRecursionErrorWithWorkflowGuidance(nodes.length);
 				contextParts.push(...guidance);
 			} else if (isRecursionError && !hasWorkflow) {
 				// Recursion error and no workflow created
@@ -134,6 +135,7 @@ export class ResponderAgent {
 
 		// Builder output (handles both node creation and parameter configuration)
 		const builderOutput = getBuilderOutput(context.coordinationLog);
+		const workflowNodes = context.workflowJSON?.nodes ?? [];
 		if (builderOutput) {
 			contextParts.push(`**Builder:** ${builderOutput}`);
 		} else if (context.workflowJSON.nodes.length) {

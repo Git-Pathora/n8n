@@ -44,6 +44,12 @@ export interface EvaluationArgs {
 	/** Path to a local JSON dataset file (alternative to --dataset for subgraph evals) */
 	datasetFile?: string;
 
+	/** Run full workflow generation from prompt instead of using pre-computed state */
+	regenerate?: boolean;
+
+	/** Write regenerated state back to the dataset source */
+	writeBack?: boolean;
+
 	/** URL to POST evaluation results to when complete */
 	webhookUrl?: string;
 	/** Secret for HMAC-SHA256 signature of webhook payload */
@@ -103,6 +109,8 @@ const cliSchema = z
 
 		subgraph: z.enum(['responder', 'discovery', 'builder', 'configurator']).optional(),
 		datasetFile: z.string().min(1).optional(),
+		regenerate: z.boolean().default(false),
+		writeBack: z.boolean().default(false),
 
 		testCase: z.string().min(1).optional(),
 		promptsCsv: z.string().min(1).optional(),
@@ -166,6 +174,18 @@ const FLAG_DEFS: Record<string, FlagDef> = {
 		kind: 'string',
 		group: 'input',
 		desc: 'Path to local JSON dataset file (for subgraph evals)',
+	},
+	'--regenerate': {
+		key: 'regenerate',
+		kind: 'boolean',
+		group: 'eval',
+		desc: 'Run full workflow generation from prompt instead of using pre-computed state',
+	},
+	'--write-back': {
+		key: 'writeBack',
+		kind: 'boolean',
+		group: 'eval',
+		desc: 'Write regenerated state back to dataset source (requires --regenerate)',
 	},
 
 	// Evaluation options
@@ -559,6 +579,14 @@ export function parseEvaluationArgs(argv: string[] = process.argv.slice(2)): Eva
 		);
 	}
 
+	if (parsed.writeBack && !parsed.regenerate) {
+		throw new Error('`--write-back` requires `--regenerate`');
+	}
+
+	if (parsed.regenerate && !parsed.subgraph) {
+		throw new Error('`--regenerate` requires `--subgraph`');
+	}
+
 	if (parsed.suite !== 'pairwise' && (filters?.doSearch || filters?.dontSearch)) {
 		throw new Error(
 			'`--filter do:` and `--filter dont:` are only supported for `--suite pairwise`',
@@ -587,6 +615,8 @@ export function parseEvaluationArgs(argv: string[] = process.argv.slice(2)): Eva
 		featureFlags,
 		subgraph: parsed.subgraph,
 		datasetFile: parsed.datasetFile,
+		regenerate: parsed.regenerate,
+		writeBack: parsed.writeBack,
 		webhookUrl: parsed.webhookUrl,
 		webhookSecret: parsed.webhookSecret,
 		// Model configuration

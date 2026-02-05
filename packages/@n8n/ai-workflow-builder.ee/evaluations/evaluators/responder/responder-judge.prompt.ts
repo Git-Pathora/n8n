@@ -2,12 +2,11 @@ import { prompt } from '@/prompts/builder';
 
 /**
  * Responder evaluation types that map to different evaluation strategies.
+ *
+ * Currently all responses happen after a full workflow generation.
+ * Plan mode types can be added later when that feature is implemented.
  */
-export type ResponderEvalType =
-	| 'plan_clarifying_questions'
-	| 'plan_output'
-	| 'datatable_instructions'
-	| 'general_response';
+export type ResponderEvalType = 'workflow_summary' | 'datatable_instructions' | 'general_response';
 
 export interface ResponderEvalCriteria {
 	type: ResponderEvalType;
@@ -26,21 +25,14 @@ function buildForbiddenPhrasesSection(): string {
 
 function buildTypeSpecificGuidance(evalType: ResponderEvalType): string {
 	switch (evalType) {
-		case 'plan_clarifying_questions':
+		case 'workflow_summary':
 			return [
 				'Additionally evaluate:',
-				'- Are the clarifying questions relevant to the user request?',
-				'- Are questions well-formed and specific (not vague)?',
-				'- Is the number of questions appropriate (not too many, not too few)?',
-				'- Do questions help disambiguate the user intent?',
-			].join('\n');
-
-		case 'plan_output':
-			return [
-				'Additionally evaluate:',
-				'- Is the plan description accurate relative to the workflow built?',
-				'- Does it cover all nodes and their purposes?',
+				'- Does the response accurately describe the workflow that was built?',
+				'- Are all key nodes and their purposes mentioned?',
 				'- Is the explanation of the workflow flow logical and complete?',
+				'- Does it explain how the workflow addresses the user request?',
+				'- Are setup instructions (credentials, placeholders) clearly provided?',
 			].join('\n');
 
 		case 'datatable_instructions':
@@ -56,6 +48,27 @@ function buildTypeSpecificGuidance(evalType: ResponderEvalType): string {
 	}
 }
 
+function buildWorkflowSummary(workflowJSON: unknown): string {
+	if (!workflowJSON || typeof workflowJSON !== 'object') {
+		return 'No workflow data available';
+	}
+
+	const workflow = workflowJSON as { nodes?: Array<{ name?: string; type?: string }> };
+	if (!Array.isArray(workflow.nodes) || workflow.nodes.length === 0) {
+		return 'Empty workflow (no nodes)';
+	}
+
+	const nodeList = workflow.nodes
+		.map((node: { name?: string; type?: string }) => {
+			const name = node.name ?? 'unnamed';
+			const type = node.type ?? 'unknown';
+			return `- ${name} (${type})`;
+		})
+		.join('\n');
+
+	return `Workflow contains ${workflow.nodes.length} nodes:\n${nodeList}`;
+}
+
 /**
  * Build the LLM judge prompt for evaluating a responder output.
  */
@@ -63,9 +76,11 @@ export function buildResponderJudgePrompt(args: {
 	userPrompt: string;
 	responderOutput: string;
 	evalCriteria: ResponderEvalCriteria;
+	workflowJSON?: unknown;
 }): string {
-	const { userPrompt, responderOutput, evalCriteria } = args;
+	const { userPrompt, responderOutput, evalCriteria, workflowJSON } = args;
 	const typeGuidance = buildTypeSpecificGuidance(evalCriteria.type);
+	const hasWorkflow = workflowJSON !== undefined;
 
 	return prompt()
 		.section(
@@ -98,7 +113,7 @@ export function buildResponderJudgePrompt(args: {
 			'dimensions',
 			[
 				'**relevance** (0-1): Does the response address the user request?',
-				'**accuracy** (0-1): Is the information factually correct?',
+				"**accuracy** (0-1): Is the information factually correct? If a workflow is provided, verify that the responder's claims about the workflow (nodes, integrations, actions) match what was actually built.",
 				'**completeness** (0-1): Does it cover everything needed?',
 				'**clarity** (0-1): Is the response well-structured and easy to understand?',
 				'**tone** (0-1): Is the tone professional and helpful?',
@@ -109,6 +124,7 @@ export function buildResponderJudgePrompt(args: {
 		.section('forbiddenPhrases', buildForbiddenPhrasesSection())
 		.section('userPrompt', userPrompt)
 		.section('responderOutput', responderOutput)
+		.sectionIf(hasWorkflow, 'actualWorkflow', () => buildWorkflowSummary(workflowJSON))
 		.section('evaluationCriteria', evalCriteria.criteria)
 		.sectionIf(typeGuidance.length > 0, 'typeSpecificGuidance', typeGuidance)
 		.build();

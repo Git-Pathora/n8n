@@ -102,7 +102,10 @@ export class AutoFinalizeHandler {
 		if (!code) {
 			this.debugLog('AUTO_FINALIZE', 'No code exists, prompting to create');
 			messages.push(
-				new HumanMessage('Please use the text editor tool to create or edit the workflow code.'),
+				new HumanMessage({
+					content: 'Please use the text editor tool to create or edit the workflow code.',
+					additional_kwargs: { validationMessage: true },
+				}),
 			);
 			return { success: false, promptedForCode: true };
 		}
@@ -132,11 +135,12 @@ export class AutoFinalizeHandler {
 					warnings: result.warnings,
 				});
 
-				// Send warnings back to agent for correction
+				// Send warnings back to agent for correction (marked as validation message for filtering)
 				messages.push(
-					new HumanMessage(
-						`Validation warnings:\n${warningText}\n\n${errorContext}\n\nUse str_replace to fix these issues.${FIX_AND_FINALIZE_INSTRUCTION}`,
-					),
+					new HumanMessage({
+						content: `Validation warnings:\n${warningText}\n\n${errorContext}\n\nUse str_replace to fix these issues.${FIX_AND_FINALIZE_INSTRUCTION}`,
+						additional_kwargs: { validationMessage: true },
+					}),
 				);
 
 				return { success: false, parseDuration };
@@ -163,11 +167,12 @@ export class AutoFinalizeHandler {
 				errorMessage,
 			});
 
-			// Send error back to agent for correction
+			// Send error back to agent for correction (marked as validation message for filtering)
 			messages.push(
-				new HumanMessage(
-					`Parse error: ${errorMessage}\n\n${errorContext}\n\nUse str_replace to fix these issues.${FIX_AND_FINALIZE_INSTRUCTION}`,
-				),
+				new HumanMessage({
+					content: `Parse error: ${errorMessage}\n\n${errorContext}\n\nUse str_replace to fix these issues.${FIX_AND_FINALIZE_INSTRUCTION}`,
+					additional_kwargs: { validationMessage: true },
+				}),
 			);
 
 			return { success: false, parseDuration };

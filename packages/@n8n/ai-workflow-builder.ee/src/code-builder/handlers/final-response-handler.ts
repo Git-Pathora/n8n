@@ -115,11 +115,12 @@ export class FinalResponseHandler {
 				error: parseResult.error,
 			});
 
-			// Add follow-up message with error
+			// Add follow-up message with error (marked as validation message for filtering)
 			messages.push(
-				new HumanMessage(
-					`Could not parse your response: ${parseResult.error}\n\nPlease provide your workflow code in a \`\`\`typescript code block.`,
-				),
+				new HumanMessage({
+					content: `Could not parse your response: ${parseResult.error}\n\nPlease provide your workflow code in a \`\`\`typescript code block.`,
+					additional_kwargs: { validationMessage: true },
+				}),
 			);
 
 			return {
@@ -168,11 +169,12 @@ export class FinalResponseHandler {
 				// Log warnings
 				this.evalLogger?.logWarnings('CODE-BUILDER:VALIDATION', newWarnings);
 
-				// Send feedback to agent
+				// Send feedback to agent (marked as validation message for filtering)
 				messages.push(
-					new HumanMessage(
-						`The workflow code has validation warnings that should be addressed:\n\n${warningMessages}\n\nPlease fix these issues and provide the corrected version in a \`\`\`typescript code block.`,
-					),
+					new HumanMessage({
+						content: `The workflow code has validation warnings that should be addressed:\n\n${warningMessages}\n\nPlease fix these issues and provide the corrected version in a \`\`\`typescript code block.`,
+						additional_kwargs: { validationMessage: true },
+					}),
 				);
 
 				return {
@@ -206,11 +208,12 @@ export class FinalResponseHandler {
 			// Log error
 			this.evalLogger?.logError('CODE-BUILDER:PARSE', errorMessage, undefined, errorStack);
 
-			// Send feedback to agent
+			// Send feedback to agent (marked as validation message for filtering)
 			messages.push(
-				new HumanMessage(
-					`The workflow code you generated has a parsing error:\n\n${errorMessage}\n\nPlease fix the code and provide the corrected version in a \`\`\`typescript code block.`,
-				),
+				new HumanMessage({
+					content: `The workflow code you generated has a parsing error:\n\n${errorMessage}\n\nPlease fix the code and provide the corrected version in a \`\`\`typescript code block.`,
+					additional_kwargs: { validationMessage: true },
+				}),
 			);
 
 			return {

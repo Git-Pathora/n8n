@@ -458,9 +458,9 @@ export function formatMessages(
 
 	for (const msg of messages) {
 		if (msg instanceof HumanMessage) {
-			// Only include user-initiated messages (those with string messageId)
-			// Filter out internal feedback messages (validation warnings, parse errors)
-			if (typeof msg.additional_kwargs?.messageId === 'string') {
+			// Filter out internal validation feedback messages
+			// These are marked with validationMessage: true in additional_kwargs
+			if (msg.additional_kwargs?.validationMessage !== true) {
 				formattedMessages.push(formatHumanMessage(msg));
 			}
 		} else if (msg instanceof AIMessage) {

@@ -311,9 +311,7 @@ describe('stream-processor', () => {
 
 	describe('formatMessages', () => {
 		it('should format HumanMessage correctly', () => {
-			const message = new HumanMessage('Hello from user');
-			message.additional_kwargs = { messageId: 'msg-001' };
-			const messages = [message];
+			const messages = [new HumanMessage('Hello from user')];
 
 			const result = formatMessages(messages);
 
@@ -322,13 +320,12 @@ describe('stream-processor', () => {
 				role: 'user',
 				type: 'message',
 				text: 'Hello from user',
-				id: 'msg-001',
 			});
 		});
 
 		it('should extract versionId from additional_kwargs as revertVersionId', () => {
 			const message = new HumanMessage({ content: 'Revert to this version' });
-			message.additional_kwargs = { versionId: 'version-123', messageId: 'msg-002' };
+			message.additional_kwargs = { versionId: 'version-123' };
 
 			const result = formatMessages([message]);
 
@@ -338,7 +335,6 @@ describe('stream-processor', () => {
 				type: 'message',
 				text: 'Revert to this version',
 				revertVersionId: 'version-123',
-				id: 'msg-002',
 			});
 		});
 
@@ -389,14 +385,20 @@ describe('stream-processor', () => {
 			expect(result[0]).not.toHaveProperty('revertVersionId');
 		});
 
-		it('should filter out HumanMessage when messageId is missing (internal feedback)', () => {
+		it('should include HumanMessage and extract versionId even without messageId', () => {
 			const message = new HumanMessage({ content: 'Another message' });
 			message.additional_kwargs = { versionId: 'version-999' };
 
 			const result = formatMessages([message]);
 
-			// Messages without string messageId are internal feedback and should be filtered out
-			expect(result).toHaveLength(0);
+			expect(result).toHaveLength(1);
+			expect(result[0]).toEqual({
+				role: 'user',
+				type: 'message',
+				text: 'Another message',
+				revertVersionId: 'version-999',
+			});
+			expect(result[0]).not.toHaveProperty('id');
 		});
 
 		it('should preserve existing message properties with versionId and messageId', () => {
@@ -414,24 +416,36 @@ describe('stream-processor', () => {
 			expect(formatted.id).toBe('msg-complete');
 		});
 
-		it('should filter out HumanMessage with undefined additional_kwargs (internal feedback)', () => {
+		it('should include HumanMessage with undefined additional_kwargs', () => {
 			const message = new HumanMessage({ content: 'Message without kwargs' });
 			// Message is created without additional_kwargs, so it's undefined by default
 
 			const result = formatMessages([message]);
 
-			// Messages without string messageId are internal feedback and should be filtered out
-			expect(result).toHaveLength(0);
+			expect(result).toHaveLength(1);
+			expect(result[0]).toEqual({
+				role: 'user',
+				type: 'message',
+				text: 'Message without kwargs',
+			});
+			expect(result[0]).not.toHaveProperty('revertVersionId');
+			expect(result[0]).not.toHaveProperty('id');
 		});
 
-		it('should filter out HumanMessage with empty additional_kwargs object (internal feedback)', () => {
+		it('should include HumanMessage with empty additional_kwargs object', () => {
 			const message = new HumanMessage({ content: 'Empty kwargs' });
 			message.additional_kwargs = {};
 
 			const result = formatMessages([message]);
 
-			// Messages without string messageId are internal feedback and should be filtered out
-			expect(result).toHaveLength(0);
+			expect(result).toHaveLength(1);
+			expect(result[0]).toEqual({
+				role: 'user',
+				type: 'message',
+				text: 'Empty kwargs',
+			});
+			expect(result[0]).not.toHaveProperty('revertVersionId');
+			expect(result[0]).not.toHaveProperty('id');
 		});
 
 		it('should only include revertVersionId when versionId is a string', () => {
@@ -450,26 +464,32 @@ describe('stream-processor', () => {
 			expect(result[0]).not.toHaveProperty('revertVersionId');
 		});
 
-		it('should filter out HumanMessage when messageId is not a string', () => {
+		it('should include HumanMessage when messageId is not a string but exclude id from output', () => {
 			const message = new HumanMessage({ content: 'Non-string messageId' });
 			message.additional_kwargs = { versionId: 'version-456', messageId: 456 };
 
 			const result = formatMessages([message]);
 
-			// Messages with non-string messageId are treated as internal feedback
-			expect(result).toHaveLength(0);
+			expect(result).toHaveLength(1);
+			expect(result[0]).toEqual({
+				role: 'user',
+				type: 'message',
+				text: 'Non-string messageId',
+				revertVersionId: 'version-456',
+			});
+			expect(result[0]).not.toHaveProperty('id');
 		});
 
 		it('should format HumanMessage with array content (multi-part messages)', () => {
-			const message = new HumanMessage({
-				content: [
-					{ type: 'text', text: 'Part 1' },
-					{ type: 'text', text: 'Part 2' },
-					{ type: 'image_url', image_url: 'http://example.com/image.png' },
-				],
-			});
-			message.additional_kwargs = { messageId: 'msg-003' };
-			const messages = [message];
+			const messages = [
+				new HumanMessage({
+					content: [
+						{ type: 'text', text: 'Part 1' },
+						{ type: 'text', text: 'Part 2' },
+						{ type: 'image_url', image_url: 'http://example.com/image.png' },
+					],
+				}),
+			];
 
 			const result = formatMessages(messages);
 
@@ -478,7 +498,6 @@ describe('stream-processor', () => {
 				role: 'user',
 				type: 'message',
 				text: 'Part 1\nPart 2',
-				id: 'msg-003',
 			});
 		});
 
@@ -494,9 +513,7 @@ describe('stream-processor', () => {
 [{"nodeName": "test"}]
 </current_execution_nodes_schemas>`;
 
-			const message = new HumanMessage(messageWithContext);
-			message.additional_kwargs = { messageId: 'msg-004' };
-			const messages = [message];
+			const messages = [new HumanMessage(messageWithContext)];
 
 			const result = formatMessages(messages);
 
@@ -505,16 +522,16 @@ describe('stream-processor', () => {
 				role: 'user',
 				type: 'message',
 				text: 'User question here',
-				id: 'msg-004',
 			});
 		});
 
 		it('should strip context tags from HumanMessage array content', () => {
-			const message = new HumanMessage({
-				content: [
-					{
-						type: 'text',
-						text: `Workflow executed successfully.
+			const messages = [
+				new HumanMessage({
+					content: [
+						{
+							type: 'text',
+							text: `Workflow executed successfully.
 <current_workflow_json>
 {"nodes": []}
 </current_workflow_json>
@@ -524,11 +541,10 @@ describe('stream-processor', () => {
 <current_execution_nodes_schemas>
 [{"nodeName": "Manual Trigger"}]
 </current_execution_nodes_schemas>`,
-					},
-				],
-			});
-			message.additional_kwargs = { messageId: 'msg-005' };
-			const messages = [message];
+						},
+					],
+				}),
+			];
 
 			const result = formatMessages(messages);
 
@@ -537,7 +553,6 @@ describe('stream-processor', () => {
 				role: 'user',
 				type: 'message',
 				text: 'Workflow executed successfully.',
-				id: 'msg-005',
 			});
 		});
 
@@ -679,7 +694,6 @@ describe('stream-processor', () => {
 		it('should handle mixed message types in sequence', () => {
 			const aiMessage1 = new AIMessage('I will help you');
 			const humanMessage = new HumanMessage('Please add a node');
-			humanMessage.additional_kwargs = { messageId: 'msg-006' };
 			const aiMessage2 = new AIMessage('');
 			aiMessage2.tool_calls = [
 				{
@@ -1106,7 +1120,6 @@ describe('stream-processor', () => {
 			];
 
 			const humanMessage = new HumanMessage('Please create a workflow');
-			humanMessage.additional_kwargs = { messageId: 'msg-007' };
 
 			const aiMessage1 = new AIMessage('');
 			aiMessage1.content = [
@@ -1149,7 +1162,6 @@ describe('stream-processor', () => {
 				role: 'user',
 				type: 'message',
 				text: 'Please create a workflow',
-				id: 'msg-007',
 			});
 
 			expect(result[1]).toEqual({
@@ -1181,14 +1193,14 @@ describe('stream-processor', () => {
 		});
 
 		describe('internal feedback message filtering', () => {
-			it('should filter out HumanMessage without messageId (internal feedback)', () => {
+			it('should filter out HumanMessage with validationMessage flag', () => {
 				const userMessage = new HumanMessage({ content: 'User request' });
 				userMessage.additional_kwargs = { messageId: 'msg-123' };
 
 				const internalFeedback = new HumanMessage({
 					content: 'Validation warnings:\n- [INVALID_EXPRESSION_PATH] Some error',
 				});
-				// No messageId - this is internal feedback
+				internalFeedback.additional_kwargs = { validationMessage: true };
 
 				const messages = [userMessage, internalFeedback];
 				const result = formatMessages(messages);
@@ -1198,22 +1210,26 @@ describe('stream-processor', () => {
 				expect(result[0].id).toBe('msg-123');
 			});
 
-			it('should filter out HumanMessage with empty additional_kwargs', () => {
-				const internalFeedback = new HumanMessage({ content: 'Parse error...' });
-				internalFeedback.additional_kwargs = {};
+			it('should include HumanMessage without validationMessage flag even if no messageId', () => {
+				// This tests that normal HumanMessages (e.g., from code-builder where
+				// messageId might be on a different message) are still included
+				const userMessage = new HumanMessage({ content: 'User request' });
+				// No messageId, but also no validationMessage flag
 
-				const result = formatMessages([internalFeedback]);
-				expect(result).toHaveLength(0);
+				const result = formatMessages([userMessage]);
+
+				expect(result).toHaveLength(1);
+				expect(result[0].text).toBe('User request');
 			});
 
-			it('should format mixed conversation excluding internal feedback', () => {
+			it('should format mixed conversation excluding validation feedback', () => {
 				const userMsg = new HumanMessage({ content: 'Build workflow' });
 				userMsg.additional_kwargs = { messageId: 'msg-1' };
 
 				const aiMsg = new AIMessage({ content: 'I will help you' });
 
 				const feedback = new HumanMessage({ content: 'Validation warnings...' });
-				// No messageId
+				feedback.additional_kwargs = { validationMessage: true };
 
 				const aiResponse = new AIMessage({ content: 'Fixed the issues' });
 

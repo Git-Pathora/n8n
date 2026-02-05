@@ -17,6 +17,11 @@ import { isNodeChain } from '../../../types/base';
 import { isTriggerNodeType } from '../../../utils/trigger-detection';
 import type { ValidatorPlugin, PluginContext, ValidationIssue } from '../types';
 import { isAutoRenamed, formatNodeRef } from '../types';
+import {
+	isIfElseComposite,
+	isSwitchCaseComposite,
+	isSplitInBatchesBuilder,
+} from '../../type-guards';
 
 /**
  * AI connection types used by subnodes to connect to parent nodes.
@@ -50,6 +55,46 @@ function isConnectedSubnode(graphNode: GraphNode): boolean {
 		}
 	}
 	return false;
+}
+
+/**
+ * Extract node name from a connection target, handling composite builders.
+ * Returns the node name string or undefined if unable to extract.
+ */
+function getTargetNodeName(target: unknown): string | undefined {
+	if (target === null || target === undefined) {
+		return undefined;
+	}
+
+	// Handle IfElseBuilder/Composite - use ifNode.name
+	if (isIfElseComposite(target)) {
+		const ifElse = target as { ifNode: { name: string } };
+		return ifElse.ifNode.name;
+	}
+
+	// Handle SwitchCaseBuilder/Composite - use switchNode.name
+	if (isSwitchCaseComposite(target)) {
+		const switchCase = target as { switchNode: { name: string } };
+		return switchCase.switchNode.name;
+	}
+
+	// Handle SplitInBatchesBuilder - use sibNode.name
+	if (isSplitInBatchesBuilder(target)) {
+		const sib = target as { sibNode: { name: string } };
+		return sib.sibNode.name;
+	}
+
+	// Handle objects with name property
+	if (typeof target === 'object' && 'name' in target) {
+		return (target as { name: string }).name;
+	}
+
+	// For primitives, convert to string
+	if (typeof target !== 'object') {
+		return String(target);
+	}
+
+	return undefined;
 }
 
 /**
@@ -92,19 +137,17 @@ function findNodesWithIncomingConnections(
 					const compositeHeadName = registry.resolveCompositeHeadName(conn.target);
 					if (compositeHeadName !== undefined) {
 						nodesWithIncoming.add(compositeHeadName);
-					} else if (typeof conn.target === 'object' && 'name' in conn.target) {
-						nodesWithIncoming.add(conn.target.name);
-					} else if (typeof conn.target === 'object') {
-						nodesWithIncoming.add(JSON.stringify(conn.target));
 					} else {
-						nodesWithIncoming.add(String(conn.target));
+						const nodeName = getTargetNodeName(conn.target);
+						if (nodeName !== undefined) {
+							nodesWithIncoming.add(nodeName);
+						}
 					}
-				} else if (typeof conn.target === 'object' && 'name' in conn.target) {
-					nodesWithIncoming.add(conn.target.name);
-				} else if (typeof conn.target === 'object') {
-					nodesWithIncoming.add(JSON.stringify(conn.target));
 				} else {
-					nodesWithIncoming.add(String(conn.target));
+					const nodeName = getTargetNodeName(conn.target);
+					if (nodeName !== undefined) {
+						nodesWithIncoming.add(nodeName);
+					}
 				}
 			}
 		}

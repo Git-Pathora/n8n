@@ -201,10 +201,11 @@ export class TextEditorToolHandler {
 				const warningText = result.warnings.map((w) => `- [${w.code}] ${w.message}`).join('\n');
 				const errorContext = this.getErrorContext(code, result.warnings[0].message);
 
-				// Add human message with warning feedback
+				// Add human message with warning feedback (marked as validation message for filtering)
 				messages.push(
 					new HumanMessage({
 						content: `Validation warnings:\n${warningText}\n\n${errorContext}\n\nUse str_replace to fix these issues.${FIX_AND_FINALIZE_INSTRUCTION}`,
+						additional_kwargs: { validationMessage: true },
 					}),
 				);
 
@@ -229,10 +230,11 @@ export class TextEditorToolHandler {
 				stack: errorStack,
 			});
 
-			// Add human message with error feedback
+			// Add human message with error feedback (marked as validation message for filtering)
 			messages.push(
 				new HumanMessage({
 					content: `Parse error: ${errorMessage}\n\n${errorContext}\n\nUse str_replace to fix these issues.${FIX_AND_FINALIZE_INSTRUCTION}`,
+					additional_kwargs: { validationMessage: true },
 				}),
 			);
 

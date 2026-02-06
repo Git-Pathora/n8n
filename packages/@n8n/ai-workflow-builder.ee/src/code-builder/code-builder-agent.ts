@@ -27,7 +27,13 @@ import type {
 	SessionMessagesChunk,
 } from '../types/streaming';
 import type { ChatPayload } from '../workflow-builder-agent';
-import { MAX_AGENT_ITERATIONS, MAX_VALIDATE_ATTEMPTS } from './constants';
+import {
+	CODE_BUILDER_GET_NODE_TYPES_TOOL,
+	CODE_BUILDER_GET_SUGGESTED_NODES_TOOL,
+	CODE_BUILDER_SEARCH_NODES_TOOL,
+	MAX_AGENT_ITERATIONS,
+	MAX_VALIDATE_ATTEMPTS,
+} from './constants';
 import { AgentIterationHandler } from './handlers/agent-iteration-handler';
 import { AutoFinalizeHandler } from './handlers/auto-finalize-handler';
 import { ChatSetupHandler, type LlmWithTools } from './handlers/chat-setup-handler';
@@ -166,6 +172,14 @@ export class CodeBuilderAgent {
 		// Initialize tool dispatch handler
 		this.toolDispatchHandler = new ToolDispatchHandler({
 			toolsMap: this.toolsMap,
+			toolDisplayTitles: new Map([
+				[CODE_BUILDER_SEARCH_NODES_TOOL.toolName, CODE_BUILDER_SEARCH_NODES_TOOL.displayTitle],
+				[CODE_BUILDER_GET_NODE_TYPES_TOOL.toolName, CODE_BUILDER_GET_NODE_TYPES_TOOL.displayTitle],
+				[
+					CODE_BUILDER_GET_SUGGESTED_NODES_TOOL.toolName,
+					CODE_BUILDER_GET_SUGGESTED_NODES_TOOL.displayTitle,
+				],
+			]),
 			validateToolHandler: this.validateToolHandler,
 			debugLog: (ctx, msg, data) => this.debugLog(ctx, msg, data),
 			evalLogger: config.evalLogger,

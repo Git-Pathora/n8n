@@ -19,11 +19,15 @@ describe('ToolDispatchHandler', () => {
 	const mockDebugLog = jest.fn();
 	const mockValidateToolHandler = {} as ValidateToolHandler;
 
-	function createHandler(toolsMap: Map<string, StructuredToolInterface>) {
+	function createHandler(
+		toolsMap: Map<string, StructuredToolInterface>,
+		toolDisplayTitles?: Map<string, string>,
+	) {
 		return new ToolDispatchHandler({
 			toolsMap,
 			validateToolHandler: mockValidateToolHandler,
 			debugLog: mockDebugLog,
+			toolDisplayTitles,
 		});
 	}
 
@@ -112,6 +116,93 @@ describe('ToolDispatchHandler', () => {
 			expect(toolChunks.length).toBeGreaterThanOrEqual(2);
 			for (const chunk of toolChunks) {
 				expect(chunk.toolCallId).toBe('call-789');
+			}
+		});
+
+		it('should include displayTitle in tool progress chunks when toolDisplayTitles is provided', async () => {
+			const mockTool = {
+				name: 'get_node_types',
+				invoke: jest.fn().mockResolvedValue('result'),
+			} as unknown as StructuredToolInterface;
+
+			const toolDisplayTitles = new Map([['get_node_types', 'Get Node Definitions']]);
+			const handler = createHandler(new Map([['get_node_types', mockTool]]), toolDisplayTitles);
+			const warningTracker = new WarningTracker();
+
+			const chunks: StreamOutput[] = [];
+			const generator = handler.dispatch({
+				toolCalls: [{ id: 'call-dt-1', name: 'get_node_types', args: {} }],
+				messages: [],
+				iteration: 1,
+				warningTracker,
+			});
+
+			for await (const chunk of generator) {
+				chunks.push(chunk);
+			}
+
+			const toolChunks = chunks.flatMap((c) => c.messages ?? []).filter(isToolProgressChunk);
+
+			// All tool progress chunks should include displayTitle
+			for (const chunk of toolChunks) {
+				expect(chunk.displayTitle).toBe('Get Node Definitions');
+			}
+		});
+
+		it('should not include displayTitle when toolDisplayTitles is not provided', async () => {
+			const mockTool = {
+				name: 'mock_tool',
+				invoke: jest.fn().mockResolvedValue('result'),
+			} as unknown as StructuredToolInterface;
+
+			const handler = createHandler(new Map([['mock_tool', mockTool]]));
+			const warningTracker = new WarningTracker();
+
+			const chunks: StreamOutput[] = [];
+			const generator = handler.dispatch({
+				toolCalls: [{ id: 'call-dt-2', name: 'mock_tool', args: {} }],
+				messages: [],
+				iteration: 1,
+				warningTracker,
+			});
+
+			for await (const chunk of generator) {
+				chunks.push(chunk);
+			}
+
+			const toolChunks = chunks.flatMap((c) => c.messages ?? []).filter(isToolProgressChunk);
+
+			for (const chunk of toolChunks) {
+				expect(chunk.displayTitle).toBeUndefined();
+			}
+		});
+
+		it('should include displayTitle in error chunks when tool throws', async () => {
+			const mockTool = {
+				name: 'search_nodes',
+				invoke: jest.fn().mockRejectedValue(new Error('Search failed')),
+			} as unknown as StructuredToolInterface;
+
+			const toolDisplayTitles = new Map([['search_nodes', 'Search Nodes']]);
+			const handler = createHandler(new Map([['search_nodes', mockTool]]), toolDisplayTitles);
+			const warningTracker = new WarningTracker();
+
+			const chunks: StreamOutput[] = [];
+			const generator = handler.dispatch({
+				toolCalls: [{ id: 'call-dt-3', name: 'search_nodes', args: {} }],
+				messages: [],
+				iteration: 1,
+				warningTracker,
+			});
+
+			for await (const chunk of generator) {
+				chunks.push(chunk);
+			}
+
+			const toolChunks = chunks.flatMap((c) => c.messages ?? []).filter(isToolProgressChunk);
+
+			for (const chunk of toolChunks) {
+				expect(chunk.displayTitle).toBe('Search Nodes');
 			}
 		});
 

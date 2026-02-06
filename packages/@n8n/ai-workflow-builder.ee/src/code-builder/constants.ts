@@ -60,12 +60,17 @@ export const CODE_BUILDER_VALIDATE_TOOL: BuilderToolBase = {
 	displayTitle: 'Validating workflow',
 };
 
+export const CODE_BUILDER_SEARCH_NODES_TOOL: BuilderToolBase = {
+	toolName: 'search_nodes',
+	displayTitle: 'Search Nodes',
+};
+
 export const CODE_BUILDER_GET_NODE_TYPES_TOOL: BuilderToolBase = {
 	toolName: 'get_node_types',
-	displayTitle: 'Looking up nodes',
+	displayTitle: 'Get Node Definitions',
 };
 
 export const CODE_BUILDER_GET_SUGGESTED_NODES_TOOL: BuilderToolBase = {
 	toolName: 'get_suggested_nodes',
-	displayTitle: 'Getting suggestions',
+	displayTitle: 'Get Suggested Nodes',
 };

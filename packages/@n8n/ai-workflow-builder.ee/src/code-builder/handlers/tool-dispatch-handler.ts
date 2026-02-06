@@ -36,6 +36,7 @@ export interface ToolCall {
  */
 export interface ToolDispatchHandlerConfig {
 	toolsMap: Map<string, StructuredToolInterface>;
+	toolDisplayTitles?: Map<string, string>;
 	validateToolHandler: ValidateToolHandler;
 	debugLog: DebugLogFn;
 	evalLogger?: EvaluationLogger;
@@ -76,12 +77,14 @@ export interface ToolDispatchResult {
  */
 export class ToolDispatchHandler {
 	private toolsMap: Map<string, StructuredToolInterface>;
+	private toolDisplayTitles?: Map<string, string>;
 	private validateToolHandler: ValidateToolHandler;
 	private debugLog: DebugLogFn;
 	private evalLogger?: EvaluationLogger;
 
 	constructor(config: ToolDispatchHandlerConfig) {
 		this.toolsMap = config.toolsMap;
+		this.toolDisplayTitles = config.toolDisplayTitles;
 		this.validateToolHandler = config.validateToolHandler;
 		this.debugLog = config.debugLog;
 		this.evalLogger = config.evalLogger;
@@ -253,6 +256,8 @@ export class ToolDispatchHandler {
 			args: toolCall.args,
 		});
 
+		const displayTitle = this.toolDisplayTitles?.get(toolCall.name);
+
 		// Stream tool progress
 		yield {
 			messages: [
@@ -260,6 +265,7 @@ export class ToolDispatchHandler {
 					type: 'tool',
 					toolName: toolCall.name,
 					toolCallId: toolCall.id,
+					displayTitle,
 					status: 'running',
 					args: toolCall.args,
 				} as ToolProgressChunk,
@@ -284,6 +290,7 @@ export class ToolDispatchHandler {
 						type: 'tool',
 						toolName: toolCall.name,
 						toolCallId: toolCall.id,
+						displayTitle,
 						status: 'error',
 						error: errorMessage,
 					} as ToolProgressChunk,
@@ -324,6 +331,7 @@ export class ToolDispatchHandler {
 						type: 'tool',
 						toolName: toolCall.name,
 						toolCallId: toolCall.id,
+						displayTitle,
 						status: 'completed',
 					} as ToolProgressChunk,
 				],
@@ -349,6 +357,7 @@ export class ToolDispatchHandler {
 						type: 'tool',
 						toolName: toolCall.name,
 						toolCallId: toolCall.id,
+						displayTitle,
 						status: 'error',
 						error: errorMessage,
 					} as ToolProgressChunk,

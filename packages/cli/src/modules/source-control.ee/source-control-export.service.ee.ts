@@ -16,7 +16,7 @@ import { PROJECT_OWNER_ROLE_SLUG } from '@n8n/permissions';
 // eslint-disable-next-line n8n-local-rules/misplaced-n8n-typeorm-import
 import { In } from '@n8n/typeorm';
 import { Credentials, InstanceSettings } from 'n8n-core';
-import { ICredentialDataDecryptedObject, UnexpectedError } from 'n8n-workflow';
+import { UnexpectedError } from 'n8n-workflow';
 import { rm as fsRm, writeFile as fsWriteFile } from 'node:fs/promises';
 import path from 'path';
 
@@ -36,13 +36,13 @@ import {
 import {
 	getCredentialExportPath,
 	getDataTableExportPath,
+	getCredentialSynchableData,
 	getFoldersPath,
 	getProjectExportPath,
 	getVariablesPath,
 	getWorkflowExportPath,
 	readFoldersFromSourceControlFile,
 	readTagAndMappingsFromSourceControlFile,
-	sanitizeCredentialData,
 	sourceControlFoldersExistCheck,
 } from './source-control-helper.ee';
 import { SourceControlScopedService } from './source-control-scoped.service';
@@ -556,20 +556,7 @@ export class SourceControlExportService {
 						};
 					}
 
-					/**
-					 * Edge case: Do not export `oauthTokenData`, so that that the
-					 * pulling instance reconnects instead of trying to use stubbed values.
-					 */
-					const credentialData = credentials.getData();
-					const { oauthTokenData, ...rest } = credentialData;
-					let sanitizedData: ICredentialDataDecryptedObject | undefined;
-
-					try {
-						sanitizedData = sanitizeCredentialData(rest);
-					} catch (error) {
-						this.logger.error(`Failed to sanitize credential data: ${(error as Error).message}`);
-						throw error;
-					}
+					const sanitizedData = getCredentialSynchableData(credentials);
 
 					const stub: ExportableCredential = {
 						id,

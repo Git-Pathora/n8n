@@ -5,6 +5,7 @@ import { Container } from '@n8n/di';
 import { generateKeyPairSync } from 'crypto';
 import { accessSync, constants as fsConstants, mkdirSync } from 'fs';
 import isEqual from 'lodash/isEqual';
+import type { Credentials } from 'n8n-core';
 import type { ICredentialDataDecryptedObject } from 'n8n-workflow';
 import { jsonParse, UserError, type DataTableColumnType } from 'n8n-workflow';
 import { ok } from 'node:assert/strict';
@@ -31,39 +32,54 @@ import type { KeyPairType } from './types/key-pair-type';
 import type { RemoteResourceOwner, StatusResourceOwner } from './types/resource-owner';
 import type { SourceControlWorkflowVersionId } from './types/source-control-workflow-version-id';
 
-/**
- * Checks if a string is an expression containing template syntax (={{ }}).
- */
-export function stringContainsExpression(testString: string): boolean {
-	return /^=.*\{\{.+\}\}/.test(testString);
-}
+export function getCredentialSynchableData(crendential: Credentials) {
+	const credentialData = crendential.getData();
 
-/**
- * Sanitizes credential data for export: keeps expressions and numbers, removes plain text secrets.
- */
-export function sanitizeCredentialData(
-	data: ICredentialDataDecryptedObject,
-): ICredentialDataDecryptedObject {
-	for (const [key] of Object.entries(data)) {
-		const value = data[key];
+	/**
+	 * Edge case: Do not export `oauthTokenData`, so that that the
+	 * pulling instance reconnects instead of trying to use stubbed values.
+	 */
+	const { oauthTokenData, ...rest } = credentialData;
 
+	const result: ICredentialDataDecryptedObject = {};
+
+	for (const [key, value] of Object.entries(rest)) {
 		if (value === null) {
-			delete data[key]; // remove invalid null values
-		} else if (typeof value === 'object') {
-			data[key] = sanitizeCredentialData(value as ICredentialDataDecryptedObject);
-		} else if (typeof value === 'string') {
-			data[key] = stringContainsExpression(value) ? data[key] : '';
-		} else if (typeof data[key] === 'number') {
-			// TODO: leaving numbers in for now, but maybe we should remove them
 			continue;
+		}
+
+		if (typeof value === 'string') {
+			result[key] = stringContainsExpression(value) ? value : '';
+		} else if (typeof value === 'number') {
+			result[key] = value;
+		} else if (typeof value === 'object') {
+			result[key] = sanitizeCredentialData(value as ICredentialDataDecryptedObject);
 		}
 	}
 
-	return data;
+	return result;
 }
 
-function isPlainObject(value: unknown): value is ICredentialDataDecryptedObject {
-	return typeof value === 'object' && value !== null && !Array.isArray(value);
+function sanitizeCredentialData(
+	data: ICredentialDataDecryptedObject,
+): ICredentialDataDecryptedObject {
+	const result: ICredentialDataDecryptedObject = {};
+
+	for (const [key, value] of Object.entries(data)) {
+		if (value === null) {
+			continue;
+		}
+
+		if (typeof value === 'string') {
+			result[key] = stringContainsExpression(value) ? value : '';
+		} else if (typeof value === 'number') {
+			result[key] = value;
+		} else if (typeof value === 'object') {
+			result[key] = sanitizeCredentialData(value as ICredentialDataDecryptedObject);
+		}
+	}
+
+	return result;
 }
 
 /**
@@ -76,26 +92,28 @@ export function mergeCredentialData(
 ): ICredentialDataDecryptedObject {
 	const merged = { ...local };
 
-	for (const key of Object.keys(remote)) {
-		const remoteValue = remote[key];
-
-		if (typeof remoteValue === 'string') {
-			if (stringContainsExpression(remoteValue)) {
-				merged[key] = remoteValue;
-			}
-			// Empty string = plain value on remote, keep local
-		} else if (isPlainObject(remoteValue)) {
-			const localValue = local[key];
-			if (isPlainObject(localValue)) {
-				merged[key] = mergeCredentialData(localValue, remoteValue);
-			} else {
-				merged[key] = mergeCredentialData({}, remoteValue);
-			}
+	for (const [key, remoteValue] of Object.entries(remote)) {
+		if (remoteValue === null) {
+			continue;
 		}
-		// Numbers, booleans, arrays from remote are ignored
+
+		if (typeof remoteValue === 'string' && stringContainsExpression(remoteValue)) {
+			merged[key] = remoteValue;
+		} else if (typeof remoteValue === 'number') {
+			merged[key] = remoteValue;
+		} else if (typeof remoteValue === 'object') {
+			merged[key] = mergeCredentialData(
+				local[key] as ICredentialDataDecryptedObject,
+				remoteValue as unknown as ICredentialDataDecryptedObject,
+			);
+		}
 	}
 
 	return merged;
+}
+
+function stringContainsExpression(testString: string): boolean {
+	return /^=.*\{\{.+\}\}/.test(testString);
 }
 
 export function getWorkflowExportPath(workflowId: string, workflowExportFolder: string): string {

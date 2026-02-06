@@ -379,14 +379,11 @@ export class ChatHubService {
 		let processedAttachments: IBinaryData[] = [];
 		let workflow: PreparedChatWorkflow;
 		let previousMessage: ChatHubMessage | undefined;
-		let vectorStoreCredential:
-			| Awaited<ReturnType<typeof this.chatHubAgentService.createVectorStoreCredential>>
-			| undefined;
 
 		try {
-			vectorStoreCredential =
+			const vectorStoreCredential =
 				model.provider === 'custom-agent'
-					? await this.chatHubAgentService.createVectorStoreCredential(user)
+					? await this.chatHubAgentService.ensureVectorStoreCredential(user)
 					: undefined;
 			const result = await this.messageRepository.manager.transaction(async (trx) => {
 				let session = await this.getChatSession(user, sessionId, trx);
@@ -520,7 +517,6 @@ export class ChatHubService {
 			credentials,
 			message,
 			processedAttachments,
-			vectorStoreCredential?.id,
 		);
 	}
 
@@ -543,6 +539,11 @@ export class ChatHubService {
 		let newStoredAttachments: IBinaryData[] = [];
 
 		try {
+			const vectorStoreCredential =
+				model.provider === 'custom-agent'
+					? await this.chatHubAgentService.ensureVectorStoreCredential(user)
+					: undefined;
+
 			result = await this.messageRepository.manager.transaction(async (trx) => {
 				const session = await this.getChatSession(user, sessionId, trx);
 				if (!session) {
@@ -607,6 +608,7 @@ export class ChatHubService {
 						tz,
 						trx,
 						executionMetadata,
+						vectorStoreCredential?.id,
 					);
 
 					return { workflow, combinedAttachments: attachments };
@@ -648,10 +650,6 @@ export class ChatHubService {
 		});
 
 		// Start the workflow execution with streaming
-		const vectorStoreCredential =
-			model.provider === 'custom-agent'
-				? await this.chatHubAgentService.createVectorStoreCredential(user)
-				: undefined;
 		void this.executeChatWorkflowWithCleanup(
 			user,
 			model,
@@ -663,7 +661,6 @@ export class ChatHubService {
 			{},
 			'',
 			[],
-			vectorStoreCredential?.id,
 		);
 	}
 
@@ -678,6 +675,11 @@ export class ChatHubService {
 	): Promise<void> {
 		const { sessionId, retryId, model, credentials, timeZone } = payload;
 		const tz = timeZone ?? this.globalConfig.generic.timezone;
+
+		const vectorStoreCredential =
+			model.provider === 'custom-agent'
+				? await this.chatHubAgentService.ensureVectorStoreCredential(user)
+				: undefined;
 
 		const { retryOfMessageId, previousMessageId, workflow } =
 			await this.messageRepository.manager.transaction(async (trx) => {
@@ -720,6 +722,7 @@ export class ChatHubService {
 					tz,
 					trx,
 					executionMetadata,
+					vectorStoreCredential?.id,
 				);
 
 				return {
@@ -730,10 +733,6 @@ export class ChatHubService {
 			});
 
 		// Start the workflow execution with streaming (fire and forget)
-		const vectorStoreCredential =
-			model.provider === 'custom-agent'
-				? await this.chatHubAgentService.createVectorStoreCredential(user)
-				: undefined;
 		void this.executeChatWorkflowWithCleanup(
 			user,
 			model,
@@ -745,7 +744,6 @@ export class ChatHubService {
 			{},
 			'',
 			[],
-			vectorStoreCredential?.id,
 		);
 	}
 
@@ -876,7 +874,6 @@ export class ChatHubService {
 		credentials: INodeCredentials,
 		humanMessage: string,
 		processedAttachments: IBinaryData[],
-		vectorStoreCredentialId?: string,
 	) {
 		await this.chatHubExecutionService.executeChatWorkflowWithCleanup(
 			user,
@@ -887,7 +884,6 @@ export class ChatHubService {
 			previousMessageId,
 			retryOfMessageId,
 			workflow.responseMode,
-			vectorStoreCredentialId,
 		);
 
 		// Generate title for the session on receiving the first human message

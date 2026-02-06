@@ -36,7 +36,6 @@ import { ChatHubMessageRepository } from './chat-message.repository';
 import { ChatStreamService } from './chat-stream.service';
 import { createStructuredChunkAggregator } from './stream-capturer';
 import { getLastNodeExecuted, shouldResumeImmediately } from '../../chat/utils';
-import { CredentialsService } from '@/credentials/credentials.service';
 
 @Service()
 export class ChatHubExecutionService {
@@ -50,7 +49,6 @@ export class ChatHubExecutionService {
 		private readonly instanceSettings: InstanceSettings,
 		private readonly chatStreamService: ChatStreamService,
 		private readonly messageRepository: ChatHubMessageRepository,
-		private readonly credentialsService: CredentialsService,
 	) {
 		this.logger = this.logger.scoped('chat-hub');
 	}
@@ -82,7 +80,6 @@ export class ChatHubExecutionService {
 		previousMessageId: ChatMessageId,
 		retryOfMessageId: ChatMessageId | null,
 		responseMode: ChatTriggerResponseMode,
-		vectorStoreCredentialId?: string,
 	) {
 		try {
 			const executionMode = model.provider === 'n8n' ? 'webhook' : 'chat';
@@ -125,17 +122,6 @@ export class ChatHubExecutionService {
 			if (model.provider !== 'n8n') {
 				// TODO: Delete chat workflow after execution
 				//await this.chatHubWorkflowService.deleteChatWorkflow(workflowData.id);
-			}
-
-			// Delete temporary vector store credential if it was created
-			if (vectorStoreCredentialId) {
-				try {
-					await this.credentialsService.delete(user, vectorStoreCredentialId);
-				} catch (error) {
-					this.logger.warn(
-						`Failed to delete temporary vector store credential ${vectorStoreCredentialId}: ${error}`,
-					);
-				}
 			}
 		}
 	}

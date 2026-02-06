@@ -240,21 +240,84 @@ export class ChatHubAgentService {
 		return FileLocation.ofCustom({ pathSegments: ['chat-hub', 'users', userId, 'embeddings'] });
 	}
 
-	async createVectorStoreCredential(user: User) {
+	async ensureVectorStoreCredential(user: User) {
+		const credentialName = 'ChatHub vector store credential';
+
 		// Get storage config from binary data service
 		const storageConfig = this.binaryDataService.getStorageConfig();
 		const storagePath = await this.binaryDataService.ensureLocation(
 			this.getVectorStorePath(user.id),
 		);
 
-		return await this.credentialsService.createManagedCredential(
+		const expectedData = { ...storageConfig, storagePath };
+
+		this.logger.debug(`Ensuring vector store credential for user ${user.id}`, {
+			expectedData,
+		});
+
+		// Check if credential already exists
+		const existingCredentials = await this.credentialsService.getMany(user, {
+			listQueryOptions: {
+				filter: {
+					type: 'instanceBinaryDataApi',
+					isManaged: true,
+					name: credentialName,
+				},
+			},
+			includeData: true,
+		});
+
+		this.logger.debug(
+			`Found ${existingCredentials.length} existing credentials with name "${credentialName}"`,
+		);
+
+		// Find credential with matching name
+		for (const cred of existingCredentials) {
+			this.logger.debug(`Checking credential ${cred.id}`, {
+				existingData: cred.data,
+			});
+
+			// Check if all fields in expectedData match the existing credential data
+			let allFieldsMatch = true;
+			for (const [key, value] of Object.entries(expectedData)) {
+				if (cred.data?.[key] !== value) {
+					this.logger.debug(`Field mismatch for credential ${cred.id}: ${key}`, {
+						expected: value,
+						actual: cred.data?.[key],
+					});
+					allFieldsMatch = false;
+					break;
+				}
+			}
+
+			if (allFieldsMatch) {
+				this.logger.debug(`Reusing existing credential ${cred.id}`);
+				return cred;
+			}
+
+			// Data doesn't match, delete the old credential and create a new one
+			this.logger.debug(`Deleting outdated credential ${cred.id} due to data mismatch`);
+			try {
+				await this.credentialsService.delete(user, cred.id);
+				this.logger.debug(`Successfully deleted outdated credential ${cred.id}`);
+			} catch (error) {
+				this.logger.warn(`Failed to delete outdated credential ${cred.id}: ${error}`);
+			}
+		}
+
+		// No matching credential found, create a new one
+		this.logger.debug(`Creating new credential with name "${credentialName}"`);
+		const newCred = await this.credentialsService.createManagedCredential(
 			{
 				type: 'instanceBinaryDataApi',
-				name: 'Temporary credential for ChatHub execution',
-				data: { ...storageConfig, storagePath },
+				name: credentialName,
+				data: expectedData,
 			},
 			user,
 		);
+		this.logger.debug(`Created new credential ${newCred.id}`);
+
+		return newCred;
 	}
 
 	private async insertEmbeddings(
@@ -267,7 +330,7 @@ export class ChatHubAgentService {
 			return;
 		}
 
-		const cred = await this.createVectorStoreCredential(user);
+		const cred = await this.ensureVectorStoreCredential(user);
 
 		const { workflowData, executionData } = await this.chatAgentRepository.manager.transaction(
 			async (trx) => {
@@ -296,19 +359,9 @@ export class ChatHubAgentService {
 			'chat', // TODO: check which one to use
 		);
 
-		try {
-			await this.chatHubExecutionService.waitForExecutionCompletion(execution.executionId);
-			await this.chatHubExecutionService.ensureWasSuccessfulOrThrow(execution.executionId);
-		} finally {
-			//await this.chatHubWorkflowService.deleteWorkflow(workflowData.id);
-
-			// Delete temporary vector store credential
-			try {
-				await this.credentialsService.delete(user, cred.id);
-			} catch (error) {
-				this.logger.warn(`Failed to delete temporary vector store credential ${cred.id}: ${error}`);
-			}
-		}
+		await this.chatHubExecutionService.waitForExecutionCompletion(execution.executionId);
+		await this.chatHubExecutionService.ensureWasSuccessfulOrThrow(execution.executionId);
+		//await this.chatHubWorkflowService.deleteWorkflow(workflowData.id);
 	}
 
 	private async deleteEmbeddings(user: User, agentId: string): Promise<void> {

@@ -217,7 +217,16 @@ const validateExistingCredentials = async () => {
 		const appCredentialTypes = new Set(
 			appEntries.value.map((entry) => entry.credentialType?.name).filter(Boolean),
 		);
-		const credentialsToValidate = credentials.filter((c) => appCredentialTypes.has(c.type));
+
+		// Deduplicate by credential type to avoid race conditions when multiple
+		// credentials of the same type run validation in parallel and overwrite
+		// each other's results in invalidCredentials (keyed by type name).
+		const seenTypes = new Set<string>();
+		const credentialsToValidate = credentials.filter((c) => {
+			if (!appCredentialTypes.has(c.type) || seenTypes.has(c.type)) return false;
+			seenTypes.add(c.type);
+			return true;
+		});
 
 		if (credentialsToValidate.length === 0) {
 			return;

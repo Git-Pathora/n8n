@@ -7,6 +7,7 @@ import { useNodeTypesStore } from '@/app/stores/nodeTypes.store';
 import { removePreviewToken } from '@/features/shared/nodeCreator/nodeCreator.utils';
 import type { AppInfo } from '../composables/useAppCredentials';
 import type { SimplifiedNodeType } from '@/Interface';
+import type { Icon, ThemeIconColor } from 'n8n-workflow';
 
 type CardState = 'default' | 'loading' | 'connected' | 'error';
 
@@ -31,7 +32,7 @@ const i18n = useI18n();
 const isInstalled = computed(() => props.installed);
 
 const installBadgeTooltip = computed(() => {
-	if (!props.isOwner) {
+	if (props.isOwner) {
 		return i18n.baseText('credentialsAppSelection.installToConnect');
 	}
 
@@ -70,20 +71,18 @@ const nodeTypeForIcon = computed((): SimplifiedNodeType | null => {
 	}
 
 	if (app.iconUrl || app.icon) {
-		return {
+		const fallback: SimplifiedNodeType = {
 			name: app.name,
 			displayName: app.displayName,
 			iconUrl: app.iconUrl,
-			icon: app.icon,
-			iconColor: app.iconColor,
+			icon: app.icon as Icon | undefined,
+			iconColor: app.iconColor as ThemeIconColor | undefined,
 			group: [],
-			inputs: [],
 			outputs: [],
-			properties: [],
-			version: 1,
 			defaults: { name: app.displayName },
 			description: '',
-		} as SimplifiedNodeType;
+		};
+		return fallback;
 	}
 
 	return null;

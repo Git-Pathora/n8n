@@ -13,6 +13,7 @@ import OfficialIcon from 'virtual:icons/mdi/verified';
 import ShieldIcon from 'virtual:icons/fa-solid/shield-alt';
 import type { AppEntry } from '../composables/useAppCredentials';
 import type { SimplifiedNodeType } from '@/Interface';
+import type { Icon, ThemeIconColor } from 'n8n-workflow';
 
 const APP_INSTALL_MODAL_KEY = 'appInstallModal';
 
@@ -115,21 +116,18 @@ const nodeTypeForIcon = computed((): SimplifiedNodeType | null => {
 	// Fallback: create a minimal node type from app info for icon rendering
 	// This handles cases where the communityNodeType lookup fails but we have icon data
 	if (app.iconUrl || app.icon) {
-		return {
+		const fallback: SimplifiedNodeType = {
 			name: app.name,
 			displayName: app.displayName,
 			iconUrl: app.iconUrl,
-			icon: app.icon,
-			iconColor: app.iconColor,
-			// Minimal required fields for SimplifiedNodeType
+			icon: app.icon as Icon | undefined,
+			iconColor: app.iconColor as ThemeIconColor | undefined,
 			group: [],
-			inputs: [],
 			outputs: [],
-			properties: [],
-			version: 1,
 			defaults: { name: app.displayName },
 			description: '',
-		} as SimplifiedNodeType;
+		};
+		return fallback;
 	}
 
 	return null;

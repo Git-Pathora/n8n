@@ -15,7 +15,7 @@ import CanvasRunWorkflowButton from '@/features/workflows/canvas/components/elem
 import { useLogsStore } from '@/app/stores/logs.store';
 import { isChatNode } from '@/app/utils/aiUtils';
 import { useToast } from '@/app/composables/useToast';
-import { N8nTooltip } from '@n8n/design-system';
+import { N8nTooltip, N8nIcon, N8nButton } from '@n8n/design-system';
 import { nextTick } from 'vue';
 import { useBuilderStore } from '@/features/ai/assistant/builder.store';
 import { SETUP_CREDENTIALS_MODAL_KEY } from '@/app/constants';
@@ -152,6 +152,18 @@ const executeButtonTooltip = computed(() =>
 		: '',
 );
 
+const showUnpinSection = computed(
+	() =>
+		builderStore.isCodeBuilder &&
+		builderStore.hasTodosHiddenByPinnedData &&
+		builderStore.hasHadSuccessfulExecution,
+);
+
+function onUnpinAll() {
+	builderStore.unpinAllNodes();
+	builderStore.trackWorkflowBuilderJourney('user_clicked_unpin_all');
+}
+
 async function onExecute() {
 	if (hasValidationIssues.value) {
 		return;
@@ -271,6 +283,12 @@ onBeforeUnmount(() => {
 						? i18n.baseText('aiAssistant.builder.executeMessage.noIssuesWithPinData')
 						: i18n.baseText('aiAssistant.builder.executeMessage.noIssues')
 				}}
+				<N8nTooltip v-if="builderStore.hasTodosHiddenByPinnedData" placement="top">
+					<template #content>
+						{{ i18n.baseText('aiAssistant.builder.executeMessage.unpinTooltip') }}
+					</template>
+					<N8nIcon icon="circle-help" size="small" :class="$style.infoIcon" />
+				</N8nTooltip>
 			</p>
 		</template>
 
@@ -297,6 +315,27 @@ onBeforeUnmount(() => {
 				@select-trigger-node="workflowsStore.setSelectedTriggerNodeName"
 			/>
 		</N8nTooltip>
+
+		<!-- Unpin All Section -->
+		<div v-if="showUnpinSection" :class="$style.unpinSection">
+			<N8nButton
+				:class="$style.unpinAllButton"
+				type="secondary"
+				size="small"
+				icon="pin"
+				:label="i18n.baseText('aiAssistant.builder.executeMessage.unpinAll')"
+				@click="onUnpinAll"
+			/>
+			<span :class="$style.unpinIndividuallyText">
+				{{ i18n.baseText('aiAssistant.builder.executeMessage.unpinIndividually') }}
+				<N8nTooltip placement="top">
+					<template #content>
+						{{ i18n.baseText('aiAssistant.builder.executeMessage.unpinTooltip') }}
+					</template>
+					<N8nIcon icon="circle-help" size="small" :class="$style.infoIcon" />
+				</N8nTooltip>
+			</span>
+		</div>
 	</div>
 </template>
 
@@ -352,5 +391,29 @@ onBeforeUnmount(() => {
 
 .runButton {
 	align-self: stretch;
+}
+
+.unpinSection {
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--spacing--3xs);
+}
+
+.unpinAllButton {
+	align-self: stretch;
+}
+
+.unpinIndividuallyText {
+	font-size: var(--font-size--2xs);
+	color: var(--color--text--tint-2);
+	display: inline-flex;
+	align-items: center;
+	gap: var(--spacing--4xs);
+}
+
+.infoIcon {
+	color: var(--color--text--tint-2);
+	cursor: help;
 }
 </style>

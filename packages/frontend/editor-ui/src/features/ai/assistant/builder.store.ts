@@ -50,6 +50,7 @@ export const ENABLED_VIEWS = BUILDER_ENABLED_VIEWS;
  */
 export type WorkflowBuilderJourneyEventType =
 	| 'user_clicked_todo'
+	| 'user_clicked_unpin_all'
 	| 'field_focus_placeholder_in_ndv'
 	| 'no_placeholder_values_left'
 	| 'revert_version_from_builder'
@@ -114,6 +115,9 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 		success: 0,
 		error: 0,
 	});
+
+	// Track whether a successful full execution has occurred in this session
+	const hasHadSuccessfulExecution = ref(false);
 
 	// Track whether AI Builder made edits since last save (resets after each save)
 	const aiBuilderMadeEdits = ref(false);
@@ -223,10 +227,14 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 		initialGeneration.value = false;
 		lastUserMessageId.value = undefined;
 		loadedSessionsForWorkflowId.value = undefined;
+		hasHadSuccessfulExecution.value = false;
 	}
 
 	function incrementManualExecutionStats(type: 'success' | 'error') {
 		manualExecStatsInBetweenMessages.value[type]++;
+		if (type === 'success') {
+			hasHadSuccessfulExecution.value = true;
+		}
 	}
 
 	function resetManualExecutionStats() {
@@ -739,6 +747,17 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 		}
 	}
 
+	function unpinAllNodes() {
+		const pinData = workflowsStore.workflow.pinData;
+		if (!pinData) return;
+		for (const nodeName of Object.keys(pinData)) {
+			const node = workflowsStore.getNodeByName(nodeName);
+			if (node) {
+				workflowsStore.unpinData({ node });
+			}
+		}
+	}
+
 	function clearExistingWorkflow() {
 		workflowState.removeAllConnections({ setStateDirty: false });
 		workflowState.removeAllNodes({ setStateDirty: false, removePinData: true });
@@ -935,9 +954,11 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 		hasMessages,
 		workflowTodos,
 		hasTodosHiddenByPinnedData,
+		hasHadSuccessfulExecution,
 		lastUserMessageId,
 
 		// Methods
+		unpinAllNodes,
 		abortStreaming,
 		resetBuilderChat,
 		sendChatMessage,

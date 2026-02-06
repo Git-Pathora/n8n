@@ -19,13 +19,17 @@ export class SessionManagerService {
 
 	private pendingHitlByThreadId = new Map<
 		string,
-		{ value: HITLInterruptValue; expiresAt: number }
+		{ value: HITLInterruptValue; triggeringMessageId?: string; expiresAt: number }
 	>();
 
 	/** Stores answered questions for session replay (not persisted in LangGraph checkpoint) */
 	private answeredQuestionsByThreadId = new Map<
 		string,
-		Array<{ questions: QuestionsInterruptValue; answers: unknown }>
+		Array<{
+			questions: QuestionsInterruptValue;
+			answers: unknown;
+			afterMessageId?: string;
+		}>
 	>();
 
 	constructor(
@@ -60,10 +64,11 @@ export class SessionManagerService {
 		return this.checkpointer;
 	}
 
-	setPendingHitl(threadId: string, value: HITLInterruptValue) {
+	setPendingHitl(threadId: string, value: HITLInterruptValue, triggeringMessageId?: string) {
 		this.evictExpiredHitl();
 		this.pendingHitlByThreadId.set(threadId, {
 			value,
+			triggeringMessageId,
 			expiresAt: Date.now() + SessionManagerService.HITL_TTL_MS,
 		});
 	}
@@ -76,12 +81,18 @@ export class SessionManagerService {
 	 * Atomically get and clear the pending HITL value for a thread.
 	 * Prevents TOCTOU races between separate get + clear calls.
 	 */
-	getAndClearPendingHitl(threadId: string): HITLInterruptValue | undefined {
-		const value = this.getPendingHitl(threadId);
-		if (value) {
+	getAndClearPendingHitl(
+		threadId: string,
+	): { value: HITLInterruptValue; triggeringMessageId?: string } | undefined {
+		this.evictExpiredHitl();
+		const entry = this.pendingHitlByThreadId.get(threadId);
+		if (!entry) return undefined;
+		if (Date.now() > entry.expiresAt) {
 			this.pendingHitlByThreadId.delete(threadId);
+			return undefined;
 		}
-		return value;
+		this.pendingHitlByThreadId.delete(threadId);
+		return { value: entry.value, triggeringMessageId: entry.triggeringMessageId };
 	}
 
 	getPendingHitl(threadId: string): HITLInterruptValue | undefined {
@@ -99,15 +110,20 @@ export class SessionManagerService {
 	 * Store answered questions for session replay.
 	 * Called when a questions interrupt is resumed with answers.
 	 */
-	addAnsweredQuestions(threadId: string, questions: QuestionsInterruptValue, answers: unknown) {
+	addAnsweredQuestions(
+		threadId: string,
+		questions: QuestionsInterruptValue,
+		answers: unknown,
+		afterMessageId?: string,
+	) {
 		const existing = this.answeredQuestionsByThreadId.get(threadId) ?? [];
-		existing.push({ questions, answers });
+		existing.push({ questions, answers, afterMessageId });
 		this.answeredQuestionsByThreadId.set(threadId, existing);
 	}
 
 	getAnsweredQuestions(
 		threadId: string,
-	): Array<{ questions: QuestionsInterruptValue; answers: unknown }> {
+	): Array<{ questions: QuestionsInterruptValue; answers: unknown; afterMessageId?: string }> {
 		return this.answeredQuestionsByThreadId.get(threadId) ?? [];
 	}
 
@@ -159,25 +175,33 @@ export class SessionManagerService {
 
 					// Inject answered questions that aren't in the checkpoint
 					// (Command.update messages don't persist across subgraph interrupts).
-					// Insert after the first user message to maintain chronological order:
-					// user request → questions → answers → plan → approve → response
+					// Each Q&A round is inserted after its triggering user message.
 					const answeredQuestions = this.getAnsweredQuestions(threadId);
-					if (answeredQuestions.length > 0) {
-						const firstUserIdx = formattedMessages.findIndex((m) => m.role === 'user');
-						const insertAt = firstUserIdx !== -1 ? firstUserIdx + 1 : 0;
-						const qaMessages: Array<Record<string, unknown>> = [];
-						for (const { questions, answers } of answeredQuestions) {
-							qaMessages.push({
+					// Insert in reverse order so splice indices stay valid
+					for (let i = answeredQuestions.length - 1; i >= 0; i--) {
+						const { questions, answers, afterMessageId } = answeredQuestions[i];
+						const qaMessages: Array<Record<string, unknown>> = [
+							{
 								role: 'assistant',
 								type: 'questions',
 								questions: questions.questions,
 								...(questions.introMessage ? { introMessage: questions.introMessage } : {}),
-							});
-							qaMessages.push({
+							},
+							{
 								role: 'user',
 								type: 'user_answers',
 								answers,
-							});
+							},
+						];
+						// Find the triggering message by ID; fall back to first user message
+						let insertAt = 0;
+						if (afterMessageId) {
+							const idx = formattedMessages.findIndex((m) => m.id === afterMessageId);
+							if (idx !== -1) insertAt = idx + 1;
+						}
+						if (insertAt === 0) {
+							const firstUserIdx = formattedMessages.findIndex((m) => m.role === 'user');
+							if (firstUserIdx !== -1) insertAt = firstUserIdx + 1;
 						}
 						formattedMessages.splice(insertAt, 0, ...qaMessages);
 					}

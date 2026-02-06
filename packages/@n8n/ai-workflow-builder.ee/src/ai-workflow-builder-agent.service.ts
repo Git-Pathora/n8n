@@ -243,21 +243,27 @@ export class AiWorkflowBuilderService {
 
 		const threadId = SessionManagerService.generateThreadId(workflowId, userId);
 
-		const resumeInterrupt = payload.resumeData
+		const pendingHitl = payload.resumeData
 			? this.sessionManager.getAndClearPendingHitl(threadId)
 			: undefined;
 
 		// Store answered questions for session replay (checkpoint doesn't preserve these)
-		if (resumeInterrupt?.type === 'questions' && payload.resumeData) {
-			this.sessionManager.addAnsweredQuestions(threadId, resumeInterrupt, payload.resumeData);
+		if (pendingHitl?.value.type === 'questions' && payload.resumeData) {
+			this.sessionManager.addAnsweredQuestions(
+				threadId,
+				pendingHitl.value,
+				payload.resumeData,
+				pendingHitl.triggeringMessageId,
+			);
 		}
 
+		const resumeInterrupt = pendingHitl?.value;
 		const agentPayload = resumeInterrupt ? { ...payload, resumeInterrupt } : payload;
 
 		for await (const output of agent.chat(agentPayload, userId, abortSignal)) {
-			const pendingHitl = this.extractHitlFromStreamOutput(output);
-			if (pendingHitl) {
-				this.sessionManager.setPendingHitl(threadId, pendingHitl);
+			const streamHitl = this.extractHitlFromStreamOutput(output);
+			if (streamHitl) {
+				this.sessionManager.setPendingHitl(threadId, streamHitl, payload.id);
 			}
 
 			yield output;

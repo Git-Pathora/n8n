@@ -37,10 +37,10 @@ export const useWorkflowSetupState = (nodes?: Ref<INodeUi[]>) => {
 
 	/**
 	 * Get all credential types that a node requires.
-	 * Combines credentials from:
-	 * 1. Node type definition (via getNodeTypeDisplayableCredentials)
-	 * 2. Node issues (for dynamically-selected credentials like HTTP Request auth)
-	 * 3. Currently assigned credentials on the node
+	 * Sources:
+	 * 1. Node type definition — standard credentials with displayOptions
+	 * 2. Node issues — dynamic credentials (e.g. in HTTP Request node) that are missing or invalid
+	 * 3. Assigned credentials — dynamic credentials already properly set
 	 */
 	const getNodeCredentialTypes = (node: INodeUi): string[] => {
 		const credentialTypes = new Set<string>();

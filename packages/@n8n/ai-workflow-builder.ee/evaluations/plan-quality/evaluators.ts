@@ -53,6 +53,8 @@ export interface MetricsInput {
 	messages: BaseMessage[];
 	expectedTriggerKeywords: string[];
 	expectedStepKeywords: string[];
+	nodesFound: Array<{ nodeName: string }>;
+	bestPractices: string | undefined;
 }
 
 export interface ComputedMetrics {
@@ -71,7 +73,7 @@ export interface ComputedMetrics {
 	notes_count: number;
 	suggested_nodes_count: number;
 	best_practices_fetched: number;
-	node_searches_count: number;
+	nodes_found_count: number;
 }
 
 /**
@@ -95,8 +97,9 @@ export function computeMetrics(input: MetricsInput): ComputedMetrics {
 		summary_length: plan?.summary.length ?? 0,
 		notes_count: (plan?.additionalSpecs ?? []).length,
 		suggested_nodes_count: computeSuggestedNodesCount(plan),
-		best_practices_fetched: countToolCalls(messages, 'get_documentation'),
-		node_searches_count: countToolCalls(messages, 'search_nodes'),
+		best_practices_fetched:
+			countToolCalls(messages, 'get_documentation') || (input.bestPractices ? 1 : 0),
+		nodes_found_count: input.nodesFound.length,
 	};
 }
 

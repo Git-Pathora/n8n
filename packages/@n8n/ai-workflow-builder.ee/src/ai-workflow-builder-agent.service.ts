@@ -348,6 +348,7 @@ export class AiWorkflowBuilderService {
 				duration_ms: metrics.durationMs,
 				input_tokens: metrics.inputTokens,
 				output_tokens: metrics.outputTokens,
+				thinking_tokens: metrics.thinkingTokens,
 			}),
 		};
 

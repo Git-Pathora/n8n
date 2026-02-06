@@ -679,7 +679,7 @@ describe('AiWorkflowBuilderService', () => {
 			);
 		});
 
-		it('should include duration_ms, input_tokens, output_tokens in telemetry when metrics available', async () => {
+		it('should include duration_ms, input_tokens, output_tokens, thinking_tokens in telemetry when metrics available', async () => {
 			// Override the mock to also return getLastChatMetrics and getState
 			MockedWorkflowBuilderAgent.mockImplementation((agentConfig) => {
 				const mockAgent = mock<WorkflowBuilderAgent>();
@@ -693,6 +693,7 @@ describe('AiWorkflowBuilderService', () => {
 					durationMs: 1500,
 					inputTokens: 1000,
 					outputTokens: 200,
+					thinkingTokens: 300,
 				});
 				(mockAgent.getState as jest.Mock).mockResolvedValue({
 					values: {
@@ -722,6 +723,7 @@ describe('AiWorkflowBuilderService', () => {
 					duration_ms: 1500,
 					input_tokens: 1000,
 					output_tokens: 200,
+					thinking_tokens: 300,
 				}),
 			);
 		});

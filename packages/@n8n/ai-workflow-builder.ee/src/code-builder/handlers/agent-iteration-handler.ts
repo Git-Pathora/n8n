@@ -17,7 +17,7 @@ import { extractTextContent, extractThinkingContent } from '../utils/content-ext
 
 /** Type guard for response metadata with usage info */
 interface ResponseMetadataWithUsage {
-	usage: { input_tokens?: number; output_tokens?: number };
+	usage: { input_tokens?: number; output_tokens?: number; thinking_tokens?: number };
 }
 
 function hasUsageMetadata(metadata: unknown): metadata is ResponseMetadataWithUsage {
@@ -179,10 +179,13 @@ export class AgentIterationHandler {
 		const outputTokens = hasUsageMetadata(responseMetadata)
 			? (responseMetadata.usage.output_tokens ?? 0)
 			: 0;
+		const thinkingTokens = hasUsageMetadata(responseMetadata)
+			? (responseMetadata.usage.thinking_tokens ?? 0)
+			: 0;
 
 		// Report token usage via callback (fire and forget)
 		if (this.onTokenUsage && (inputTokens > 0 || outputTokens > 0)) {
-			this.onTokenUsage({ inputTokens, outputTokens });
+			this.onTokenUsage({ inputTokens, outputTokens, thinkingTokens });
 		}
 
 		this.debugLog('ITERATION', 'LLM response received', {

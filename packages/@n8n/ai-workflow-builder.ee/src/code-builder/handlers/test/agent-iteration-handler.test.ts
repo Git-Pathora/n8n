@@ -56,6 +56,7 @@ describe('AgentIterationHandler', () => {
 				expect(onTokenUsage).toHaveBeenCalledWith({
 					inputTokens: 100,
 					outputTokens: 50,
+					thinkingTokens: 0,
 				});
 			});
 

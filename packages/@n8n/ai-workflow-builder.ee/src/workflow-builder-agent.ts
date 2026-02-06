@@ -94,6 +94,7 @@ export interface ChatMetrics {
 	durationMs: number;
 	inputTokens: number;
 	outputTokens: number;
+	thinkingTokens: number;
 }
 
 export interface ChatPayload {
@@ -199,6 +200,7 @@ export class WorkflowBuilderAgent {
 
 			let accumulatedInputTokens = 0;
 			let accumulatedOutputTokens = 0;
+			let accumulatedThinkingTokens = 0;
 
 			// Use CodeWorkflowBuilder (unified code builder agent)
 			const codeWorkflowBuilder = new CodeWorkflowBuilder({
@@ -217,6 +219,7 @@ export class WorkflowBuilderAgent {
 				onTokenUsage: (usage) => {
 					accumulatedInputTokens += usage.inputTokens;
 					accumulatedOutputTokens += usage.outputTokens;
+					accumulatedThinkingTokens += usage.thinkingTokens;
 				},
 			});
 
@@ -226,6 +229,7 @@ export class WorkflowBuilderAgent {
 				durationMs: Date.now() - startTime,
 				inputTokens: accumulatedInputTokens,
 				outputTokens: accumulatedOutputTokens,
+				thinkingTokens: accumulatedThinkingTokens,
 			};
 			return;
 		}
@@ -254,6 +258,7 @@ export class WorkflowBuilderAgent {
 			durationMs: Date.now() - startTime,
 			inputTokens: tokenUsage.inputTokens,
 			outputTokens: tokenUsage.outputTokens,
+			thinkingTokens: 0,
 		};
 	}
 

@@ -2,7 +2,6 @@ import type { QuickConnectOption } from '@n8n/api-types';
 import { computed } from 'vue';
 
 import { useSettingsStore } from '@/app/stores/settings.store';
-import { useCredentialsStore } from '../credentials.store';
 
 /**
  * Composable for quick connect detection.
@@ -10,7 +9,6 @@ import { useCredentialsStore } from '../credentials.store';
  */
 export function useQuickConnect() {
 	const settingsStore = useSettingsStore();
-	const credentialsStore = useCredentialsStore();
 
 	const quickConnectOptions = computed<QuickConnectOption[]>(
 		() => settingsStore.moduleSettings['quick-connect']?.options ?? [],
@@ -41,26 +39,9 @@ export function useQuickConnect() {
 		);
 	}
 
-	/**
-	 * Get the sign-in button text for a credential type.
-	 */
-	function getSignInButtonText(credentialTypeName: string, nodeType?: string): string {
-		const option = getQuickConnectOption(credentialTypeName, nodeType);
-		if (option?.text) {
-			return option.text;
-		}
-
-		const credentialType = credentialsStore.getCredentialTypeByName(credentialTypeName);
-		const displayName = credentialType?.displayName ?? credentialTypeName;
-		const cleanName = displayName.replace(/\s*(OAuth2?|API|Credentials?)\s*/gi, '').trim();
-
-		return `Sign in with ${cleanName}`;
-	}
-
 	return {
 		quickConnectOptions,
 		hasQuickConnect,
 		getQuickConnectOption,
-		getSignInButtonText,
 	};
 }

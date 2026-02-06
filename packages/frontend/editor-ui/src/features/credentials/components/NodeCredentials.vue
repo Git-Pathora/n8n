@@ -26,7 +26,7 @@ import { useCredentialsStore } from '../credentials.store';
 import { useQuickConnect } from '../composables/useQuickConnect';
 import { useCredentialOAuth } from '../composables/useCredentialOAuth';
 import { usePostHog } from '@/app/stores/posthog.store';
-import QuickConnectSignInButton from './QuickConnectSignInButton.vue';
+import QuickConnectButton from './QuickConnectButton.vue';
 import { useNDVStore } from '@/features/ndv/shared/ndv.store';
 import { useNodeTypesStore } from '@/app/stores/nodeTypes.store';
 import { useUIStore } from '@/app/stores/ui.store';
@@ -45,6 +45,7 @@ import { useEnvFeatureFlag } from '@/features/shared/envFeatureFlag/useEnvFeatur
 
 import {
 	N8nBadge,
+	N8nButton,
 	N8nIcon,
 	N8nInput,
 	N8nInputLabel,
@@ -95,8 +96,9 @@ const { check: checkEnvFeatureFlag } = useEnvFeatureFlag();
 const isQuickConnectEnabled = computed(() =>
 	posthogStore.isVariantEnabled(QUICK_CONNECT_EXPERIMENT.name, 'variant'),
 );
-const { hasQuickConnect, getSignInButtonText } = useQuickConnect();
-const { isOAuthCredentialType, authorizeOAuth } = useCredentialOAuth();
+const { hasQuickConnect } = useQuickConnect();
+const { isOAuthCredentialType, isGoogleOAuthType, hasManagedOAuthCredentials, authorize } =
+	useCredentialOAuth();
 
 const canCreateCredentials = computed(
 	() =>
@@ -498,7 +500,11 @@ function getCredentialsFieldLabel(credentialType: INodeCredentialDescription): s
 			interpolate: { credentialType: credentialTypeName },
 		});
 	}
-	return i18n.baseText('nodeCredentials.credentialsLabel');
+	return i18n.baseText(
+		isQuickConnectEnabled.value
+			? 'nodeCredentials.credentialsLabelShort'
+			: 'nodeCredentials.credentialsLabel',
+	);
 }
 
 function setFilter(newFilter = '') {
@@ -522,14 +528,14 @@ function hasCredentialsForType(type: INodeCredentialDescription): boolean {
 
 function showQuickConnectEmptyState(type: INodeCredentialDescription): boolean {
 	if (hasCredentialsForType(type)) return false;
-	// Quick connect takes priority, OAuth as fallback
-	return hasQuickConnect(type.name, props.node.type) || isOAuthCredentialType(type.name);
+	// Quick connect: explicit config OR managed OAuth credentials
+	return hasQuickConnect(type.name, props.node.type) || hasManagedOAuthCredentials(type.name);
 }
 
 function showStandardEmptyState(type: INodeCredentialDescription): boolean {
 	if (hasCredentialsForType(type)) return false;
-	// Standard empty state when no quick connect AND not OAuth
-	return !hasQuickConnect(type.name, props.node.type) && !isOAuthCredentialType(type.name);
+	// Standard empty state when no quick connect AND not managed OAuth
+	return !hasQuickConnect(type.name, props.node.type) && !hasManagedOAuthCredentials(type.name);
 }
 
 async function onQuickConnectSignIn(credentialTypeName: string) {
@@ -546,12 +552,18 @@ async function onQuickConnectSignIn(credentialTypeName: string) {
 
 	let credential: ICredentialsResponse;
 	try {
-		credential = await credentialsStore.createNewCredential({
-			id: '',
-			name: credentialType.displayName,
-			type: credentialTypeName,
-			data: {},
-		});
+		// Create credential on backend but don't add to store yet (wait for OAuth success)
+		credential = await credentialsStore.createNewCredential(
+			{
+				id: '',
+				name: credentialType.displayName,
+				type: credentialTypeName,
+				data: {},
+			},
+			undefined,
+			undefined,
+			{ skipStoreUpdate: true },
+		);
 	} catch (error) {
 		toast.showError(error, i18n.baseText('nodeCredentials.showMessage.title'));
 		return;
@@ -559,15 +571,25 @@ async function onQuickConnectSignIn(credentialTypeName: string) {
 
 	subscribedToCredentialType.value = credentialTypeName;
 
-	await authorizeOAuth(credential, {
-		onSuccess: () => {
-			onCredentialSelected(credentialTypeName, credential.id);
-			toast.showMessage({
-				title: i18n.baseText('credentialEdit.credentialEdit.showMessage.title'),
-				type: 'success',
-			});
-		},
+	const success = await authorize(credential);
+
+	// Track telemetry
+	telemetry.track('User saved credentials', {
+		credential_type: credentialTypeName,
+		workflow_id: workflowsStore.workflowId ?? null,
+		credential_id: credential.id,
+		is_complete: true,
+		is_new: true,
+		is_valid: success,
+		uses_external_secrets: false,
+		node_type: props.node.type,
 	});
+
+	if (success) {
+		// Only add credential to store after OAuth succeeds
+		credentialsStore.upsertCredential(credential);
+		onCredentialSelected(credentialTypeName, credential.id);
+	}
 }
 </script>
 
@@ -595,21 +617,31 @@ async function onQuickConnectSignIn(credentialTypeName: string) {
 				<template v-else-if="isQuickConnectEnabled">
 					<div
 						v-if="showQuickConnectEmptyState(type)"
-						:class="$style.quickConnectContainer"
+						:class="[
+							$style.quickConnectContainer,
+							{ [$style.noMarginTop]: isGoogleOAuthType(type.name) },
+						]"
 						data-test-id="quick-connect-empty-state"
 					>
-						<QuickConnectSignInButton
+						<QuickConnectButton
 							:credential-type-name="type.name"
-							:button-text="getSignInButtonText(type.name, node.type)"
 							@click="onQuickConnectSignIn(type.name)"
 						/>
-						<N8nLink
-							:class="$style.setupManuallyLink"
-							data-test-id="setup-manually-link"
-							@click="createNewCredential(type.name, true, showMixedCredentials(type))"
-						>
-							{{ i18n.baseText('nodeCredentials.quickConnect.orSetupManually') }}
-						</N8nLink>
+						<span :class="$style.setupManuallyContainer">
+							<N8nText size="small" :class="$style.setupManuallyOr">
+								{{ i18n.baseText('nodeCredentials.quickConnect.or') }}
+							</N8nText>
+							<N8nLink
+								:class="$style.setupManuallyLink"
+								theme="secondary"
+								underline
+								size="small"
+								data-test-id="setup-manually-link"
+								@click="createNewCredential(type.name, true, showMixedCredentials(type))"
+							>
+								{{ i18n.baseText('nodeCredentials.quickConnect.setupManually') }}
+							</N8nLink>
+						</span>
 					</div>
 
 					<div
@@ -623,14 +655,15 @@ async function onQuickConnectSignIn(credentialTypeName: string) {
 							disabled
 							:placeholder="i18n.baseText('nodeCredentials.emptyState.noCredentials')"
 						/>
-						<N8nLink
+						<N8nButton
 							v-if="canCreateCredentials"
-							:class="$style.setupCredentialLink"
-							data-test-id="setup-credential-link"
+							type="highlightFill"
+							size="medium"
+							data-test-id="setup-credential-button"
 							@click="createNewCredential(type.name, true, showMixedCredentials(type))"
 						>
 							{{ i18n.baseText('nodeCredentials.emptyState.setupCredential') }}
-						</N8nLink>
+						</N8nButton>
 					</div>
 
 					<div
@@ -899,15 +932,6 @@ async function onQuickConnectSignIn(credentialTypeName: string) {
 	font-size: var(--font-size--sm);
 }
 
-.edit {
-	display: flex;
-	justify-content: center;
-	align-items: center;
-	color: var(--color--text);
-	margin-left: var(--spacing--3xs);
-	font-size: var(--font-size--sm);
-}
-
 .input {
 	display: flex;
 	align-items: center;
@@ -994,19 +1018,43 @@ async function onQuickConnectSignIn(credentialTypeName: string) {
 
 .quickConnectContainer {
 	display: flex;
-	flex-direction: column;
-	align-items: flex-start;
+	flex-direction: row;
+	align-items: center;
 	gap: var(--spacing--2xs);
+	margin-top: var(--spacing--4xs);
+
+	&.noMarginTop {
+		margin-top: 0;
+	}
+}
+
+.setupManuallyContainer {
+	display: inline-flex;
+	align-items: baseline;
+	gap: var(--spacing--4xs);
+}
+
+.setupManuallyOr {
+	color: var(--color--text);
 }
 
 .setupManuallyLink {
-	font-size: var(--font-size--2xs);
+	--link--color--secondary: var(--color--text);
+
+	&:hover,
+	&:focus,
+	&:active {
+		:global(span) {
+			color: var(--color--text--shade-1);
+		}
+	}
 }
 
 .standardEmptyContainer {
 	display: flex;
 	align-items: center;
-	gap: var(--spacing--2xs);
+	gap: var(--spacing--xs);
+	margin-top: var(--spacing--4xs);
 }
 
 .emptySelect {
@@ -1016,5 +1064,18 @@ async function onQuickConnectSignIn(credentialTypeName: string) {
 .setupCredentialLink {
 	font-size: var(--font-size--xs);
 	white-space: nowrap;
+}
+
+.edit {
+	display: flex;
+	justify-content: center;
+	align-items: center;
+	color: var(--color--text);
+	margin-left: var(--spacing--xs);
+
+	&:hover,
+	&:focus {
+		color: var(--color--primary);
+	}
 }
 </style>

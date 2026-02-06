@@ -1,7 +1,7 @@
-import type { ICredentialsResponse } from '../credentials.types';
-import { useCredentialsStore } from '../credentials.store';
 import { useToast } from '@/app/composables/useToast';
 import { useI18n } from '@n8n/i18n';
+import { useCredentialsStore } from '../credentials.store';
+import type { ICredentialsResponse } from '../credentials.types';
 
 /**
  * Composable for OAuth credential type detection and authorization.
@@ -49,12 +49,39 @@ export function useCredentialOAuth() {
 	}
 
 	/**
-	 * Authorize OAuth credentials by opening a popup and listening for callback.
+	 * Check if an OAuth credential type has all required fields managed/overwritten.
+	 * This indicates the credential can be used with quick connect (just OAuth flow, no manual config).
+	 * Reuses logic patterns from CredentialEdit.vue (credentialProperties + requiredPropertiesFilled).
 	 */
-	async function authorizeOAuth(
-		credential: ICredentialsResponse,
-		options?: { onSuccess?: () => void },
-	): Promise<void> {
+	function hasManagedOAuthCredentials(credentialTypeName: string): boolean {
+		if (!isOAuthCredentialType(credentialTypeName)) {
+			return false;
+		}
+
+		const credentialType = credentialsStore.getCredentialTypeByName(credentialTypeName);
+		if (!credentialType) {
+			return false;
+		}
+
+		const overwrittenProperties = credentialType.__overwrittenProperties ?? [];
+		if (overwrittenProperties.length === 0) {
+			return false;
+		}
+
+		// Get required properties that would need user input (excluding notice and already overwritten)
+		const requiredProperties = credentialType.properties.filter(
+			(prop) => prop.required === true && prop.type !== 'notice',
+		);
+
+		// All required properties must be overwritten for managed credentials
+		return requiredProperties.every((prop) => overwrittenProperties.includes(prop.name));
+	}
+
+	/**
+	 * Authorize OAuth credentials by opening a popup and listening for callback.
+	 * Returns true if OAuth was successful, false if cancelled or failed.
+	 */
+	async function authorize(credential: ICredentialsResponse): Promise<boolean> {
 		const credentialTypeName = credential.type;
 		const types = getParentTypes(credentialTypeName);
 
@@ -70,7 +97,7 @@ export function useCredentialOAuth() {
 				error,
 				i18n.baseText('credentialEdit.credentialEdit.showError.generateAuthorizationUrl.title'),
 			);
-			return;
+			return false;
 		}
 
 		if (!url) {
@@ -78,7 +105,7 @@ export function useCredentialOAuth() {
 				new Error(i18n.baseText('credentialEdit.credentialEdit.showError.invalidOAuthUrl.message')),
 				i18n.baseText('credentialEdit.credentialEdit.showError.invalidOAuthUrl.title'),
 			);
-			return;
+			return false;
 		}
 
 		try {
@@ -91,29 +118,45 @@ export function useCredentialOAuth() {
 				new Error(i18n.baseText('credentialEdit.credentialEdit.showError.invalidOAuthUrl.message')),
 				i18n.baseText('credentialEdit.credentialEdit.showError.invalidOAuthUrl.title'),
 			);
-			return;
+			return false;
 		}
 
 		const params =
 			'scrollbars=no,resizable=yes,status=no,titlebar=no,location=no,toolbar=no,menubar=no,width=500,height=700';
 		const oauthPopup = window.open(url, 'OAuth Authorization', params);
 
-		const oauthChannel = new BroadcastChannel('oauth-callback');
-		const receiveMessage = (event: MessageEvent) => {
-			if (event.data === 'success') {
-				oauthChannel.removeEventListener('message', receiveMessage);
+		return await new Promise((resolve) => {
+			const oauthChannel = new BroadcastChannel('oauth-callback');
+
+			oauthChannel.addEventListener('message', (event: MessageEvent) => {
+				const success = event.data === 'success';
+
 				oauthChannel.close();
 				oauthPopup?.close();
-				options?.onSuccess?.();
-			}
-		};
-		oauthChannel.addEventListener('message', receiveMessage);
+				if (success) {
+					toast.showMessage({
+						title: i18n.baseText('credentialEdit.credentialEdit.showMessage.accountConnected'),
+						type: 'success',
+					});
+					resolve(true);
+				} else if (event.data === 'error') {
+					toast.showMessage({
+						title: i18n.baseText(
+							'credentialEdit.credentialEdit.showMessage.accountConnectionFailed',
+						),
+						type: 'error',
+					});
+					resolve(false);
+				}
+			});
+		});
 	}
 
 	return {
 		getParentTypes,
 		isOAuthCredentialType,
 		isGoogleOAuthType,
-		authorizeOAuth,
+		hasManagedOAuthCredentials,
+		authorize,
 	};
 }

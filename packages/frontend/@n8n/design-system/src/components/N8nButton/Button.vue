@@ -47,6 +47,7 @@ const classes = computed(() => {
 		`${props.loading ? ` ${$style.loading}` : ''}` +
 		`${props.float ? ` ${$style[`float-${props.float}`]}` : ''}` +
 		`${props.text ? ` ${$style.text}` : ''}` +
+		`${props.theme ? ` ${$style[`theme-${props.theme}`]}` : ''}` +
 		`${props.disabled ? ` ${$style.disabled}` : ''}` +
 		`${props.block ? ` ${$style.block}` : ''}` +
 		`${props.active ? ` ${$style.active}` : ''}` +
@@ -340,6 +341,14 @@ $loading-overlay-background-color: rgba(255, 255, 255, 0);
 .transparent {
 	--button--color--background: transparent;
 	--button--color--background--active: transparent;
+}
+
+.theme-light {
+	color-scheme: light;
+}
+
+.theme-dark {
+	color-scheme: dark;
 }
 
 .withIcon {

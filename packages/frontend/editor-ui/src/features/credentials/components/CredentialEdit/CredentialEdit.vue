@@ -48,7 +48,7 @@ import {
 	getNodeCredentialForSelectedAuthType,
 	updateNodeAuthType,
 } from '@/app/utils/nodeTypesUtils';
-import { isCredentialModalState, isValidCredentialResponse } from '@/app/utils/typeGuards';
+import { isCredentialModalState } from '@/app/utils/typeGuards';
 import { useI18n } from '@n8n/i18n';
 import { useElementSize } from '@vueuse/core';
 import { useRouter } from 'vue-router';
@@ -66,6 +66,7 @@ import { injectWorkflowState } from '@/app/composables/useWorkflowState';
 import { setParameterValue } from '@/app/utils/parameterUtils';
 import get from 'lodash/get';
 import { useEnvFeatureFlag } from '@/features/shared/envFeatureFlag/useEnvFeatureFlag';
+import { useCredentialOAuth } from '../../composables/useCredentialOAuth';
 
 type Props = {
 	modalName: string;
@@ -93,6 +94,7 @@ const telemetry = useTelemetry();
 const router = useRouter();
 const rootStore = useRootStore();
 const { check: checkEnvFeatureFlag } = useEnvFeatureFlag();
+const { authorize } = useCredentialOAuth();
 
 const activeTab = ref('connection');
 const authError = ref('');
@@ -1024,113 +1026,54 @@ async function deleteCredential() {
 }
 
 async function oAuthCredentialAuthorize() {
-	let url;
-
 	const credential = await saveCredential();
 	if (!credential) {
 		return;
 	}
 
-	const types = parentTypes.value;
+	// We exclude sharedWithProjects because it's not needed for the authorization and it causes the request to be too large
+	const { sharedWithProjects: _, ...sanitizedCredData } = credentialData.value;
+	const credData = {
+		id: credential.id,
+		type: credential.type,
+		...sanitizedCredData,
+	} as ICredentialsResponse;
 
-	try {
-		// We exclude sharedWithProjects because it's not needed for the authorization and it causes the request to be too large
-		const { sharedWithProjects, ...sanitizedCredData } = credentialData.value;
-		const credData = { id: credential.id, ...sanitizedCredData };
-
-		if (credentialTypeName.value === 'oAuth2Api' || types.includes('oAuth2Api')) {
-			if (isValidCredentialResponse(credData)) {
-				url = await credentialsStore.oAuth2Authorize(credData);
-			}
-		} else if (credentialTypeName.value === 'oAuth1Api' || types.includes('oAuth1Api')) {
-			if (isValidCredentialResponse(credData)) {
-				url = await credentialsStore.oAuth1Authorize(credData);
-			}
-		}
-	} catch (error) {
-		toast.showError(
-			error,
-			i18n.baseText('credentialEdit.credentialEdit.showError.generateAuthorizationUrl.title'),
-			i18n.baseText('credentialEdit.credentialEdit.showError.generateAuthorizationUrl.message'),
-		);
-
-		return;
-	}
-
-	if (url === undefined || url === '') {
-		toast.showError(
-			new Error(i18n.baseText('credentialEdit.credentialEdit.showError.invalidOAuthUrl.message')),
-			i18n.baseText('credentialEdit.credentialEdit.showError.invalidOAuthUrl.title'),
-		);
-		return;
-	}
-
-	// Prevent javascript:, data:, vbscript: and other non-http(s) protocols (XSS)
-	const allowedOAuthUrlProtocols = ['http:', 'https:'];
-	try {
-		const parsedUrl = new URL(url);
-		if (!allowedOAuthUrlProtocols.includes(parsedUrl.protocol)) {
-			toast.showError(
-				new Error(i18n.baseText('credentialEdit.credentialEdit.showError.invalidOAuthUrl.message')),
-				i18n.baseText('credentialEdit.credentialEdit.showError.invalidOAuthUrl.title'),
-			);
-			return;
-		}
-	} catch {
-		toast.showError(
-			new Error(i18n.baseText('credentialEdit.credentialEdit.showError.invalidOAuthUrl.message')),
-			i18n.baseText('credentialEdit.credentialEdit.showError.invalidOAuthUrl.title'),
-		);
-		return;
-	}
-
-	const params =
-		'scrollbars=no,resizable=yes,status=no,titlebar=noe,location=no,toolbar=no,menubar=no,width=500,height=700';
-	const oauthPopup = window.open(url, 'OAuth Authorization', params);
-
+	// Clear token data before auth
 	credentialData.value = {
 		...credentialData.value,
 		oauthTokenData: null as unknown as CredentialInformation,
 	};
 
-	const oauthChannel = new BroadcastChannel('oauth-callback');
-	const receiveMessage = (event: MessageEvent) => {
-		const successfullyConnected = event.data === 'success';
+	const success = await authorize(credData);
 
-		const trackProperties: ITelemetryTrackProperties = {
-			credential_type: credentialTypeName.value,
-			workflow_id: workflowsStore.workflowId || null,
-			credential_id: credentialId.value,
-			is_complete: !!requiredPropertiesFilled.value,
-			is_new: props.mode === 'new' && !credentialId.value,
-			is_valid: successfullyConnected,
-			uses_external_secrets: usesExternalSecrets(credentialData.value),
-		};
-
-		if (ndvStore.activeNode) {
-			trackProperties.node_type = ndvStore.activeNode.type;
-		}
-
-		telemetry.track('User saved credentials', trackProperties);
-		void handleDynamicNotification(successfullyConnected);
-
-		if (successfullyConnected) {
-			oauthChannel.removeEventListener('message', receiveMessage);
-
-			// Set some kind of data that status changes.
-			// As data does not get displayed directly it does not matter what data.
-			credentialData.value = {
-				...credentialData.value,
-				oauthTokenData: {} as CredentialInformation,
-			};
-
-			// Close the window
-			if (oauthPopup) {
-				oauthPopup.close();
-			}
-		}
+	// Track telemetry
+	const trackProperties: ITelemetryTrackProperties = {
+		credential_type: credentialTypeName.value,
+		workflow_id: workflowsStore.workflowId ?? null,
+		credential_id: credentialId.value,
+		is_complete: !!requiredPropertiesFilled.value,
+		is_new: props.mode === 'new' && !credentialId.value,
+		is_valid: success,
+		uses_external_secrets: usesExternalSecrets(credentialData.value),
 	};
-	oauthChannel.addEventListener('message', receiveMessage);
+	if (ndvStore.activeNode) {
+		trackProperties.node_type = ndvStore.activeNode.type;
+	}
+	telemetry.track('User saved credentials', trackProperties);
+
+	void handleDynamicNotification(success);
+
+	if (success) {
+		// Set some kind of data that status changes.
+		// As data does not get displayed directly it does not matter what data.
+		credentialData.value = {
+			...credentialData.value,
+			oauthTokenData: {} as CredentialInformation,
+		};
+	}
+
+	return success;
 }
 
 async function onAuthTypeChanged(type: string): Promise<void> {
@@ -1341,6 +1284,10 @@ const { width } = useElementSize(credNameRef);
 	:global(.el-dialog__body) {
 		padding-top: var(--spacing--lg);
 		position: relative;
+	}
+
+	:global(.el-dialog__headerbtn) {
+		margin-top: var(--spacing--4xs);
 	}
 }
 

@@ -19,7 +19,9 @@ import {
 	DOCS_DOMAIN,
 	EnterpriseEditionFeature,
 	NEW_ASSISTANT_SESSION_MODAL,
+	QUICK_CONNECT_EXPERIMENT,
 } from '@/app/constants';
+import { usePostHog } from '@/app/stores/posthog.store';
 import type { PermissionsRecord } from '@n8n/permissions';
 import { useCredentialsStore } from '../../credentials.store';
 import { useNDVStore } from '@/features/ndv/shared/ndv.store';
@@ -31,9 +33,11 @@ import CopyInput from '@/app/components/CopyInput.vue';
 import CredentialInputs from './CredentialInputs.vue';
 import GoogleAuthButton from './GoogleAuthButton.vue';
 import OauthButton from './OauthButton.vue';
+import QuickConnectButton from '../QuickConnectButton.vue';
 import { useChatPanelStore } from '@/features/ai/assistant/chatPanel.store';
 import { useAssistantStore } from '@/features/ai/assistant/assistant.store';
 import FreeAiCreditsCallout from '@/app/components/FreeAiCreditsCallout.vue';
+import { useCredentialOAuth } from '../../composables/useCredentialOAuth';
 
 import {
 	N8nCallout,
@@ -93,9 +97,11 @@ const uiStore = useUIStore();
 const workflowsStore = useWorkflowsStore();
 const assistantStore = useAssistantStore();
 const chatPanelStore = useChatPanelStore();
+const posthogStore = usePostHog();
 
 const i18n = useI18n();
 const telemetry = useTelemetry();
+const { isGoogleOAuthType: isGoogleOAuthTypeFn } = useCredentialOAuth();
 
 onBeforeMount(async () => {
 	uiStore.activeCredentialType = props.credentialType.name;
@@ -129,6 +135,9 @@ const appName = computed(() => {
 	);
 });
 const credentialTypeName = computed(() => props.credentialType?.name);
+const isQuickConnectEnabled = computed(() =>
+	posthogStore.isVariantEnabled(QUICK_CONNECT_EXPERIMENT.name, 'variant'),
+);
 const credentialOwnerName = computed(() =>
 	credentialsStore.getCredentialOwnerNameById(`${props.credentialId}`),
 );
@@ -162,10 +171,7 @@ const documentationUrl = computed(() => {
 	return url.href;
 });
 
-const isGoogleOAuthType = computed(
-	() =>
-		credentialTypeName.value === 'googleOAuth2Api' || props.parentTypes.includes('googleOAuth2Api'),
-);
+const isGoogleOAuthType = computed(() => isGoogleOAuthTypeFn(credentialTypeName.value));
 
 const oAuthCallbackUrl = computed(() => {
 	const oauthType =
@@ -297,12 +303,26 @@ watch(showOAuthSuccessBanner, (newValue, oldValue) => {
 				v-show="showOAuthSuccessBanner && !showValidationWarning"
 				theme="success"
 				:message="i18n.baseText('credentialEdit.credentialConfig.accountConnected')"
-				:button-label="i18n.baseText('credentialEdit.credentialConfig.reconnect')"
+				:button-label="
+					isQuickConnectEnabled ? undefined : i18n.baseText('credentialEdit.credentialConfig.reconnect')
+				"
 				:button-title="i18n.baseText('credentialEdit.credentialConfig.reconnectOAuth2Credential')"
 				data-test-id="oauth-connect-success-banner"
 				@click="$emit('oauth')"
 			>
-				<template v-if="isGoogleOAuthType" #button>
+				<template v-if="isQuickConnectEnabled" #button>
+					<p
+						v-if="isGoogleOAuthType"
+						:class="$style.googleReconnectLabel"
+						v-text="`${i18n.baseText('credentialEdit.credentialConfig.reconnect')}:`"
+					/>
+					<QuickConnectButton
+						:credential-type-name="credentialTypeName"
+						:label="i18n.baseText('credentialEdit.credentialConfig.reconnect')"
+						@click="$emit('oauth')"
+					/>
+				</template>
+				<template v-else-if="isGoogleOAuthType" #button>
 					<p
 						:class="$style.googleReconnectLabel"
 						v-text="`${i18n.baseText('credentialEdit.credentialConfig.reconnect')}:`"
@@ -414,8 +434,21 @@ watch(showOAuthSuccessBanner, (newValue, oldValue) => {
 				@update="onDataChange"
 			/>
 
-			<OauthButton
+			<QuickConnectButton
 				v-if="
+					isQuickConnectEnabled &&
+					isOAuthType &&
+					!isOAuthConnected &&
+					((credentialPermissions.create && isNewCredential) || credentialPermissions.update)
+				"
+				:credential-type-name="credentialTypeName"
+				:disabled="!requiredPropertiesFilled"
+				:disabled-tooltip="i18n.baseText('credentialEdit.oAuthButton.fillRequiredFields')"
+				data-test-id="oauth-connect-button"
+				@click="$emit('oauth')"
+			/>
+			<OauthButton
+				v-else-if="
 					isOAuthType &&
 					requiredPropertiesFilled &&
 					!isOAuthConnected &&

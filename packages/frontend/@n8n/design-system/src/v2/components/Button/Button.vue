@@ -18,6 +18,8 @@ interface Props extends /* @vue-ignore */ ButtonHTMLAttributes {
 	icon?: boolean;
 	/** If true, the button will be disabled */
 	disabled?: boolean;
+	/** Forces a specific color theme regardless of app theme */
+	theme?: 'light' | 'dark';
 	/** Additional classes to apply to the button */
 	class?: string;
 }
@@ -33,6 +35,7 @@ const props = withDefaults(defineProps<Props>(), {
 	loading: false,
 	icon: false,
 	disabled: false,
+	theme: undefined,
 	class: undefined,
 });
 
@@ -59,6 +62,7 @@ const classes = computed(() =>
 		props.loading && $style.loading,
 		props.icon && $style.icon,
 		props.disabled && $style.disabled,
+		props.theme && $style[`theme-${props.theme}`],
 		props.class,
 	),
 );
@@ -187,14 +191,14 @@ const handleClick = (event: MouseEvent) => {
 		--button--color--background-hover: var(--color--orange-500);
 		--button--color--background-active: var(--color--orange-600);
 		--button--color: var(--color--neutral-white);
-		--button--shadow:
-			0 1px 3px 0 light-dark(var(--color--black-alpha-100), var(--color--black-alpha-200)),
+		--button--shadow: 0 1px 3px 0
+				light-dark(var(--color--black-alpha-100), var(--color--black-alpha-200)),
 			0 0 0 1px var(--color--orange-400);
-		--button--shadow--hover:
-			0 1px 3px 0 light-dark(var(--color--black-alpha-100), var(--color--black-alpha-200)),
+		--button--shadow--hover: 0 1px 3px 0
+				light-dark(var(--color--black-alpha-100), var(--color--black-alpha-200)),
 			0 0 0 1px var(--color--orange-500);
-		--button--shadow--active:
-			0 1px 3px 0 light-dark(var(--color--black-alpha-100), var(--color--black-alpha-200)),
+		--button--shadow--active: 0 1px 3px 0
+				light-dark(var(--color--black-alpha-100), var(--color--black-alpha-200)),
 			0 0 0 1px var(--color--orange-600);
 	}
 
@@ -208,16 +212,16 @@ const handleClick = (event: MouseEvent) => {
 			var(--color--neutral-250),
 			var(--color--neutral-600)
 		);
-		--button--shadow:
-			0 1px 3px 0 light-dark(var(--color--black-alpha-200), var(--color--black-alpha-300)),
+		--button--shadow: 0 1px 3px 0
+				light-dark(var(--color--black-alpha-200), var(--color--black-alpha-300)),
 			0 0 0 1px light-dark(var(--color--black-alpha-100), var(--color--white-alpha-100)),
 			0 0 0 2px light-dark(transparent, var(--color--black-alpha-100));
-		--button--shadow--hover:
-			0 1px 3px 0 light-dark(var(--color--black-alpha-200), var(--color--black-alpha-300)),
+		--button--shadow--hover: 0 1px 3px 0
+				light-dark(var(--color--black-alpha-200), var(--color--black-alpha-300)),
 			0 0 0 1px light-dark(var(--color--black-alpha-200), var(--color--white-alpha-300)),
 			0 0 0 2px light-dark(transparent, var(--color--black-alpha-100));
-		--button--shadow--active:
-			0 1px 3px 0 light-dark(var(--color--black-alpha-200), var(--color--black-alpha-300)),
+		--button--shadow--active: 0 1px 3px 0
+				light-dark(var(--color--black-alpha-200), var(--color--black-alpha-300)),
 			0 0 0 1px light-dark(var(--color--black-alpha-300), var(--color--white-alpha-300)),
 			0 0 0 2px light-dark(transparent, var(--color--black-alpha-100));
 	}
@@ -262,20 +266,17 @@ const handleClick = (event: MouseEvent) => {
 		--button--color--background-hover: light-dark(var(--color--red-600), var(--color--red-500));
 		--button--color--background-active: light-dark(var(--color--red-600), var(--color--red-400));
 		--button--color: var(--color--neutral-white);
-		--button--shadow:
-			light-dark(
+		--button--shadow: light-dark(
 				0 1px 3px 0 var(--color--black-alpha-100),
 				0 1px 3px 0 var(--color--black-alpha-200)
 			),
 			0 0 0 1px light-dark(var(--color--red-500), var(--color--red-600));
-		--button--shadow--hover:
-			light-dark(
+		--button--shadow--hover: light-dark(
 				0 1px 3px 0 var(--color--black-alpha-100),
 				0 1px 3px 0 var(--color--black-alpha-200)
 			),
 			0 0 0 1px light-dark(var(--color--red-600), var(--color--red-500));
-		--button--shadow--active:
-			light-dark(
+		--button--shadow--active: light-dark(
 				0 1px 3px 0 var(--color--black-alpha-100),
 				0 1px 3px 0 var(--color--black-alpha-200)
 			),
@@ -298,6 +299,14 @@ const handleClick = (event: MouseEvent) => {
 	&.icon {
 		width: var(--button--height);
 		padding: 0;
+	}
+
+	&.theme-light {
+		color-scheme: light;
+	}
+
+	&.theme-dark {
+		color-scheme: dark;
 	}
 }
 

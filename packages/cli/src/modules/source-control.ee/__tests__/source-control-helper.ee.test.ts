@@ -2,7 +2,9 @@ import type { SourceControlledFile } from '@n8n/api-types';
 import { Container } from '@n8n/di';
 import { constants as fsConstants, accessSync } from 'fs';
 import { mock } from 'jest-mock-extended';
+import type { Credentials } from 'n8n-core';
 import { InstanceSettings } from 'n8n-core';
+import type { ICredentialDataDecryptedObject } from 'n8n-workflow';
 import path from 'path';
 
 import {
@@ -19,6 +21,8 @@ import {
 	isWorkflowModified,
 	sourceControlFoldersExistCheck,
 	areSameCredentials,
+	getCredentialSynchableData,
+	mergeRemoteCrendetialDataIntoLocalCredentialData,
 } from '../source-control-helper.ee';
 import type { SourceControlPreferencesService } from '@/modules/source-control.ee/source-control-preferences.service.ee';
 import type { License } from '@/license';
@@ -570,9 +574,31 @@ describe('areSameCredentials', () => {
 		expect(areSameCredentials(creds1, creds2)).toBe(true);
 	});
 
-	it('should return true when only data is different', () => {
+	it('should return true when plain string secrets are different (sanitized to empty)', () => {
 		const creds1 = mockCredential({ data: { accessToken: 'access token' } });
 		const creds2 = mockCredential({ data: { accessToken: 'different access token' } });
+
+		// Plain strings are sanitized to empty strings, so they're considered equal
+		expect(areSameCredentials(creds1, creds2)).toBe(true);
+	});
+
+	it('should return false when synchable data (expressions) are different', () => {
+		const creds1 = mockCredential({ data: { apiKey: '={{ $json.key1 }}' } });
+		const creds2 = mockCredential({ data: { apiKey: '={{ $json.key2 }}' } });
+
+		expect(areSameCredentials(creds1, creds2)).toBe(false);
+	});
+
+	it('should return false when synchable data (numbers) are different', () => {
+		const creds1 = mockCredential({ data: { port: 8080 } });
+		const creds2 = mockCredential({ data: { port: 9090 } });
+
+		expect(areSameCredentials(creds1, creds2)).toBe(false);
+	});
+
+	it('should return true when data has same sanitized values', () => {
+		const creds1 = mockCredential({ data: { port: 8080, expression: '={{ $json.key }}' } });
+		const creds2 = mockCredential({ data: { port: 8080, expression: '={{ $json.key }}' } });
 
 		expect(areSameCredentials(creds1, creds2)).toBe(true);
 	});
@@ -610,5 +636,469 @@ describe('areSameCredentials', () => {
 		const creds2 = mockCredential({ isGlobal: true });
 
 		expect(areSameCredentials(creds1, creds2)).toBe(false);
+	});
+
+	it('should return true when both have undefined data', () => {
+		const creds1 = mockCredential({ data: undefined });
+		const creds2 = mockCredential({ data: undefined });
+
+		expect(areSameCredentials(creds1, creds2)).toBe(true);
+	});
+
+	it('should return false when one has data and the other is undefined', () => {
+		const creds1 = mockCredential({ data: { port: 8080 } });
+		const creds2 = mockCredential({ data: undefined });
+
+		expect(areSameCredentials(creds1, creds2)).toBe(false);
+	});
+
+	it('should return true when both have empty objects', () => {
+		const creds1 = mockCredential({ data: {} });
+		const creds2 = mockCredential({ data: {} });
+
+		expect(areSameCredentials(creds1, creds2)).toBe(true);
+	});
+
+	it('should return false when nested synchable data differs', () => {
+		const creds1 = mockCredential({
+			data: {
+				auth: {
+					port: 8080,
+					apiKey: '={{ $json.key }}',
+				},
+			},
+		});
+		const creds2 = mockCredential({
+			data: {
+				auth: {
+					port: 9090,
+					apiKey: '={{ $json.key }}',
+				},
+			},
+		});
+
+		expect(areSameCredentials(creds1, creds2)).toBe(false);
+	});
+
+	it('should ignore oauthTokenData differences', () => {
+		const creds1 = mockCredential({
+			data: {
+				port: 8080,
+				oauthTokenData: { accessToken: 'token1' },
+			},
+		});
+		const creds2 = mockCredential({
+			data: {
+				port: 8080,
+				oauthTokenData: { accessToken: 'token2' },
+			},
+		});
+
+		// oauthTokenData is not synchable, so it's ignored in comparison
+		expect(areSameCredentials(creds1, creds2)).toBe(true);
+	});
+});
+
+describe('getCredentialSynchableData', () => {
+	function createMockCredentials(data: ICredentialDataDecryptedObject): Credentials {
+		const credentials = mock<Credentials>();
+		credentials.getData.mockReturnValue(data);
+		return credentials;
+	}
+
+	it('should preserve expressions', () => {
+		const data = {
+			apiKey: '={{ $json.key }}',
+			host: '={{ $vars.host }}',
+		};
+
+		const result = getCredentialSynchableData(createMockCredentials(data));
+
+		expect(result.apiKey).toBe('={{ $json.key }}');
+		expect(result.host).toBe('={{ $vars.host }}');
+	});
+
+	it('should preserve numbers', () => {
+		const data = {
+			port: 8080,
+			timeout: 30000,
+			retries: 3,
+		};
+
+		const result = getCredentialSynchableData(createMockCredentials(data));
+
+		expect(result.port).toBe(8080);
+		expect(result.timeout).toBe(30000);
+		expect(result.retries).toBe(3);
+	});
+
+	it('should omit plain strings (not synchable)', () => {
+		const data = {
+			apiKey: 'secret123',
+			password: 'mypassword',
+			token: 'bearer-token',
+		};
+
+		const result = getCredentialSynchableData(createMockCredentials(data));
+
+		// Plain strings are not synchable, so they're omitted from the result
+		expect(result.apiKey).toBeUndefined();
+		expect(result.password).toBeUndefined();
+		expect(result.token).toBeUndefined();
+	});
+
+	it('should recursively handle nested objects', () => {
+		const data = {
+			auth: {
+				apiKey: 'secret',
+				username: '={{ $vars.user }}',
+			},
+			config: {
+				port: 443,
+				timeout: 5000,
+			},
+		};
+
+		const result = getCredentialSynchableData(createMockCredentials(data));
+
+		expect(result.auth).toBeDefined();
+		expect((result.auth as any).apiKey).toBeUndefined(); // Plain strings omitted
+		expect((result.auth as any).username).toBe('={{ $vars.user }}');
+		expect(result.config).toBeDefined();
+		expect((result.config as any).port).toBe(443);
+		expect((result.config as any).timeout).toBe(5000);
+	});
+
+	it('should omit null values and plain strings', () => {
+		const data = {
+			apiKey: 'secret',
+			emptyField: null,
+			port: 8080,
+		} as any;
+
+		const result = getCredentialSynchableData(createMockCredentials(data));
+
+		expect(result.apiKey).toBeUndefined(); // Plain strings omitted
+		expect(result.emptyField).toBeUndefined(); // Null values omitted
+		expect(result.port).toBe(8080);
+	});
+
+	it('should recursively process arrays as objects and omit booleans', () => {
+		const data = {
+			apiKey: 'secret',
+			enabled: true,
+			tags: ['tag1', 'tag2'],
+			port: 8080,
+		};
+
+		const result = getCredentialSynchableData(createMockCredentials(data));
+
+		expect(result.apiKey).toBeUndefined(); // Plain strings omitted
+		expect(result.enabled).toBeUndefined(); // Booleans omitted
+		expect(result.tags).toBeDefined(); // Arrays are processed as objects
+		expect(result.port).toBe(8080);
+	});
+
+	it('should handle mixed data types correctly', () => {
+		const data = {
+			host: 'localhost',
+			port: 8080,
+			expression: '={{ $json.value }}',
+			enabled: true,
+			tags: ['a', 'b'],
+			nested: {
+				apiKey: 'secret',
+				timeout: 3000,
+			},
+		};
+
+		const result = getCredentialSynchableData(createMockCredentials(data));
+
+		expect(result.host).toBeUndefined(); // Plain strings omitted
+		expect(result.port).toBe(8080);
+		expect(result.expression).toBe('={{ $json.value }}');
+		expect(result.enabled).toBeUndefined(); // Booleans omitted
+		expect(result.tags).toBeDefined(); // Arrays processed as objects
+		expect(result.nested).toBeDefined();
+		expect((result.nested as any).apiKey).toBeUndefined(); // Plain strings omitted
+		expect((result.nested as any).timeout).toBe(3000);
+	});
+
+	it('should exclude oauthTokenData', () => {
+		const data = {
+			apiKey: 'secret123',
+			oauthTokenData: {
+				accessToken: 'token123',
+				refreshToken: 'refresh123',
+			},
+			port: 8080,
+		};
+
+		const result = getCredentialSynchableData(createMockCredentials(data));
+
+		expect(result.apiKey).toBeUndefined(); // Plain strings omitted
+		expect(result.oauthTokenData).toBeUndefined(); // Explicitly excluded
+		expect(result.port).toBe(8080);
+	});
+});
+
+describe('mergeCredentialData', () => {
+	it('should merge expressions from remote and preserve local secrets', () => {
+		const local = {
+			apiKey: 'local-secret',
+			host: 'localhost',
+		};
+		const remote = {
+			apiKey: '={{ $json.key }}',
+			// host is omitted from remote (plain strings not synchable)
+		};
+
+		const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
+
+		expect(result.apiKey).toBe('={{ $json.key }}'); // Expression from remote
+		expect(result.host).toBe('localhost'); // Local value preserved
+	});
+
+	it('should merge numbers from remote', () => {
+		const local = {
+			port: 3000,
+			timeout: 5000,
+		};
+		const remote = {
+			port: 8080,
+			timeout: 30000,
+		};
+
+		const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
+
+		expect(result.port).toBe(8080);
+		expect(result.timeout).toBe(30000);
+	});
+
+	it('should preserve local secrets when remote omits plain strings', () => {
+		const local = {
+			apiKey: 'local-secret-123',
+			password: 'local-password',
+		};
+		const remote = {
+			// Plain strings not included in remote (not synchable)
+		};
+
+		const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
+
+		expect(result.apiKey).toBe('local-secret-123');
+		expect(result.password).toBe('local-password');
+	});
+
+	it('should recursively merge nested objects', () => {
+		const local = {
+			auth: {
+				apiKey: 'local-secret',
+				username: 'user1',
+			},
+			config: {
+				port: 3000,
+			},
+		};
+		const remote = {
+			auth: {
+				apiKey: '={{ $vars.key }}',
+				// username omitted (plain strings not synchable)
+			},
+			config: {
+				port: 8080,
+			},
+		};
+
+		const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
+
+		expect((result.auth as any).apiKey).toBe('={{ $vars.key }}'); // Expression from remote
+		expect((result.auth as any).username).toBe('user1'); // Local value preserved
+		expect((result.config as any).port).toBe(8080); // Number from remote
+	});
+
+	it('should merge arrays as objects and ignore booleans from remote', () => {
+		const local = {
+			apiKey: 'secret',
+			port: 3000,
+		};
+		const remote = {
+			// apiKey omitted (plain string not synchable)
+			port: 8080,
+			enabled: true, // Booleans not synchable, will be omitted by sanitize
+			tags: ['tag1', 'tag2'], // Arrays processed as objects
+		};
+
+		const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
+
+		expect(result.apiKey).toBe('secret'); // Local preserved
+		expect(result.port).toBe(8080); // Number from remote
+		expect(result.enabled).toBeUndefined(); // Booleans not synchable
+		expect(result.tags).toBeDefined(); // Arrays are merged as objects
+	});
+
+	it('should handle mismatched types (local string, remote object)', () => {
+		const local = {
+			config: 'simple-config',
+			apiKey: 'secret',
+		};
+		const remote = {
+			config: {
+				port: 8080,
+				timeout: 3000,
+			},
+		};
+
+		const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
+
+		// Remote object overwrites local string
+		expect(result.config).toBeDefined();
+		expect((result.config as any).port).toBe(8080);
+		expect((result.config as any).timeout).toBe(3000);
+		expect(result.apiKey).toBe('secret'); // Local preserved
+	});
+
+	it('should handle null values in remote (sanitized away)', () => {
+		const local = {
+			apiKey: 'secret',
+			port: 3000,
+		};
+		const remote = {
+			// apiKey omitted (plain strings not synchable)
+			nullField: null, // Will be omitted by sanitization
+		} as any;
+
+		const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
+
+		expect(result.apiKey).toBe('secret'); // Local preserved
+		expect(result.nullField).toBeUndefined(); // Null values not synchable
+		expect(result.port).toBe(3000); // Local preserved
+	});
+
+	it('should preserve local fields not in remote', () => {
+		const local = {
+			apiKey: 'secret',
+			port: 3000,
+			extraField: 'local-only',
+		};
+		const remote = {
+			port: 8080,
+			// Other fields omitted from remote
+		};
+
+		const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
+
+		expect(result.apiKey).toBe('secret'); // Local preserved
+		expect(result.port).toBe(8080); // Merged from remote
+		expect(result.extraField).toBe('local-only'); // Local preserved
+	});
+});
+
+describe('getCredentialSynchableData + merge consistency', () => {
+	function createMockCredentials(data: ICredentialDataDecryptedObject): Credentials {
+		const credentials = mock<Credentials>();
+		credentials.getData.mockReturnValue(data);
+		return credentials;
+	}
+
+	it('should round-trip numbers correctly', () => {
+		const original = {
+			port: 8080,
+			apiKey: 'secret123',
+			timeout: 30000,
+		};
+
+		// Sanitize for export (simulates push to remote)
+		const sanitized = getCredentialSynchableData(createMockCredentials(original));
+
+		// Plain strings (apiKey) are omitted, numbers preserved
+		expect(sanitized.port).toBe(8080);
+		expect(sanitized.timeout).toBe(30000);
+		expect(sanitized.apiKey).toBeUndefined();
+
+		// Merge back (simulates pull from remote)
+		const merged = mergeRemoteCrendetialDataIntoLocalCredentialData({
+			local: original,
+			remote: sanitized,
+		});
+
+		expect(merged.port).toBe(8080); // Number synced from remote
+		expect(merged.timeout).toBe(30000); // Number synced from remote
+		expect(merged.apiKey).toBe('secret123'); // Local secret preserved (not in remote)
+	});
+
+	it('should round-trip expressions correctly', () => {
+		const original = {
+			apiKey: '={{ $json.key }}',
+			host: 'localhost',
+		};
+
+		// Sanitize for export
+		const sanitized = getCredentialSynchableData(createMockCredentials(original));
+
+		// Expressions preserved, plain strings omitted
+		expect(sanitized.apiKey).toBe('={{ $json.key }}');
+		expect(sanitized.host).toBeUndefined();
+
+		// Merge back
+		const merged = mergeRemoteCrendetialDataIntoLocalCredentialData({
+			local: original,
+			remote: sanitized,
+		});
+
+		expect(merged.apiKey).toBe('={{ $json.key }}'); // Expression synced from remote
+		expect(merged.host).toBe('localhost'); // Local secret preserved (not in remote)
+	});
+
+	it('should round-trip nested objects correctly', () => {
+		const original = {
+			auth: {
+				apiKey: 'secret',
+				port: 443,
+				expression: '={{ $vars.token }}',
+			},
+		};
+
+		const sanitized = getCredentialSynchableData(createMockCredentials(original));
+		const merged = mergeRemoteCrendetialDataIntoLocalCredentialData({
+			local: original,
+			remote: sanitized,
+		});
+
+		expect((merged.auth as any).apiKey).toBe('secret'); // Local secret preserved
+		expect((merged.auth as any).port).toBe(443); // Number preserved
+		expect((merged.auth as any).expression).toBe('={{ $vars.token }}'); // Expression preserved
+	});
+
+	it('should handle complete credential lifecycle', () => {
+		const original = {
+			host: 'api.example.com',
+			port: 443,
+			apiKey: 'secret-api-key',
+			timeout: 30000,
+			expression: '={{ $json.value }}',
+			retries: 3,
+		};
+
+		// Step 1: Sanitize for export (simulate push)
+		const sanitized = getCredentialSynchableData(createMockCredentials(original));
+		expect(sanitized.host).toBeUndefined(); // Plain string omitted
+		expect(sanitized.port).toBe(443); // Number kept
+		expect(sanitized.apiKey).toBeUndefined(); // Secret omitted
+		expect(sanitized.timeout).toBe(30000); // Number kept
+		expect(sanitized.expression).toBe('={{ $json.value }}'); // Expression kept
+		expect(sanitized.retries).toBe(3); // Number kept
+
+		// Step 2: Merge sanitized data back (simulate pull)
+		const merged = mergeRemoteCrendetialDataIntoLocalCredentialData({
+			local: original,
+			remote: sanitized,
+		});
+		expect(merged.host).toBe('api.example.com'); // Local secret preserved
+		expect(merged.port).toBe(443); // Number synced
+		expect(merged.apiKey).toBe('secret-api-key'); // Local secret preserved
+		expect(merged.timeout).toBe(30000); // Number synced
+		expect(merged.expression).toBe('={{ $json.value }}'); // Expression synced
+		expect(merged.retries).toBe(3); // Number synced
 	});
 });

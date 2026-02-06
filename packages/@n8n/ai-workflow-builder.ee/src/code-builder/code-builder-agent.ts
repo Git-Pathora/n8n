@@ -750,7 +750,7 @@ ${'='.repeat(50)}
 		// Check if we should exit after text editor finalize
 		if (textEditorEnabled && state.workflow && !dispatchResult.validatePassedThisIteration) {
 			this.debugLog('CHAT', 'Workflow ready from text editor, exiting loop');
-			if (this.evalLogger && textEditorHandler) {
+			if (textEditorHandler) {
 				state.sourceCode = textEditorHandler.getWorkflowCode() ?? null;
 			}
 			return { shouldBreak: true };

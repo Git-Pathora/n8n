@@ -43,13 +43,13 @@ const buttonLabel = computed(() => {
 			<GoogleAuthButton
 				v-if="isGoogleOAuthType(credentialTypeName)"
 				:disabled="disabled"
-				@click="!disabled && $emit('click')"
+				@click="$emit('click')"
 			/>
 			<N8nButton2
 				v-else
 				variant="subtle"
 				size="small"
-				theme="light"
+				:class="$style.lightTheme"
 				:disabled="disabled"
 				@click="$emit('click')"
 			>
@@ -59,3 +59,9 @@ const buttonLabel = computed(() => {
 		</span>
 	</N8nTooltip>
 </template>
+
+<style lang="scss" module>
+.lightTheme {
+	color-scheme: light;
+}
+</style>

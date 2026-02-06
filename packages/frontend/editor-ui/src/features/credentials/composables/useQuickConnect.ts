@@ -25,23 +25,8 @@ export function useQuickConnect() {
 		);
 	}
 
-	/**
-	 * Get the quick connect option for a credential type.
-	 */
-	function getQuickConnectOption(
-		credentialTypeName: string,
-		nodeType?: string,
-	): QuickConnectOption | undefined {
-		return quickConnectOptions.value.find(
-			(option) =>
-				option.credentialType === credentialTypeName &&
-				(nodeType === undefined || option.packageName === nodeType.split('.')[0]),
-		);
-	}
-
 	return {
 		quickConnectOptions,
 		hasQuickConnect,
-		getQuickConnectOption,
 	};
 }

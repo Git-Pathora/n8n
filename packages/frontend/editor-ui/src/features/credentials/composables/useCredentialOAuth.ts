@@ -128,18 +128,27 @@ export function useCredentialOAuth() {
 		return await new Promise((resolve) => {
 			const oauthChannel = new BroadcastChannel('oauth-callback');
 
-			oauthChannel.addEventListener('message', (event: MessageEvent) => {
-				const success = event.data === 'success';
+			// Poll for popup being closed without completing OAuth (user clicked X)
+			const popupPollInterval = setInterval(() => {
+				if (oauthPopup?.closed) {
+					clearInterval(popupPollInterval);
+					oauthChannel.close();
+					resolve(false);
+				}
+			}, 500);
 
+			oauthChannel.addEventListener('message', (event: MessageEvent) => {
+				clearInterval(popupPollInterval);
 				oauthChannel.close();
 				oauthPopup?.close();
-				if (success) {
+
+				if (event.data === 'success') {
 					toast.showMessage({
 						title: i18n.baseText('credentialEdit.credentialEdit.showMessage.accountConnected'),
 						type: 'success',
 					});
 					resolve(true);
-				} else if (event.data === 'error') {
+				} else {
 					toast.showMessage({
 						title: i18n.baseText(
 							'credentialEdit.credentialEdit.showMessage.accountConnectionFailed',

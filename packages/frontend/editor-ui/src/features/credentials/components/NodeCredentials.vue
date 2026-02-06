@@ -522,18 +522,14 @@ async function onClickCreateCredential(type: ICredentialType | INodeCredentialDe
 }
 
 // Quick connect UI state helpers
-function hasCredentialsForType(type: INodeCredentialDescription): boolean {
-	return isCredentialExisting(type);
-}
-
 function showQuickConnectEmptyState(type: INodeCredentialDescription): boolean {
-	if (hasCredentialsForType(type)) return false;
+	if (isCredentialExisting(type)) return false;
 	// Quick connect: explicit config OR managed OAuth credentials
 	return hasQuickConnect(type.name, props.node.type) || hasManagedOAuthCredentials(type.name);
 }
 
 function showStandardEmptyState(type: INodeCredentialDescription): boolean {
-	if (hasCredentialsForType(type)) return false;
+	if (isCredentialExisting(type)) return false;
 	// Standard empty state when no quick connect AND not managed OAuth
 	return !hasQuickConnect(type.name, props.node.type) && !hasManagedOAuthCredentials(type.name);
 }
@@ -589,6 +585,9 @@ async function onQuickConnectSignIn(credentialTypeName: string) {
 		// Only add credential to store after OAuth succeeds
 		credentialsStore.upsertCredential(credential);
 		onCredentialSelected(credentialTypeName, credential.id);
+	} else {
+		// Clean up the orphaned credential created before OAuth
+		void credentialsStore.deleteCredential({ id: credential.id });
 	}
 }
 </script>
@@ -614,164 +613,56 @@ async function onQuickConnectSignIn(credentialTypeName: string) {
 						data-test-id="node-credentials-select"
 					/>
 				</div>
-				<template v-else-if="isQuickConnectEnabled">
-					<div
-						v-if="showQuickConnectEmptyState(type)"
-						:class="[
-							$style.quickConnectContainer,
-							{ [$style.noMarginTop]: isGoogleOAuthType(type.name) },
-						]"
-						data-test-id="quick-connect-empty-state"
-					>
-						<QuickConnectButton
-							:credential-type-name="type.name"
-							@click="onQuickConnectSignIn(type.name)"
-						/>
-						<span :class="$style.setupManuallyContainer">
-							<N8nText size="small" :class="$style.setupManuallyOr">
-								{{ i18n.baseText('nodeCredentials.quickConnect.or') }}
-							</N8nText>
-							<N8nLink
-								:class="$style.setupManuallyLink"
-								theme="secondary"
-								underline
-								size="small"
-								data-test-id="setup-manually-link"
-								@click="createNewCredential(type.name, true, showMixedCredentials(type))"
-							>
-								{{ i18n.baseText('nodeCredentials.quickConnect.setupManually') }}
-							</N8nLink>
-						</span>
-					</div>
-
-					<div
-						v-else-if="showStandardEmptyState(type)"
-						:class="$style.standardEmptyContainer"
-						data-test-id="standard-empty-state"
-					>
-						<N8nSelect
-							:class="$style.emptySelect"
+				<div
+					v-else-if="isQuickConnectEnabled && showQuickConnectEmptyState(type)"
+					:class="[
+						$style.quickConnectContainer,
+						{ [$style.noMarginTop]: isGoogleOAuthType(type.name) },
+					]"
+					data-test-id="quick-connect-empty-state"
+				>
+					<QuickConnectButton
+						:credential-type-name="type.name"
+						@click="onQuickConnectSignIn(type.name)"
+					/>
+					<span :class="$style.setupManuallyContainer">
+						<N8nText size="small" :class="$style.setupManuallyOr">
+							{{ i18n.baseText('nodeCredentials.quickConnect.or') }}
+						</N8nText>
+						<N8nLink
+							:class="$style.setupManuallyLink"
+							theme="secondary"
+							underline
 							size="small"
-							disabled
-							:placeholder="i18n.baseText('nodeCredentials.emptyState.noCredentials')"
-						/>
-						<N8nButton
-							v-if="canCreateCredentials"
-							type="highlightFill"
-							size="medium"
-							data-test-id="setup-credential-button"
+							data-test-id="setup-manually-link"
 							@click="createNewCredential(type.name, true, showMixedCredentials(type))"
 						>
-							{{ i18n.baseText('nodeCredentials.emptyState.setupCredential') }}
-						</N8nButton>
-					</div>
+							{{ i18n.baseText('nodeCredentials.quickConnect.setupManually') }}
+						</N8nLink>
+					</span>
+				</div>
 
-					<div
-						v-else
-						:class="getIssues(type.name).length && !hideIssues ? $style.hasIssues : $style.input"
-						data-test-id="node-credentials-select"
+				<div
+					v-else-if="isQuickConnectEnabled && showStandardEmptyState(type)"
+					:class="$style.standardEmptyContainer"
+					data-test-id="standard-empty-state"
+				>
+					<N8nSelect
+						:class="$style.emptySelect"
+						size="small"
+						disabled
+						:placeholder="i18n.baseText('nodeCredentials.emptyState.noCredentials')"
+					/>
+					<N8nButton
+						v-if="canCreateCredentials"
+						type="highlightFill"
+						size="medium"
+						data-test-id="setup-credential-button"
+						@click="createNewCredential(type.name, true, showMixedCredentials(type))"
 					>
-						<div :class="$style.selectContainer">
-							<N8nSelect
-								ref="selectRefs"
-								:model-value="getSelectedId(type)"
-								:placeholder="getSelectPlaceholder(type.name, getIssues(type.name))"
-								size="small"
-								filterable
-								:filter-method="setFilter"
-								:popper-class="$style.selectPopper"
-								:class="{ [$style.selectWithDynamic]: isCredentialResolvable(type.name) }"
-								@update:model-value="
-									(value: string) =>
-										onCredentialSelected(type.name, value, showMixedCredentials(type))
-								"
-								@blur="emit('blur', 'credentials')"
-							>
-								<N8nOption
-									v-for="item in options.filter((o) => matches(filter, o.name))"
-									:key="item.id"
-									:data-test-id="`node-credentials-select-item-${item.id}`"
-									:label="item.name"
-									:value="item.id"
-								>
-									<div :class="[$style.credentialOption, 'mt-2xs', 'mb-2xs']">
-										<div :class="$style.credentialOptionName">
-											<N8nText bold>{{ item.name }}</N8nText>
-											<N8nTooltip
-												v-if="isDynamicCredentialsEnabled && item.isResolvable"
-												placement="top"
-											>
-												<template #content>{{
-													i18n.baseText('credentials.dynamic.tooltip')
-												}}</template>
-												<N8nIcon
-													icon="key-round"
-													size="medium"
-													:class="$style.dynamicIcon"
-													data-test-id="credential-option-dynamic-icon"
-												/>
-											</N8nTooltip>
-										</div>
-										<N8nText size="small">{{ item.typeDisplayName }}</N8nText>
-									</div>
-								</N8nOption>
-								<template #empty> </template>
-								<template #footer>
-									<button
-										type="button"
-										data-test-id="node-credentials-select-item-new"
-										:class="[$style.newCredential]"
-										:disabled="!canCreateCredentials"
-										@click="onClickCreateCredential(type)"
-									>
-										<N8nIcon size="xsmall" icon="plus" />
-										{{ NEW_CREDENTIALS_TEXT }}
-									</button>
-								</template>
-							</N8nSelect>
-							<div v-if="isCredentialResolvable(type.name)" :class="$style.dynamicIndicator">
-								<N8nTooltip placement="top">
-									<template #content>{{ i18n.baseText('credentials.dynamic.tooltip') }}</template>
-									<N8nBadge
-										theme="tertiary"
-										class="pl-3xs pr-3xs"
-										data-test-id="node-credential-dynamic-icon"
-									>
-										<span :class="$style.dynamicBadgeText">
-											<N8nIcon icon="key-round" size="medium" />
-											{{ i18n.baseText('credentials.dynamic.badge') }}
-										</span>
-									</N8nBadge>
-								</N8nTooltip>
-							</div>
-						</div>
-
-						<div v-if="getIssues(type.name).length && !hideIssues" :class="$style.warning">
-							<N8nTooltip placement="top">
-								<template #content>
-									<TitledList
-										:title="`${i18n.baseText('nodeCredentials.issues')}:`"
-										:items="getIssues(type.name)"
-									/>
-								</template>
-								<N8nIcon icon="triangle-alert" />
-							</N8nTooltip>
-						</div>
-
-						<div
-							v-if="selected[type.name] && isCredentialExisting(type)"
-							:class="$style.edit"
-							data-test-id="credential-edit-button"
-						>
-							<N8nIcon
-								icon="pen"
-								class="clickable"
-								:title="i18n.baseText('nodeCredentials.updateCredential')"
-								@click="editCredential(type.name)"
-							/>
-						</div>
-					</div>
-				</template>
+						{{ i18n.baseText('nodeCredentials.emptyState.setupCredential') }}
+					</N8nButton>
+				</div>
 				<div
 					v-else
 					:class="getIssues(type.name).length && !hideIssues ? $style.hasIssues : $style.input"
@@ -1071,7 +962,8 @@ async function onQuickConnectSignIn(credentialTypeName: string) {
 	justify-content: center;
 	align-items: center;
 	color: var(--color--text);
-	margin-left: var(--spacing--xs);
+	margin-left: var(--spacing--3xs);
+	font-size: var(--font-size--sm);
 
 	&:hover,
 	&:focus {

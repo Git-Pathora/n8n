@@ -1031,21 +1031,13 @@ async function oAuthCredentialAuthorize() {
 		return;
 	}
 
-	// We exclude sharedWithProjects because it's not needed for the authorization and it causes the request to be too large
-	const { sharedWithProjects: _, ...sanitizedCredData } = credentialData.value;
-	const credData = {
-		id: credential.id,
-		type: credential.type,
-		...sanitizedCredData,
-	} as ICredentialsResponse;
-
 	// Clear token data before auth
 	credentialData.value = {
 		...credentialData.value,
 		oauthTokenData: null as unknown as CredentialInformation,
 	};
 
-	const success = await authorize(credData);
+	const success = await authorize(credential);
 
 	// Track telemetry
 	const trackProperties: ITelemetryTrackProperties = {

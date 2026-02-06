@@ -68,8 +68,9 @@ import {
 	getProjectExportPath,
 	getWorkflowExportPath,
 	isValidDataTableColumnType,
-	mergeCredentialData,
+	mergeRemoteCrendetialDataIntoLocalCredentialData,
 	getCredentialSynchableData,
+	sanitizeCredentialData,
 } from './source-control-helper.ee';
 import { SourceControlScopedService } from './source-control-scoped.service';
 import type {
@@ -1008,12 +1009,6 @@ export class SourceControlImportService {
 				const { name, type, data, id, isGlobal = false } = credential;
 				const newCredentialObject = new Credentials({ id, name }, type);
 
-				/**
-				 * Edge case: Do not import `oauthTokenData`, so that that the
-				 * pulling instance reconnects instead of trying to use stubbed values.
-				 */
-				const { oauthTokenData, ...remoteData } = data;
-
 				if (existingCredential?.data) {
 					// Credential exists - merge expressions from remote while preserving local plain values
 					const existingDecrypted = new Credentials(
@@ -1022,11 +1017,17 @@ export class SourceControlImportService {
 						existingCredential.data,
 					);
 					const localData = existingDecrypted.getData();
-					const mergedData = mergeCredentialData(localData, remoteData);
+					const mergedData = mergeRemoteCrendetialDataIntoLocalCredentialData({
+						local: localData,
+						remote: data,
+					});
 					newCredentialObject.setData(mergedData);
 				} else {
-					// New credential - use stub data from file
-					newCredentialObject.setData(remoteData);
+					// This is a safe guard, in principle remote data should already be sanitized
+					// This prevents importing invalid data that should have not been synched in the first place
+					const sanitizedData = sanitizeCredentialData(data);
+
+					newCredentialObject.setData(sanitizedData);
 				}
 
 				this.logger.debug(`Updating credential id ${newCredentialObject.id as string}`);

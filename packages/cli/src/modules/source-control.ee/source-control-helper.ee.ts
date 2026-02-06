@@ -31,44 +31,18 @@ import type { KeyPair } from './types/key-pair';
 import type { KeyPairType } from './types/key-pair-type';
 import type { RemoteResourceOwner, StatusResourceOwner } from './types/resource-owner';
 import type { SourceControlWorkflowVersionId } from './types/source-control-workflow-version-id';
-
-export function getCredentialSynchableData(crendential: Credentials) {
-	const credentialData = crendential.getData();
-
-	/**
-	 * Edge case: Do not export `oauthTokenData`, so that that the
-	 * pulling instance reconnects instead of trying to use stubbed values.
-	 */
-	const { oauthTokenData, ...rest } = credentialData;
-
-	const result: ICredentialDataDecryptedObject = {};
-
-	for (const [key, value] of Object.entries(rest)) {
-		if (value === null) {
-			continue;
-		}
-
-		if (typeof value === 'string') {
-			result[key] = stringContainsExpression(value) ? value : '';
-		} else if (typeof value === 'number') {
-			result[key] = value;
-		} else if (typeof value === 'object') {
-			result[key] = sanitizeCredentialData(value as ICredentialDataDecryptedObject);
-		}
-	}
-
-	return result;
+export function getCredentialSynchableData(credential: Credentials) {
+	const credentialData = credential.getData();
+	return sanitizeCredentialData(credentialData);
 }
 
-function sanitizeCredentialData(
+export function sanitizeCredentialData(
 	data: ICredentialDataDecryptedObject,
 ): ICredentialDataDecryptedObject {
 	const result: ICredentialDataDecryptedObject = {};
 
 	for (const [key, value] of Object.entries(data)) {
-		if (value === null) {
-			continue;
-		}
+		if (!isSynchableProperty(key, value)) continue;
 
 		if (typeof value === 'string') {
 			result[key] = stringContainsExpression(value) ? value : '';
@@ -86,26 +60,31 @@ function sanitizeCredentialData(
  * Merges remote credential data into local data.
  * Remote expressions overwrite local values; empty strings are ignored (preserves local secrets).
  */
-export function mergeCredentialData(
-	local: ICredentialDataDecryptedObject,
-	remote: ICredentialDataDecryptedObject,
-): ICredentialDataDecryptedObject {
+export function mergeRemoteCrendetialDataIntoLocalCredentialData({
+	local,
+	remote,
+}: {
+	local: ICredentialDataDecryptedObject;
+	remote: ICredentialDataDecryptedObject;
+}): ICredentialDataDecryptedObject {
 	const merged = { ...local };
 
-	for (const [key, remoteValue] of Object.entries(remote)) {
-		if (remoteValue === null) {
-			continue;
-		}
+	// This is a safe guard, in principle remote data should already be sanitized
+	// This prevents importing invalid data that should have not been synched in the first place
+	const sanitizedRemote = sanitizeCredentialData(remote);
+
+	for (const [key, remoteValue] of Object.entries(sanitizedRemote)) {
+		if (!isSynchableProperty(key, remoteValue)) continue;
 
 		if (typeof remoteValue === 'string' && stringContainsExpression(remoteValue)) {
 			merged[key] = remoteValue;
 		} else if (typeof remoteValue === 'number') {
 			merged[key] = remoteValue;
 		} else if (typeof remoteValue === 'object') {
-			merged[key] = mergeCredentialData(
-				local[key] as ICredentialDataDecryptedObject,
-				remoteValue as unknown as ICredentialDataDecryptedObject,
-			);
+			merged[key] = mergeRemoteCrendetialDataIntoLocalCredentialData({
+				local: local[key] as ICredentialDataDecryptedObject,
+				remote: remoteValue as ICredentialDataDecryptedObject,
+			});
 		}
 	}
 
@@ -476,15 +455,32 @@ export function areSameCredentials(
 		credA.type === credB.type &&
 		!hasOwnerChanged(credA.ownedBy, credB.ownedBy) &&
 		Boolean(credA.isGlobal) === Boolean(credB.isGlobal) &&
-		!hasCredentialDataChanged(credA.data, credB.data)
+		!hasSynchableCredentialDataChanged(credA.data, credB.data)
 	);
 }
 
-function hasCredentialDataChanged(
+function hasSynchableCredentialDataChanged(
 	data1: ICredentialDataDecryptedObject | undefined,
 	data2: ICredentialDataDecryptedObject | undefined,
 ): boolean {
 	if (!data1 && !data2) return false;
 	if (!data1 || !data2) return true;
-	return !isEqual(data1, data2);
+
+	const sanitizedData1 = sanitizeCredentialData(data1);
+	const sanitizedData2 = sanitizeCredentialData(data2);
+	return !isEqual(sanitizedData1, sanitizedData2);
+}
+
+function isSynchableProperty(key: string, value: unknown): boolean {
+	/**
+	 * Edge case: Do not export `oauthTokenData`, so that that the
+	 * pulling instance reconnects instead of trying to use stubbed values.
+	 */
+	if (key === 'oauthTokenData') return false;
+
+	const isStringExpression = typeof value === 'string' && stringContainsExpression(value);
+	const isNumber = typeof value === 'number';
+	const isObject = typeof value === 'object' && value !== null;
+
+	return isStringExpression || isNumber || isObject;
 }

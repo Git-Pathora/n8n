@@ -184,6 +184,119 @@ describe('execution-schema-jsdoc', () => {
 		});
 	});
 
+	describe('schemaToOutputSample - with real values (excludeValues=false)', () => {
+		it('includes real string values', () => {
+			const schema: Schema = {
+				type: 'object',
+				path: '',
+				value: [{ key: 'name', type: 'string', value: 'John Doe', path: '' }],
+			};
+			const result = schemaToOutputSample(schema, false);
+			expect(result).toEqual({ name: 'John Doe' });
+		});
+
+		it('parses real number values from string representation', () => {
+			const schema: Schema = {
+				type: 'object',
+				path: '',
+				value: [{ key: 'count', type: 'number', value: '42', path: '' }],
+			};
+			const result = schemaToOutputSample(schema, false);
+			expect(result).toEqual({ count: 42 });
+		});
+
+		it('parses real boolean values from string representation', () => {
+			const schema: Schema = {
+				type: 'object',
+				path: '',
+				value: [{ key: 'active', type: 'boolean', value: 'true', path: '' }],
+			};
+			const result = schemaToOutputSample(schema, false);
+			expect(result).toEqual({ active: true });
+		});
+
+		it('includes real values in nested objects recursively', () => {
+			const schema: Schema = {
+				type: 'object',
+				path: '',
+				value: [
+					{
+						key: 'user',
+						type: 'object',
+						path: '',
+						value: [
+							{ key: 'name', type: 'string', value: 'John', path: '' },
+							{ key: 'age', type: 'number', value: '30', path: '' },
+						],
+					},
+				],
+			};
+			const result = schemaToOutputSample(schema, false);
+			expect(result).toEqual({ user: { name: 'John', age: 30 } });
+		});
+
+		it('truncates string values longer than 200 chars', () => {
+			const longValue = 'a'.repeat(250);
+			const schema: Schema = {
+				type: 'object',
+				path: '',
+				value: [{ key: 'data', type: 'string', value: longValue, path: '' }],
+			};
+			const result = schemaToOutputSample(schema, false);
+			expect(result).toEqual({ data: 'a'.repeat(200) + '... [truncated]' });
+		});
+
+		it('handles [null] special value as null', () => {
+			const schema: Schema = {
+				type: 'object',
+				path: '',
+				value: [{ key: 'data', type: 'string', value: '[null]', path: '' }],
+			};
+			const result = schemaToOutputSample(schema, false);
+			expect(result).toEqual({ data: null });
+		});
+
+		it('handles <EMPTY> special value as undefined', () => {
+			const schema: Schema = {
+				type: 'object',
+				path: '',
+				value: [{ key: 'data', type: 'string', value: '<EMPTY>', path: '' }],
+			};
+			const result = schemaToOutputSample(schema, false);
+			expect(result).toEqual({ data: undefined });
+		});
+
+		it('includes multiple real values', () => {
+			const schema: Schema = {
+				type: 'object',
+				path: '',
+				value: [
+					{ type: 'string', key: 'id', value: 'usr_12345', path: 'id' },
+					{ type: 'string', key: 'name', value: 'John Doe', path: 'name' },
+					{ type: 'number', key: 'age', value: '30', path: 'age' },
+					{ type: 'boolean', key: 'active', value: 'true', path: 'active' },
+				],
+			};
+			const result = schemaToOutputSample(schema, false);
+			expect(result).toEqual({
+				id: 'usr_12345',
+				name: 'John Doe',
+				age: 30,
+				active: true,
+			});
+		});
+
+		it('still redacts when excludeValues is not passed (backward compat)', () => {
+			const schema: Schema = {
+				type: 'object',
+				path: '',
+				value: [{ key: 'name', type: 'string', value: 'John Doe', path: '' }],
+			};
+			const result = schemaToOutputSample(schema);
+			expect(result).toEqual({ name: '' });
+		});
+	});
+
 	describe('generateSchemaJSDoc', () => {
 		it('generates JSDoc for object schema with primitive fields', () => {
 			const schema: Schema = {

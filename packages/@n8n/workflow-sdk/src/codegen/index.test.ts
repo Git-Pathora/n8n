@@ -329,7 +329,7 @@ describe('codegen index', () => {
 				});
 
 				expect(code).not.toContain('// Output values redacted');
-				expect(code).toContain("output: [{ id: '' }]");
+				expect(code).toContain("output: [{ id: 'usr_123' }]");
 			});
 
 			it('adds pinned data comment when node is in pinnedNodes', () => {

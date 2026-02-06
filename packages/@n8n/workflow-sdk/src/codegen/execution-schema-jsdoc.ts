@@ -9,29 +9,61 @@ import type { Schema } from 'n8n-workflow';
  * @param schema - The node's output schema
  * @returns A sample object with example values, or null if schema is not an object
  */
-export function schemaToOutputSample(schema: Schema): Record<string, unknown> | null {
+export function schemaToOutputSample(
+	schema: Schema,
+	excludeValues?: boolean,
+): Record<string, unknown> | null {
 	if (schema.type !== 'object' || !Array.isArray(schema.value)) {
 		return null;
 	}
+
+	const shouldRedact = excludeValues !== false;
 
 	const sample: Record<string, unknown> = {};
 	for (const field of schema.value) {
 		if (!field.key) continue;
 
-		// Always use redacted values for privacy (strings→'', numbers→0, booleans→false)
 		if (field.type === 'object' && Array.isArray(field.value)) {
-			// Recursively convert nested objects (values will be redacted)
-			const nestedSample = schemaToOutputSample(field);
+			const nestedSample = schemaToOutputSample(field, excludeValues);
 			sample[field.key] = nestedSample ?? {};
 		} else if (field.type === 'array' && Array.isArray(field.value)) {
-			// For arrays, use empty array
 			sample[field.key] = [];
-		} else {
-			// Use type-appropriate default (redacted value)
+		} else if (shouldRedact) {
 			sample[field.key] = getDefaultForType(field.type);
+		} else {
+			sample[field.key] = parseSchemaValue(field);
 		}
 	}
 	return sample;
+}
+
+const MAX_OUTPUT_VALUE_LENGTH = 200;
+
+function parseSchemaValue(field: Schema): unknown {
+	const value = typeof field.value === 'string' ? field.value : undefined;
+
+	if (value === undefined) return null;
+	if (value === '[null]') return null;
+	if (value === '<EMPTY>') return undefined;
+
+	switch (field.type) {
+		case 'string': {
+			if (value.length > MAX_OUTPUT_VALUE_LENGTH) {
+				return value.slice(0, MAX_OUTPUT_VALUE_LENGTH) + '... [truncated]';
+			}
+			return value;
+		}
+		case 'number': {
+			const num = Number(value);
+			return Number.isNaN(num) ? 0 : num;
+		}
+		case 'boolean':
+			return value === 'true';
+		case 'null':
+			return null;
+		default:
+			return null;
+	}
 }
 
 /**

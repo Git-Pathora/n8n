@@ -418,7 +418,7 @@ function generateNodeConfig(node: SemanticNode, ctx: GenerationContext): string 
 	const nodeName = node.json.name;
 	if (nodeName && ctx.nodeSchemas?.has(nodeName)) {
 		const schema = ctx.nodeSchemas.get(nodeName)!;
-		const outputSample = schemaToOutputSample(schema);
+		const outputSample = schemaToOutputSample(schema, ctx.valuesExcluded);
 		if (outputSample && Object.keys(outputSample).length > 0) {
 			// Add comment if values are excluded (redacted)
 			if (ctx.valuesExcluded) {

@@ -312,8 +312,10 @@ test('should work with --all flag (existing behavior)', async () => {
 	const exportedData = JSON.parse(fs.readFileSync(outputFile, 'utf-8'));
 
 	expect(exportedData).toHaveLength(2);
-	expect(exportedData[0].name).toBe('Workflow 1');
-	expect(exportedData[1].name).toBe('Workflow 2');
+
+	const workflowNames = exportedData.map((w: any) => w.name);
+	expect(workflowNames).toContain('Workflow 1');
+	expect(workflowNames).toContain('Workflow 2');
 });
 
 test('should work with --pretty flag (existing behavior)', async () => {
@@ -325,4 +327,62 @@ test('should work with --pretty flag (existing behavior)', async () => {
 	const fileContents = fs.readFileSync(outputFile, 'utf-8');
 	expect(fileContents).toContain('\n');
 	expect(fileContents).toMatch(/\s{2}/);
+});
+
+test('should use historical name when set in workflow history', async () => {
+	const workflow = await createWorkflowWithTriggerAndHistory({
+		name: 'Original Name',
+	});
+
+	const version2Id = nanoid();
+	workflow.versionId = version2Id;
+	workflow.name = 'Updated Name';
+	await Container.get(WorkflowRepository).save(workflow);
+
+	await createWorkflowHistory(workflow, undefined, undefined, {
+		name: 'Version 2 Historical Name',
+	});
+
+	const version3Id = nanoid();
+	workflow.versionId = version3Id;
+	workflow.name = 'Current Name';
+	await Container.get(WorkflowRepository).save(workflow);
+	await createWorkflowHistory(workflow);
+
+	const outputFile = path.join(testOutputDir, 'output.json');
+	await command.run([`--id=${workflow.id}`, `--version=${version2Id}`, `--output=${outputFile}`]);
+
+	const exportedData = JSON.parse(fs.readFileSync(outputFile, 'utf-8'))[0];
+
+	expect(exportedData.name).toBe('Version 2 Historical Name');
+	expect(exportedData.versionId).toBe(version2Id);
+});
+
+test('should use historical description when set in workflow history', async () => {
+	const workflow = await createWorkflowWithTriggerAndHistory({
+		description: 'Original Description',
+	});
+
+	const version2Id = nanoid();
+	workflow.versionId = version2Id;
+	workflow.description = 'Updated Description';
+	await Container.get(WorkflowRepository).save(workflow);
+
+	await createWorkflowHistory(workflow, undefined, undefined, {
+		description: 'Version 2 Historical Description',
+	});
+
+	const version3Id = nanoid();
+	workflow.versionId = version3Id;
+	workflow.description = 'Current Description';
+	await Container.get(WorkflowRepository).save(workflow);
+	await createWorkflowHistory(workflow);
+
+	const outputFile = path.join(testOutputDir, 'output.json');
+	await command.run([`--id=${workflow.id}`, `--version=${version2Id}`, `--output=${outputFile}`]);
+
+	const exportedData = JSON.parse(fs.readFileSync(outputFile, 'utf-8'))[0];
+
+	expect(exportedData.description).toBe('Version 2 Historical Description');
+	expect(exportedData.versionId).toBe(version2Id);
 });

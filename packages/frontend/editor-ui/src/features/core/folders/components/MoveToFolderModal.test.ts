@@ -714,7 +714,7 @@ describe('MoveToFolderModal', () => {
 				projectId: anotherUser.id,
 				parentFolder: {
 					id: undefined,
-					name: anotherUser.name,
+					name: `${anotherUser.name} (Personal space)`,
 				},
 				canAccess: false,
 			},
@@ -896,7 +896,7 @@ describe('MoveToFolderModal', () => {
 				projectId: anotherUser.id,
 				parentFolder: {
 					id: undefined,
-					name: anotherUser.name,
+					name: `${anotherUser.name} (Personal space)`,
 				},
 				canAccess: false,
 			},

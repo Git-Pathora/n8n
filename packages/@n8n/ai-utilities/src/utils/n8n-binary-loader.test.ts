@@ -111,7 +111,7 @@ describe('N8nBinaryLoader', () => {
 		});
 
 		it('should process multiple items', async () => {
-			mockContext.getNodeParameter.mockImplementation((param: string, index: number) => {
+			mockContext.getNodeParameter.mockImplementation((param: string) => {
 				if (param === 'binaryMode') return 'singleFile';
 				if (param === 'loader') return 'textLoader';
 				return undefined;
@@ -138,7 +138,7 @@ describe('N8nBinaryLoader', () => {
 
 	describe('processItem - singleFile mode', () => {
 		it('should process text file', async () => {
-			mockContext.getNodeParameter.mockImplementation((param: string, index: number) => {
+			mockContext.getNodeParameter.mockImplementation((param: string) => {
 				if (param === 'binaryMode') return 'singleFile';
 				if (param === 'loader') return 'textLoader';
 				return undefined;
@@ -164,7 +164,7 @@ describe('N8nBinaryLoader', () => {
 		});
 
 		it('should process PDF file', async () => {
-			mockContext.getNodeParameter.mockImplementation((param: string, index: number) => {
+			mockContext.getNodeParameter.mockImplementation((param: string) => {
 				if (param === 'binaryMode') return 'singleFile';
 				if (param === 'loader') return 'pdfLoader';
 				if (param === 'splitPages') return false;
@@ -191,7 +191,7 @@ describe('N8nBinaryLoader', () => {
 		});
 
 		it('should process CSV file with options', async () => {
-			mockContext.getNodeParameter.mockImplementation((param: string, index: number) => {
+			mockContext.getNodeParameter.mockImplementation((param: string) => {
 				if (param === 'binaryMode') return 'singleFile';
 				if (param === 'loader') return 'csvLoader';
 				if (param === 'column') return 'text';
@@ -220,7 +220,7 @@ describe('N8nBinaryLoader', () => {
 		});
 
 		it('should process JSON file with pointers', async () => {
-			mockContext.getNodeParameter.mockImplementation((param: string, index: number) => {
+			mockContext.getNodeParameter.mockImplementation((param: string) => {
 				if (param === 'binaryMode') return 'singleFile';
 				if (param === 'loader') return 'jsonLoader';
 				if (param === 'pointers') return '/data, /items';
@@ -250,7 +250,7 @@ describe('N8nBinaryLoader', () => {
 
 	describe('processItem - allInputData mode', () => {
 		it('should process all binary data from input', async () => {
-			mockContext.getNodeParameter.mockImplementation((param: string, index: number) => {
+			mockContext.getNodeParameter.mockImplementation((param: string) => {
 				if (param === 'binaryMode') return 'allInputData';
 				if (param === 'loader') return 'auto';
 				return undefined;
@@ -308,7 +308,7 @@ describe('N8nBinaryLoader', () => {
 
 	describe('validateMimeType', () => {
 		it('should throw error when loader does not match mime type', async () => {
-			mockContext.getNodeParameter.mockImplementation((param: string, index: number) => {
+			mockContext.getNodeParameter.mockImplementation((param: string) => {
 				if (param === 'binaryMode') return 'singleFile';
 				if (param === 'loader') return 'pdfLoader';
 				return undefined;
@@ -335,7 +335,7 @@ describe('N8nBinaryLoader', () => {
 		});
 
 		it('should throw error for unsupported mime type', async () => {
-			mockContext.getNodeParameter.mockImplementation((param: string, index: number) => {
+			mockContext.getNodeParameter.mockImplementation((param: string) => {
 				if (param === 'binaryMode') return 'singleFile';
 				if (param === 'loader') return 'auto';
 				return undefined;
@@ -360,7 +360,7 @@ describe('N8nBinaryLoader', () => {
 		});
 
 		it('should accept valid mime type for auto loader', async () => {
-			mockContext.getNodeParameter.mockImplementation((param: string, index: number) => {
+			mockContext.getNodeParameter.mockImplementation((param: string) => {
 				if (param === 'binaryMode') return 'singleFile';
 				if (param === 'loader') return 'auto';
 				return undefined;
@@ -387,7 +387,7 @@ describe('N8nBinaryLoader', () => {
 
 	describe('binary data with ID', () => {
 		it('should handle binary data with ID', async () => {
-			mockContext.getNodeParameter.mockImplementation((param: string, index: number) => {
+			mockContext.getNodeParameter.mockImplementation((param: string) => {
 				if (param === 'binaryMode') return 'singleFile';
 				if (param === 'loader') return 'textLoader';
 				return undefined;
@@ -423,7 +423,7 @@ describe('N8nBinaryLoader', () => {
 			const customMetadata = { source: 'test', type: 'document' };
 			getMetadataFiltersValues.mockReturnValue(customMetadata);
 
-			mockContext.getNodeParameter.mockImplementation((param: string, index: number) => {
+			mockContext.getNodeParameter.mockImplementation((param: string) => {
 				if (param === 'binaryMode') return 'singleFile';
 				if (param === 'loader') return 'textLoader';
 				return undefined;
@@ -460,7 +460,7 @@ describe('N8nBinaryLoader', () => {
 				splitDocuments: jest.fn().mockResolvedValue(mockDocuments),
 			} as unknown as TextSplitter;
 
-			mockContext.getNodeParameter.mockImplementation((param: string, index: number) => {
+			mockContext.getNodeParameter.mockImplementation((param: string) => {
 				if (param === 'binaryMode') return 'singleFile';
 				if (param === 'loader') return 'textLoader';
 				return undefined;
@@ -479,7 +479,7 @@ describe('N8nBinaryLoader', () => {
 			};
 
 			const loader = new N8nBinaryLoader(mockContext, '', 'file', mockSplitter);
-			const result = await loader.processItem(item, 0);
+			await loader.processItem(item, 0);
 
 			expect(mockSplitter.splitDocuments).toHaveBeenCalled();
 		});
@@ -488,7 +488,7 @@ describe('N8nBinaryLoader', () => {
 	describe('options prefix', () => {
 		it('should use options prefix for loader parameters', async () => {
 			const prefix = 'options.';
-			mockContext.getNodeParameter.mockImplementation((param: string, index: number) => {
+			mockContext.getNodeParameter.mockImplementation((param: string) => {
 				if (param === 'binaryMode') return 'singleFile';
 				if (param === 'loader') return 'pdfLoader';
 				if (param === `${prefix}splitPages`) return true;
@@ -508,14 +508,14 @@ describe('N8nBinaryLoader', () => {
 			};
 
 			const loader = new N8nBinaryLoader(mockContext, prefix, 'pdf');
-			const result = await loader.processItem(item, 0);
+			await loader.processItem(item, 0);
 
 			expect(mockContext.getNodeParameter).toHaveBeenCalledWith(`${prefix}splitPages`, 0, false);
 		});
 	});
 
 	it('should process text file', async () => {
-		mockContext.getNodeParameter.mockImplementation((param: string, index: number) => {
+		mockContext.getNodeParameter.mockImplementation((param: string) => {
 			if (param === 'binaryMode') return 'singleFile';
 			if (param === 'loader') return 'textLoader';
 			return undefined;
@@ -540,7 +540,7 @@ describe('N8nBinaryLoader', () => {
 	});
 
 	it('should process JSON file', async () => {
-		mockContext.getNodeParameter.mockImplementation((param: string, index: number) => {
+		mockContext.getNodeParameter.mockImplementation((param: string) => {
 			if (param === 'binaryMode') return 'singleFile';
 			if (param === 'loader') return 'jsonLoader';
 			if (param === 'pointers') return '';

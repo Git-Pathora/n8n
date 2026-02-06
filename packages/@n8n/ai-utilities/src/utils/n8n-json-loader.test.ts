@@ -75,7 +75,7 @@ describe('N8nJsonLoader', () => {
 		});
 
 		it('should process single item', async () => {
-			mockContext.getNodeParameter.mockImplementation((param: string, index: number) => {
+			mockContext.getNodeParameter.mockImplementation((param: string) => {
 				if (param === 'jsonMode') return 'allInputData';
 				if (param === 'pointers') return '';
 				return undefined;
@@ -95,7 +95,7 @@ describe('N8nJsonLoader', () => {
 		});
 
 		it('should process multiple items', async () => {
-			mockContext.getNodeParameter.mockImplementation((param: string, index: number) => {
+			mockContext.getNodeParameter.mockImplementation((param: string) => {
 				if (param === 'jsonMode') return 'allInputData';
 				if (param === 'pointers') return '';
 				return undefined;
@@ -117,7 +117,7 @@ describe('N8nJsonLoader', () => {
 
 	describe('processItem - allInputData mode', () => {
 		it('should process item in allInputData mode', async () => {
-			mockContext.getNodeParameter.mockImplementation((param: string, index: number) => {
+			mockContext.getNodeParameter.mockImplementation((param: string) => {
 				if (param === 'jsonMode') return 'allInputData';
 				if (param === 'pointers') return '';
 				return undefined;
@@ -137,7 +137,7 @@ describe('N8nJsonLoader', () => {
 		});
 
 		it('should process item with JSON pointers in allInputData mode', async () => {
-			mockContext.getNodeParameter.mockImplementation((param: string, index: number) => {
+			mockContext.getNodeParameter.mockImplementation((param: string) => {
 				if (param === 'jsonMode') return 'allInputData';
 				if (param === 'pointers') return '/test, /nested/value';
 				return undefined;
@@ -156,7 +156,7 @@ describe('N8nJsonLoader', () => {
 	});
 
 	it('should process string data in expressionData mode', async () => {
-		mockContext.getNodeParameter.mockImplementation((param: string, index: number) => {
+		mockContext.getNodeParameter.mockImplementation((param: string) => {
 			if (param === 'jsonMode') return 'expressionData';
 			if (param === 'jsonData') return 'plain text data';
 			if (param === 'pointers') return '';
@@ -176,7 +176,7 @@ describe('N8nJsonLoader', () => {
 	});
 
 	it('should process object data in expressionData mode', async () => {
-		mockContext.getNodeParameter.mockImplementation((param: string, index: number) => {
+		mockContext.getNodeParameter.mockImplementation((param: string) => {
 			if (param === 'jsonMode') return 'expressionData';
 			if (param === 'jsonData') return { test: 'object data' };
 			if (param === 'pointers') return '';
@@ -198,7 +198,7 @@ describe('N8nJsonLoader', () => {
 		const metadata = { source: 'test', category: 'document' };
 		getMetadataFiltersValues.mockReturnValue(metadata);
 
-		mockContext.getNodeParameter.mockImplementation((param: string, index: number) => {
+		mockContext.getNodeParameter.mockImplementation((param: string) => {
 			if (param === 'jsonMode') return 'allInputData';
 			if (param === 'pointers') return '';
 			return undefined;
@@ -225,7 +225,7 @@ describe('N8nJsonLoader', () => {
 			splitDocuments: jest.fn().mockResolvedValue(mockDocuments),
 		} as unknown as TextSplitter;
 
-		mockContext.getNodeParameter.mockImplementation((param: string, index: number) => {
+		mockContext.getNodeParameter.mockImplementation((param: string) => {
 			if (param === 'jsonMode') return 'allInputData';
 			if (param === 'pointers') return '';
 			return undefined;
@@ -244,7 +244,7 @@ describe('N8nJsonLoader', () => {
 
 	it('should use options prefix for pointers parameter', async () => {
 		const prefix = 'customPrefix.';
-		mockContext.getNodeParameter.mockImplementation((param: string, index: number) => {
+		mockContext.getNodeParameter.mockImplementation((param: string) => {
 			if (param === 'jsonMode') return 'allInputData';
 			if (param === `${prefix}pointers`) return '/custom';
 			return '';

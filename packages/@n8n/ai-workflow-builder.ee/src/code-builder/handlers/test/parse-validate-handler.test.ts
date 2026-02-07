@@ -5,7 +5,6 @@
 import type { WorkflowJSON } from '@n8n/workflow-sdk';
 import { parseWorkflowCodeToBuilder, validateWorkflow, workflow } from '@n8n/workflow-sdk';
 
-import type { ParseAndValidateResult } from '../../types';
 import { ParseValidateHandler } from '../parse-validate-handler';
 
 // Mock the workflow-sdk module
@@ -242,55 +241,6 @@ describe('ParseValidateHandler', () => {
 			await expect(handler.parseAndValidate('invalid syntax')).rejects.toThrow(
 				'Failed to parse generated workflow code',
 			);
-		});
-	});
-
-	describe('formatValidationFeedback', () => {
-		it('should format warnings with error context', () => {
-			const result: ParseAndValidateResult = {
-				workflow: { id: 'test', name: 'Test', nodes: [], connections: {} },
-				warnings: [{ code: 'WARN001', message: 'Missing parameter at line 10' }],
-			};
-
-			const code =
-				'line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10\nline11\nline12';
-
-			const feedback = handler.formatValidationFeedback(result, code);
-
-			expect(feedback.feedbackMessage).toContain('WARN001');
-			expect(feedback.feedbackMessage).toContain('Missing parameter');
-		});
-
-		it('should return empty feedback when no warnings', () => {
-			const result: ParseAndValidateResult = {
-				workflow: { id: 'test', name: 'Test', nodes: [], connections: {} },
-				warnings: [],
-			};
-
-			const feedback = handler.formatValidationFeedback(result, 'code');
-
-			expect(feedback.feedbackMessage).toBe('');
-			expect(feedback.hasWarnings).toBe(false);
-		});
-	});
-
-	describe('formatParseError', () => {
-		it('should format parse error with code context', () => {
-			const code = 'line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10';
-
-			const feedback = handler.formatParseError(new Error('Unexpected token at line 5'), code);
-
-			expect(feedback.feedbackMessage).toContain('Parse error');
-			expect(feedback.feedbackMessage).toContain('Unexpected token');
-		});
-
-		it('should show first lines when no line number in error', () => {
-			const code = 'line1\nline2\nline3\nline4\nline5';
-
-			const feedback = handler.formatParseError(new Error('Some generic error'), code);
-
-			expect(feedback.feedbackMessage).toContain('Parse error');
-			expect(feedback.feedbackMessage).toContain('Some generic error');
 		});
 	});
 

@@ -322,7 +322,7 @@ describe('TextEditorToolHandler', () => {
 			expect(content).toContain('WARN002');
 			expect(content).not.toContain('WARN001');
 			// New warning should now be marked as seen
-			expect(warningTracker.allSeen([newWarning])).toBe(true);
+			expect(warningTracker.filterNewWarnings([newWarning])).toHaveLength(0);
 		});
 
 		it('should annotate pre-existing warnings with [pre-existing] tag after create', async () => {

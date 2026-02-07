@@ -213,7 +213,7 @@ describe('AutoFinalizeHandler', () => {
 			expect((messages[1] as ToolMessage).content).toContain('W002');
 			expect((messages[1] as ToolMessage).content).not.toContain('W001');
 			// New warning should now be marked as seen
-			expect(warningTracker.allSeen([newWarning])).toBe(true);
+			expect(warningTracker.filterNewWarnings([newWarning])).toHaveLength(0);
 		});
 
 		it('should annotate pre-existing warnings with [pre-existing] tag', async () => {

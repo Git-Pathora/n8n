@@ -10,10 +10,8 @@ import type { Logger } from '@n8n/backend-common';
 import { parseWorkflowCodeToBuilder, validateWorkflow, workflow } from '@n8n/workflow-sdk';
 import type { WorkflowJSON } from '@n8n/workflow-sdk';
 
-import { FIX_VALIDATION_ERRORS_INSTRUCTION } from '../constants';
 import type { ParseAndValidateResult, ValidationWarning } from '../types';
 import { stripImportStatements } from '../utils/extract-code';
-import { formatWarnings } from '../utils/format-warnings';
 
 /**
  * Debug log callback type
@@ -26,21 +24,6 @@ type DebugLogFn = (context: string, message: string, data?: Record<string, unkno
 export interface ParseValidateHandlerConfig {
 	debugLog?: DebugLogFn;
 	logger?: Logger;
-}
-
-/**
- * Result of formatting validation feedback
- */
-export interface ValidationFeedbackResult {
-	feedbackMessage: string;
-	hasWarnings: boolean;
-}
-
-/**
- * Result of formatting a parse error
- */
-export interface ParseErrorResult {
-	feedbackMessage: string;
 }
 
 /**
@@ -307,43 +290,6 @@ export class ParseValidateHandler {
 				`Failed to parse generated workflow code: ${error instanceof Error ? error.message : 'Unknown error'}`,
 			);
 		}
-	}
-
-	/**
-	 * Format validation warnings into feedback for the agent.
-	 *
-	 * @param result - The parse and validate result
-	 * @param code - The original code for error context
-	 * @returns Formatted feedback message
-	 */
-	formatValidationFeedback(result: ParseAndValidateResult, code: string): ValidationFeedbackResult {
-		if (result.warnings.length === 0) {
-			return { feedbackMessage: '', hasWarnings: false };
-		}
-
-		const warningText = formatWarnings(result.warnings);
-		const errorContext = this.getErrorContext(code, result.warnings[0].message);
-
-		return {
-			feedbackMessage: `Validation warnings:\n${warningText}\n\n${errorContext}\n\n${FIX_VALIDATION_ERRORS_INSTRUCTION}`,
-			hasWarnings: true,
-		};
-	}
-
-	/**
-	 * Format a parse error into feedback for the agent.
-	 *
-	 * @param error - The parse error
-	 * @param code - The original code for error context
-	 * @returns Formatted feedback message
-	 */
-	formatParseError(error: Error, code: string): ParseErrorResult {
-		const errorMessage = error.message;
-		const errorContext = this.getErrorContext(code, errorMessage);
-
-		return {
-			feedbackMessage: `Parse error: ${errorMessage}\n\n${errorContext}\n\n${FIX_VALIDATION_ERRORS_INSTRUCTION}`,
-		};
 	}
 
 	/**

@@ -307,7 +307,6 @@ ${'='.repeat(50)}
 		durationMs: number;
 		beforeWorkflow?: WorkflowJSON;
 		afterWorkflow?: WorkflowJSON | null;
-		warningTracker?: WarningTracker;
 	}): void {
 		if (!this.onTelemetryEvent) {
 			return;
@@ -324,7 +323,6 @@ ${'='.repeat(50)}
 			durationMs,
 			beforeWorkflow,
 			afterWorkflow,
-			warningTracker,
 		} = params;
 
 		const nodeChanges = calculateNodeChanges(beforeWorkflow, afterWorkflow);
@@ -347,10 +345,6 @@ ${'='.repeat(50)}
 
 		if (errorMessage) {
 			properties.error_message = errorMessage;
-		}
-
-		if (warningTracker?.hasTrackedWarnings()) {
-			properties.validation_issues = warningTracker.getIssuesWithResolutionStatus();
 		}
 
 		this.onTelemetryEvent('Code builder agent ran', properties);
@@ -394,7 +388,6 @@ ${'='.repeat(50)}
 
 		// Track state for telemetry in catch block
 		let iteration = 0;
-		let warningTracker: WarningTracker | undefined;
 
 		try {
 			this.logger?.debug('Code builder agent starting', {
@@ -433,7 +426,6 @@ ${'='.repeat(50)}
 
 			const { workflow, parseDuration, sourceCode } = loopResult;
 			iteration = loopResult.iteration;
-			warningTracker = loopResult.warningTracker;
 
 			if (!workflow) {
 				throw new Error(
@@ -497,7 +489,6 @@ ${'='.repeat(50)}
 				durationMs: totalDuration,
 				beforeWorkflow,
 				afterWorkflow: workflow,
-				warningTracker,
 			});
 		} catch (error) {
 			const totalDuration = Date.now() - startTime;
@@ -546,7 +537,6 @@ ${'='.repeat(50)}
 				durationMs: totalDuration,
 				beforeWorkflow,
 				afterWorkflow: null,
-				warningTracker,
 			});
 		}
 	}
@@ -690,7 +680,6 @@ ${'='.repeat(50)}
 			parseDuration: state.parseDuration,
 			sourceCode: state.sourceCode,
 			iteration: state.iteration,
-			warningTracker: state.warningTracker,
 		};
 	}
 
@@ -928,7 +917,6 @@ interface AgenticLoopResult {
 	parseDuration: number;
 	sourceCode: string | null;
 	iteration: number;
-	warningTracker: WarningTracker;
 }
 
 /**

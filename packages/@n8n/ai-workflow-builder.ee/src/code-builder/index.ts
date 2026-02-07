@@ -36,11 +36,7 @@ export { WarningTracker } from './state/warning-tracker';
 
 // Handlers
 export { ParseValidateHandler } from './handlers/parse-validate-handler';
-export type {
-	ParseValidateHandlerConfig,
-	ValidationFeedbackResult,
-	ParseErrorResult,
-} from './handlers/parse-validate-handler';
+export type { ParseValidateHandlerConfig } from './handlers/parse-validate-handler';
 
 export { ValidateToolHandler } from './handlers/validate-tool-handler';
 export type {

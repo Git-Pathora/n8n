@@ -304,6 +304,3 @@ export function createFromAIExpression(
 
 	return `={{ ${marker} $fromAI(${args.join(', ')}) }}`;
 }
-
-// Re-export for convenience
-export { parseExpression as parse, serializeExpression as serialize };

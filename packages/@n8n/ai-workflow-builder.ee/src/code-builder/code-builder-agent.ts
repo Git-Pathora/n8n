@@ -809,28 +809,6 @@ ${'='.repeat(50)}
 			return { shouldBreak: true };
 		}
 
-		// Check if we should exit after text editor finalize
-		// Only exit if validate was NOT called this iteration. If validate was called
-		// but failed with warnings, the LLM needs another iteration to fix them.
-		const validateCalledThisIteration = toolCalls.some((tc) => tc.name === 'validate_workflow');
-		if (
-			textEditorEnabled &&
-			state.workflow &&
-			!dispatchResult.validatePassedThisIteration &&
-			!validateCalledThisIteration
-		) {
-			this.debugLog('CHAT', 'Workflow ready from text editor, exiting loop');
-			if (textEditorHandler) {
-				state.sourceCode = textEditorHandler.getWorkflowCode() ?? null;
-			}
-			return { shouldBreak: true };
-		}
-
-		// Track validate attempts
-		if (dispatchResult.validatePassedThisIteration) {
-			state.textEditorValidateAttempts++;
-		}
-
 		// Check for too many validate failures
 		if (textEditorEnabled && state.textEditorValidateAttempts >= MAX_VALIDATE_ATTEMPTS) {
 			throw new Error(

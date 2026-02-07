@@ -118,6 +118,10 @@ export class ParseValidateHandler {
 	 * @returns Array of validation warnings found in the existing workflow
 	 */
 	validateExistingWorkflow(json: WorkflowJSON): ValidationWarning[] {
+		if (json.nodes.length === 0) {
+			return [];
+		}
+
 		const builder = workflow.fromJSON(json);
 		const allWarnings: ValidationWarning[] = [];
 		const graphValidation = builder.validate();

@@ -2,6 +2,7 @@
  * Tests for ParseValidateHandler
  */
 
+import type { WorkflowJSON } from '@n8n/workflow-sdk';
 import { parseWorkflowCodeToBuilder, validateWorkflow, workflow } from '@n8n/workflow-sdk';
 
 import type { ParseAndValidateResult } from '../../types';
@@ -314,24 +315,27 @@ describe('ParseValidateHandler', () => {
 	});
 
 	describe('validateExistingWorkflow', () => {
-		it('should return warnings from an existing workflow JSON', () => {
-			const inputJson = { id: 'test', name: 'Test', nodes: [], connections: {} };
+		const nonEmptyJson = {
+			id: 'test',
+			name: 'Test',
+			nodes: [{ type: 'n8n-nodes-base.set' }],
+			connections: {},
+		} as unknown as WorkflowJSON;
 
+		it('should return graph warnings from an existing workflow JSON', () => {
 			const mockBuilder = {
 				validate: jest.fn().mockReturnValue({
 					valid: true,
 					errors: [],
 					warnings: [{ code: 'WARN001', message: 'Existing warning', nodeName: 'Node1' }],
 				}),
-				toJSON: jest.fn().mockReturnValue(inputJson),
 			};
 
 			mockFromJSON.mockReturnValue(mockBuilder);
-			mockValidateWorkflow.mockReturnValue({ valid: true, errors: [], warnings: [] });
 
-			const result = handler.validateExistingWorkflow(inputJson);
+			const result = handler.validateExistingWorkflow(nonEmptyJson);
 
-			expect(mockFromJSON).toHaveBeenCalledWith(inputJson);
+			expect(mockFromJSON).toHaveBeenCalledWith(nonEmptyJson);
 			expect(mockBuilder.validate).toHaveBeenCalled();
 			expect(result).toHaveLength(1);
 			expect(result[0]).toEqual({
@@ -342,49 +346,55 @@ describe('ParseValidateHandler', () => {
 		});
 
 		it('should return empty array when no warnings', () => {
-			const inputJson = { id: 'test', name: 'Test', nodes: [], connections: {} };
-
 			const mockBuilder = {
 				validate: jest.fn().mockReturnValue({ valid: true, errors: [], warnings: [] }),
-				toJSON: jest.fn().mockReturnValue(inputJson),
 			};
 
 			mockFromJSON.mockReturnValue(mockBuilder);
-			mockValidateWorkflow.mockReturnValue({ valid: true, errors: [], warnings: [] });
 
-			const result = handler.validateExistingWorkflow(inputJson);
+			const result = handler.validateExistingWorkflow(nonEmptyJson);
 
 			expect(result).toHaveLength(0);
 		});
 
-		it('should collect both graph and JSON validation issues', () => {
-			const inputJson = { id: 'test', name: 'Test', nodes: [], connections: {} };
-
+		it('should collect both graph errors and warnings', () => {
 			const mockBuilder = {
 				validate: jest.fn().mockReturnValue({
 					valid: false,
 					errors: [{ code: 'GRAPH_ERR', message: 'Graph error' }],
 					warnings: [{ code: 'GRAPH_WARN', message: 'Graph warning' }],
 				}),
-				toJSON: jest.fn().mockReturnValue(inputJson),
 			};
 
 			mockFromJSON.mockReturnValue(mockBuilder);
-			mockValidateWorkflow.mockReturnValue({
-				valid: false,
-				errors: [{ code: 'JSON_ERR', message: 'JSON error' }],
-				warnings: [{ code: 'JSON_WARN', message: 'JSON warning' }],
-			});
 
-			const result = handler.validateExistingWorkflow(inputJson);
+			const result = handler.validateExistingWorkflow(nonEmptyJson);
 
-			expect(result).toHaveLength(4);
-			expect(result.map((w) => w.code)).toEqual([
-				'GRAPH_ERR',
-				'GRAPH_WARN',
-				'JSON_ERR',
-				'JSON_WARN',
-			]);
+			expect(result).toHaveLength(2);
+			expect(result.map((w) => w.code)).toEqual(['GRAPH_ERR', 'GRAPH_WARN']);
+		});
+
+		it('should skip validation and return empty array when workflow has no nodes', () => {
+			const emptyJson = { id: 'test', name: 'Test', nodes: [], connections: {} };
+
+			const result = handler.validateExistingWorkflow(emptyJson);
+
+			expect(result).toHaveLength(0);
+			expect(mockFromJSON).not.toHaveBeenCalled();
+		});
+
+		it('should not call toJSON or validateWorkflow', () => {
+			const mockBuilder = {
+				validate: jest.fn().mockReturnValue({ valid: true, errors: [], warnings: [] }),
+				toJSON: jest.fn(),
+			};
+
+			mockFromJSON.mockReturnValue(mockBuilder);
+
+			handler.validateExistingWorkflow(nonEmptyJson);
+
+			expect(mockBuilder.toJSON).not.toHaveBeenCalled();
+			expect(mockValidateWorkflow).not.toHaveBeenCalled();
 		});
 	});
 });

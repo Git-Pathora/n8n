@@ -29,65 +29,14 @@ const RESPONSE_STYLE = `**Be extremely concise in your visible responses.** The 
 All your reasoning and analysis should happen in your internal thinking process before generating output. Never include reasoning, analysis, or self-talk in your visible response.`;
 
 /**
- * Workflow structure rules
- */
-const WORKFLOW_RULES = `Follow these rules strictly when generating workflows:
-
-1. **Always start with a trigger node**
-   - Use \`manualTrigger\` for testing or when no other trigger is specified
-   - Use \`scheduleTrigger\` for recurring tasks
-   - Use \`webhook\` for external integrations
-
-2. **No orphaned nodes**
-   - Every node (except triggers) must be connected to the workflow
-   - Use \`.to()\` to chain nodes or \`.add()\` for separate chains
-
-3. **Use descriptive node names**
-   - Good: "Fetch Weather Data", "Format Response", "Check Temperature"
-   - Bad: "HTTP Request", "Set", "If"
-
-4. **Position nodes left-to-right**
-   - Start trigger at \`[240, 300]\`
-   - Each subsequent node +300 in x direction: \`[540, 300]\`, \`[840, 300]\`, etc.
-   - Branch vertically: \`[540, 200]\` for top branch, \`[540, 400]\` for bottom branch
-
-5. **Use newCredential() for authentication**
-   - When a node needs credentials, use \`newCredential('Name')\` in the credentials config
-   - Example: \`credentials: {{ slackApi: newCredential('Slack Bot') }}\`
-   - The credential type must match what the node expects
-
-7. **Expressions and Data Flow** (see ExpressionContext in SDK API)
-   - ALWAYS use \`expr()\` when a parameter contains \`{{{{ }}}}\` expression syntax
-   - Template expressions: \`expr('Hello {{{{ $json.name }}}}')\`
-   - Node references: \`expr("{{{{ $('Previous Node').item.json.data }}}}")\`
-
-8. **OUTPUT DECLARATION (MANDATORY)**
-    Every node MUST include an \`output\` property showing sample output data
-		In order to reason about what data is available at each step.
-		Expressions in following nodes depend on output of previous nodes.
-		Use types for node output data, if available.
-
-		Example:
-    \`\`\`javascript
-    const webhook = trigger({{
-      type: 'n8n-nodes-base.webhook',
-      version: 2.1,
-      config: {{ name: 'Webhook', parameters: {{ httpMethod: 'POST' }} }},
-      output: [{{ amount: 100, description: 'Laptop' }}]
-    }});
-    \`\`\`
-
-    <handling_multiple_branches>
-			When a node receives data from multiple paths (after Switch, IF, Merge):
-			- **Option A**: Use optional chaining: \`expr('{{{{ $json.data?.approved ?? $json.status }}}}')\`
-			- **Option B**: Reference a node that ALWAYS runs: \`expr("{{{{ $('Webhook').item.json.field }}}}")\`
-			- **Option C**: Normalize data before convergence with Set nodes
-    </handling_multiple_branches>`;
-
-/**
  * Workflow patterns - condensed examples
  */
-const WORKFLOW_PATTERNS = `<linear_chain>
+const WORKFLOW_PATTERNS = `**Workflow structure rules:**
+- Always start with a trigger node (\`manualTrigger\` for testing, \`scheduleTrigger\` for recurring tasks, \`webhook\` for external integrations)
+- No orphaned nodes — every node (except triggers) must be connected via \`.to()\` or \`.add()\`
+- Use descriptive node names (Good: "Fetch Weather Data", "Check Temperature"; Bad: "HTTP Request", "Set", "If")
+
+<linear_chain>
 \`\`\`javascript
 // 1. Define all nodes first
 const startTrigger = trigger({{
@@ -454,7 +403,7 @@ Analyze the user request internally. Do NOT produce visible output in this step 
 
 4. **Identify Workflow Concepts**: What patterns are needed?
    - Trigger type (manual, schedule, webhook, etc.)
-   - Branching/routing (if/else, switch)
+   - Branching/routing (if/else, switch, merge)
    - Loops (batch processing)
    - Data transformation needs
 
@@ -517,9 +466,11 @@ Use the \`think\` tool to make decisions based on search results. Do NOT produce
    - Is this linear, branching, parallel, or looped? Or merge to combine parallel branches?
    - Which nodes connect to which?
 	 - Draw out the flow in text form (e.g., "Trigger → Node A → Node B → Node C" or "Trigger → Node A → [Node B (true), Node C (false)]")
+   - **Handling convergence after branches**: When a node receives data from multiple paths (after Switch, IF, Merge): use optional chaining \`expr('{{{{ $json.data?.approved ?? $json.status }}}}')\`, reference a node that ALWAYS runs \`expr("{{{{ $('Webhook').item.json.field }}}}")\`, or normalize data before convergence with Set nodes
 
-3. **Plan Node Positions**: Following left-to-right, top-to-bottom layout
-   - Write out the [x, y] coordinates for each node
+3. **Plan Node Positions**: Layout left-to-right, top-to-bottom
+   - Start trigger at \`[240, 300]\`, each subsequent node +300 in x: \`[540, 300]\`, \`[840, 300]\`, etc.
+   - Branch vertically: \`[540, 200]\` for top branch, \`[540, 400]\` for bottom branch
 
 4. **Identify Placeholders and Credentials**:
    - List values needing user input → use placeholder()
@@ -553,11 +504,13 @@ Include discriminators for nodes that require them (shown in search results).
 
 Do NOT produce visible output — only the tool call to edit code.
 
-The workflow file \`/workflow.js\` already exists with code. Use \`str_replace\` to replace existing code or \`insert\` to add new lines. Do NOT use \`create\` — the file is pre-populated.
+Edit \`/workflow.js\` using \`str_replace\` or \`insert\` (never \`create\` — file is pre-populated). Use exact parameter names and structures from the type definitions.
 
-After receiving type definitions, edit the JavaScript code using exact parameter names and structures from the type definitions.
-
-**IMPORTANT:** Use unique variable names - never reuse builder function names as variable names.
+Rules:
+- Use unique variable names — never reuse builder function names (e.g. \`node\`, \`trigger\`) as variable names
+- Credentials: \`credentials: {{ slackApi: newCredential('Slack Bot') }}\` — type must match what the node expects
+- Expressions: use \`expr()\` for any \`{{{{ }}}}\` syntax — e.g. \`expr('Hello {{{{ $json.name }}}}')\` or \`expr("{{{{ $('Node').item.json.field }}}}")\`
+- Every node MUST have an \`output\` property with sample data — following nodes depend on it for expressions
 
 </step_5_edit_workflow>
 
@@ -625,7 +578,6 @@ export function buildCodeBuilderPrompt(
 	const promptSections = [
 		`<role>\n${ROLE}\n</role>`,
 		`<response_style>\n${RESPONSE_STYLE}\n</response_style>`,
-		`<workflow_generation_rules>\n${WORKFLOW_RULES}\n</workflow_generation_rules>`,
 		`<workflow_patterns>\n${WORKFLOW_PATTERNS}\n</workflow_patterns>`,
 		`<sdk_api_reference>\n${SDK_API_CONTENT_ESCAPED}\n</sdk_api_reference>`,
 		`<mandatory_workflow_process>\n${MANDATORY_WORKFLOW}\n</mandatory_workflow_process>`,

@@ -7,7 +7,7 @@
 
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { AIMessage } from '@langchain/core/messages';
-import type { WorkflowJSON } from '@n8n/workflow-sdk';
+import type { IWorkflowBase } from 'n8n-workflow';
 
 import { CodeBuilderAgent } from '../code-builder-agent';
 
@@ -31,7 +31,7 @@ jest.mock('../prompts', () => ({
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const { parseWorkflowCodeToBuilder, validateWorkflow } = require('@n8n/workflow-sdk');
 
-const MOCK_WORKFLOW: WorkflowJSON = {
+const MOCK_WORKFLOW: Partial<IWorkflowBase> = {
 	id: 'test-wf-1',
 	name: 'Test Workflow',
 	nodes: [
@@ -45,7 +45,7 @@ const MOCK_WORKFLOW: WorkflowJSON = {
 		},
 	],
 	connections: {},
-} as unknown as WorkflowJSON;
+};
 
 function createMockBuilder(warnings: Array<{ code: string; message: string }> = []) {
 	return {

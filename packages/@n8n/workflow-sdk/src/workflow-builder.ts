@@ -734,7 +734,14 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 
 					if (nodeToCheck && nodeName && typeof nodeToCheck.getConnections === 'function') {
 						const nodeConns = nodeToCheck.getConnections();
-						if (nodeConns.some((c) => c.target === target && c.outputIndex === outputIndex)) {
+						if (
+							nodeConns.some(
+								(c) =>
+									c.target === target &&
+									c.outputIndex === outputIndex &&
+									c.targetInputIndex === targetInputIndex,
+							)
+						) {
 							// This chain node declared this connection
 							// First, ensure target nodes are added to the graph (e.g., error handler chains)
 							if (isNodeChain(target)) {
@@ -774,7 +781,11 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 										sourceGraphNode.connections.get('main') ??
 										new Map<number, ConnectionTarget[]>();
 									const outputConns: ConnectionTarget[] = mainConns.get(outputIndex) ?? [];
-									if (!outputConns.some((c) => c.node === targetName)) {
+									if (
+										!outputConns.some(
+											(c) => c.node === targetName && c.index === (targetInputIndex ?? 0),
+										)
+									) {
 										outputConns.push({
 											node: targetName,
 											type: 'main',

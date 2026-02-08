@@ -227,5 +227,57 @@ describe('Merge', () => {
 			expect(json.connections['API 2'].main[0]![0].index).toBe(1);
 			expect(json.connections['API 3'].main[0]![0].index).toBe(2);
 		});
+
+		it('should not connect to both inputs when using inline chain pattern with .to([])', () => {
+			const webhookTrigger = trigger({
+				type: 'n8n-nodes-base.webhook',
+				version: 2,
+				config: { name: 'Webhook' },
+			});
+			const mergeResults = node({
+				type: 'n8n-nodes-base.merge',
+				version: 3,
+				config: { name: 'Merge Results' },
+			}) as MergeNode;
+			const fetchEmails = node({
+				type: 'n8n-nodes-base.httpRequest',
+				version: 4.2,
+				config: { name: 'Fetch Emails' },
+			});
+			const summarizeEmails = node({
+				type: 'n8n-nodes-base.set',
+				version: 3,
+				config: { name: 'Summarize Emails' },
+			});
+			const fetchWeather = node({
+				type: 'n8n-nodes-base.httpRequest',
+				version: 4.2,
+				config: { name: 'Fetch Weather' },
+			});
+
+			// Inline chain pattern: two sub-chains in .to([...]) targeting different merge inputs
+			const wf = workflow('test-id', 'Test').add(
+				webhookTrigger.to([
+					fetchEmails.to(summarizeEmails.to(mergeResults.input(0))),
+					fetchWeather.to(mergeResults.input(1)),
+				]),
+			);
+
+			const json = wf.toJSON();
+
+			// Summarize Emails should connect to Merge Results input 0 only
+			const summarizeConns = json.connections['Summarize Emails'];
+			expect(summarizeConns).toBeDefined();
+			expect(summarizeConns.main[0]).toHaveLength(1);
+			expect(summarizeConns.main[0]![0].node).toBe('Merge Results');
+			expect(summarizeConns.main[0]![0].index).toBe(0);
+
+			// Fetch Weather should connect to Merge Results input 1 only
+			const weatherConns = json.connections['Fetch Weather'];
+			expect(weatherConns).toBeDefined();
+			expect(weatherConns.main[0]).toHaveLength(1);
+			expect(weatherConns.main[0]![0].node).toBe('Merge Results');
+			expect(weatherConns.main[0]![0].index).toBe(1);
+		});
 	});
 });

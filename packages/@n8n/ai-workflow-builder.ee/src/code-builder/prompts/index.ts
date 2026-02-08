@@ -480,7 +480,6 @@ For each service/concept searched, list the matching node(s) found:
 - Note [RELATED] nodes that might be useful
 - Note @relatedNodes with relationHints for complementary nodes
 - **Pay special attention to @builderHint and @example annotations** — write these out as they are guides specifically meant to help you choose the right node configurations
-- **Review patternHints and notes from get_suggested_nodes results** — these describe the expected workflow structure (e.g., "Trigger → Fetch → Extract → Store") and mandatory node requirements. Treat notes as actionable instructions, not just informational context
 - It's OK for this section to be quite long if many nodes were found
 
 </step_2c_review_search_results>
@@ -495,9 +494,7 @@ Use the \`think\` tool to make design decisions based on the reviewed results. D
    - Use dedicated integration nodes when available (from search)
    - Only use HTTP Request if no dedicated node was found
    - Note discriminators needed for each node
-   - **Follow the patternHint from get_suggested_nodes** — if it says "Trigger → Fetch → Extract → Store", your workflow MUST include nodes for each stage. If a note says "Always include X", include it even if the user didn't explicitly ask for it
    - **If you identified \`scraping_and_research\` in Step 1, you MUST include a data-fetching node or tool** (e.g., SerpApi tool, Perplexity, HTTP Request). Do not rely on the AI model's training data for real-world information — commit to the data source you identified earlier
-   - **Respect node notes from suggested results** — notes like "Default storage when user does not specify a destination" or "Every agent MUST have memory" are mandatory guidance, not suggestions
 
 2. **Map Node Connections**:
    - Is this linear, branching, parallel, or looped? Or merge to combine parallel branches?

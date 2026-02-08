@@ -221,8 +221,7 @@ export const suggestedNodesData: Record<string, CategoryData> = {
 
 	scraping_and_research: {
 		description: 'Collecting information from websites or APIs',
-		patternHint:
-			'Trigger → Fetch → Extract → Store (Always include a storage step in scraping workflows)',
+		patternHint: 'Trigger → Fetch → Extract → Store',
 		nodes: [
 			{
 				name: 'n8n-nodes-base.dataTable',

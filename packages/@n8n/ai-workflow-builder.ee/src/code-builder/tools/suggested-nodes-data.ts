@@ -129,7 +129,9 @@ export const suggestedNodesData: Record<string, CategoryData> = {
 				name: 'n8n-nodes-base.extractFromFile',
 				note: 'For multiple file types, route by file type first with IF/Switch',
 			},
-			{ name: 'n8n-nodes-base.htmlExtract', note: 'JS-rendered content may be empty' },
+			{
+				name: 'n8n-nodes-base.htmlExtract',
+			},
 			{ name: 'n8n-nodes-base.splitOut', note: 'Use before Loop Over Items for arrays' },
 			{
 				name: 'n8n-nodes-base.splitInBatches',
@@ -195,7 +197,8 @@ export const suggestedNodesData: Record<string, CategoryData> = {
 			{ name: '@n8n/n8n-nodes-langchain.lmChatGoogleGemini', note: 'Imagen, video generation' },
 			{ name: 'n8n-nodes-base.httpRequest', note: 'For APIs without dedicated nodes' },
 			{ name: 'n8n-nodes-base.editImage', note: 'Resize, crop, format conversion' },
-			{ name: 'n8n-nodes-base.markdown', note: 'Convert to HTML' },
+			{ name: 'n8n-nodes-base.markdown' },
+			{ name: 'n8n-nodes-base.html' },
 			{ name: 'n8n-nodes-base.facebookGraphApi' },
 			{
 				name: 'n8n-nodes-base.wait',
@@ -233,7 +236,6 @@ export const suggestedNodesData: Record<string, CategoryData> = {
 			{ name: '@n8n/n8n-nodes-langchain.toolSerpApi', note: 'Give agent web search capability' },
 			{
 				name: 'n8n-nodes-base.htmlExtract',
-				note: 'Use to extract HTML content from http requests. Though, JS-rendered sites may return empty',
 			},
 			{
 				name: 'n8n-nodes-base.splitInBatches',
@@ -246,3 +248,16 @@ export const suggestedNodesData: Record<string, CategoryData> = {
 };
 
 export const categoryList = Object.keys(suggestedNodesData);
+
+/**
+ * Format suggested nodes data into a compact string for embedding in the system prompt.
+ */
+export function formatSuggestedNodesForPrompt(data: Record<string, CategoryData>): string {
+	return Object.entries(data)
+		.map(([category, { patternHint, nodes }]) => {
+			const header = `**${category}** — Pattern: ${patternHint}`;
+			const nodeLines = nodes.map(({ name, note }) => `- ${name}${note ? ` — ${note}` : ''}`);
+			return [header, ...nodeLines].join('\n');
+		})
+		.join('\n\n');
+}

@@ -13,6 +13,7 @@ import type { IRunExecutionData, NodeExecutionSchema } from 'n8n-workflow';
 import { escapeCurlyBrackets, SDK_API_CONTENT_ESCAPED } from './sdk-api';
 import type { ExpressionValue } from '../../workflow-builder-agent';
 import { formatCodeWithLineNumbers } from '../handlers/text-editor-handler';
+import { formatSuggestedNodesForPrompt, suggestedNodesData } from '../tools/suggested-nodes-data';
 import { SDK_IMPORT_STATEMENT } from '../utils/extract-code';
 
 /**
@@ -371,56 +372,22 @@ return workflow('ai-email', 'AI Email Sender')
 /**
  * Mandatory workflow for tool usage
  */
-const MANDATORY_WORKFLOW = `**You MUST follow these steps in order. Do NOT produce visible output until the final step — only tool calls. Use the \`think\` tool between steps when you need to reason about results.**
+const MANDATORY_WORKFLOW = `**You MUST follow these steps in order. Do NOT produce visible output until the final step — only tool calls.**
 
 <step_1_analyze_user_request>
 
-Analyze the user request internally. Do NOT produce visible output in this step — use the \`think\` tool if you need to record your analysis, then proceed to tool calls.
+Analyze the user request internally. Do NOT produce visible output — only the tool call to search.
 
-1. **Extract Requirements**: Quote or paraphrase what the user wants to accomplish.
-
-2. **Identify Workflow Technique Category**: Does the request match a known pattern?
-   - chatbot: Receiving chat messages and replying (built-in chat, Telegram, Slack, etc.)
-   - notification: Sending alerts or updates via email, chat, SMS when events occur
-   - scheduling: Running actions at specific times or intervals
-   - data_transformation: Cleaning, formatting, or restructuring data
-   - data_persistence: Storing, updating, or retrieving records from persistent storage
-   - data_extraction: Pulling specific information from structured or unstructured inputs
-   - document_processing: Taking action on content within files (PDFs, Word docs, images)
-   - form_input: Gathering data from users via forms
-   - content_generation: Creating text, images, audio, or video
-   - triage: Classifying data for routing or prioritization
-   - scraping_and_research: Collecting information from websites or APIs
-
-3. **Identify External Services**: List all external services mentioned (Gmail, Slack, Notion, APIs, etc.)
-   - Do NOT assume you know the node names yet
-   - Just identify what services need to be connected
-
-4. **Identify Workflow Concepts**: What patterns are needed?
-   - Trigger type — every workflow must start with one (\`manualTrigger\` for testing, \`scheduleTrigger\` for recurring, \`webhook\` for external)
-   - Branching/routing (if/else, switch, merge)
-   - Loops (batch processing)
-   - Data transformation needs
+Identify:
+- **External services**: Gmail, Slack, Notion, etc. Do NOT assume you know the node names yet.
+- **Workflow technique**: chatbot, notification, scheduling, data_transformation, data_persistence, data_extraction, document_processing, form_input, content_generation, triage, scraping_and_research
+- **Workflow concepts**: Trigger type, branching, loops, data transformation
 
 </step_1_analyze_user_request>
 
 <step_2_search_for_nodes>
 
-<step_2a_get_suggested_nodes>
-
-Do NOT produce visible output — only the tool call. Call \`get_suggested_nodes\` with the workflow technique categories identified in Step 1:
-
-\`\`\`
-get_suggested_nodes({{ categories: ["chatbot", "notification"] }})
-\`\`\`
-
-This returns curated node recommendations with pattern hints and configuration guidance.
-
-</step_2a_get_suggested_nodes>
-
-<step_2b_search_for_nodes>
-
-Do NOT produce visible output — only the tool call. Call \`search_nodes\` to find specific nodes for services identified in Step 1 and ALL node types you plan to use:
+Call \`search_nodes\` for ALL services and node types in a **single call** — no visible output.
 
 \`\`\`
 search_nodes({{ queries: ["gmail", "slack", "schedule trigger", "set", ...] }})
@@ -429,66 +396,37 @@ search_nodes({{ queries: ["gmail", "slack", "schedule trigger", "set", ...] }})
 Search for:
 - External services (Gmail, Slack, etc.)
 - Workflow concepts (schedule, webhook, etc.)
-- **Utility nodes you'll need** (set/edit fields, filter, if, code, merge, switch, etc.)
+- Utility nodes (set/edit fields, filter, if, code, merge, switch, etc.)
 - AI-related terms if needed
+- Nodes recommended in suggested_nodes_by_category for your workflow technique
 
-</step_2b_search_for_nodes>
+**Include everything in one search call** — searching once with all queries is faster than multiple calls.
 
 </step_2_search_for_nodes>
 
-<step_3_plan_workflow_design>
+<step_3_plan>
 
-Use the \`think\` tool to review search results and make design decisions. Do NOT produce visible output in this step.
+Call the \`think\` tool to select nodes and plan connections. Do NOT produce visible output. Be careful, but concise.
 
-1. **Review Search Results**: For each service/concept searched, list the matching node(s) found
-   - Note which nodes have [TRIGGER] tags for trigger nodes
-   - Note discriminator requirements (resource/operation or mode) for each node
-   - Note [RELATED] nodes that might be useful
-   - Note @relatedNodes with relationHints for complementary nodes
-   - **Pay special attention to @builderHint annotations** - write these out as they are guides specifically meant to help you choose the right node configurations
+1. Review search results, writing out relevant @builderHint
+   - **Pay attention to any @example and [RELATED] annotations** to select the right nodes and discriminators.
+2. **Select Nodes**: Pick specific nodes from search results.  Note the discriminator (resource/operation) for each.
+3. **Map Connections**: Linear, branching, parallel, or looped?
+   - **Convergence after branches**: When a node receives data from multiple paths (after Switch, IF, Merge): use optional chaining \`expr('{{{{ $json.data?.approved ?? $json.status }}}}')\`, reference a node that ALWAYS runs \`expr("{{{{ $('Webhook').item.json.field }}}}")\`, or normalize data before convergence with Set nodes
 
-2. **Select Nodes**: Based on search results, choose specific nodes:
-   - Use dedicated integration nodes when available (from search)
-   - Only use HTTP Request if no dedicated node was found
-   - Note discriminators needed for each node
+</step_3_plan>
 
-3. **Map Node Connections**:
-   - Is this linear, branching, parallel, or looped? Or merge to combine parallel branches?
-   - Which nodes connect to which?
-	 - Draw out the flow in text form (e.g., "Trigger → Node A → Node B → Node C" or "Trigger → Node A → [Node B (true), Node C (false)]")
-   - **Handling convergence after branches**: When a node receives data from multiple paths (after Switch, IF, Merge): use optional chaining \`expr('{{{{ $json.data?.approved ?? $json.status }}}}')\`, reference a node that ALWAYS runs \`expr("{{{{ $('Webhook').item.json.field }}}}")\`, or normalize data before convergence with Set nodes
+<step_4_get_node_types>
 
-4. **Plan Node Positions**: Layout left-to-right, top-to-bottom
-   - Start trigger at \`[240, 300]\`, each subsequent node +300 in x: \`[540, 300]\`, \`[840, 300]\`, etc.
-   - Branch vertically: \`[540, 200]\` for top branch, \`[540, 400]\` for bottom branch
-
-5. **Identify Placeholders and Credentials**:
-   - List values needing user input → use placeholder()
-   - List credentials needed → use newCredential()
-
-6. **Prepare get_node_types Call**: Write the exact call including discriminators
-
-It's OK for this section to be quite long as you review results and work through the design.
-
-</step_3_plan_workflow_design>
-
-<step_4_get_node_type_definitions>
-
-Do NOT produce visible output — only the tool call.
-
-**MANDATORY:** Call \`get_node_types\` with ALL nodes you selected.
+Call \`get_node_types\` with ALL nodes selected in the previous step, including discriminators — no visible output.
 
 \`\`\`
 get_node_types({{ nodeIds: ["n8n-nodes-base.manualTrigger", {{ nodeId: "n8n-nodes-base.gmail", resource: "message", operation: "send" }}, ...] }})
 \`\`\`
 
-Include discriminators for nodes that require them (shown in search results).
+**DO NOT skip get_node_types!** Guessing parameter names or versions creates invalid workflows.
 
-**DO NOT skip this step!** Guessing parameter names or versions creates invalid workflows.
-
-**Pay attention to @builderHint annotations in the type definitions** - these provide critical guidance on how to correctly configure node parameters.
-
-</step_4_get_node_type_definitions>
+</step_4_get_node_types>
 
 <step_5_edit_workflow>
 
@@ -499,11 +437,13 @@ Edit \`/workflow.js\` using \`str_replace\` or \`insert\` (never \`create\` — 
 Rules:
 - Use unique variable names — never reuse builder function names (e.g. \`node\`, \`trigger\`) as variable names
 - Use descriptive node names (Good: "Fetch Weather Data", "Check Temperature"; Bad: "HTTP Request", "Set", "If")
+- Positions: start trigger at \`[240, 300]\`, each subsequent node +300 in x. Branch vertically: \`[x, 200]\` top, \`[x, 400]\` bottom
 - Credentials: \`credentials: {{ slackApi: newCredential('Slack Bot') }}\` — type must match what the node expects
 - Expressions: use \`expr()\` for any \`{{{{ }}}}\` syntax — always use single or double quotes, NOT backtick template literals
   - e.g. \`expr('Hello {{{{ $json.name }}}}')\` or \`expr("{{{{ $('Node').item.json.field }}}}")\`
   - For multiline expressions, use string concatenation: \`expr('Line 1\\n' + 'Line 2 {{{{ $json.value }}}}')\`
 - Every node MUST have an \`output\` property with sample data — following nodes depend on it for expressions
+- **Pay attention to @builderHint annotations in the type definitions** - these provide critical guidance on how to correctly configure node parameters.
 
 </step_5_edit_workflow>
 
@@ -572,6 +512,7 @@ export function buildCodeBuilderPrompt(
 		`<role>\n${ROLE}\n</role>`,
 		`<response_style>\n${RESPONSE_STYLE}\n</response_style>`,
 		`<workflow_patterns>\n${WORKFLOW_PATTERNS}\n</workflow_patterns>`,
+		`<suggested_nodes_by_category>\nReference these curated recommendations when searching for nodes and planning workflow design.\n\n${escapeCurlyBrackets(formatSuggestedNodesForPrompt(suggestedNodesData))}\n</suggested_nodes_by_category>`,
 		`<sdk_api_reference>\n${SDK_API_CONTENT_ESCAPED}\n</sdk_api_reference>`,
 		`<mandatory_workflow_process>\n${MANDATORY_WORKFLOW}\n</mandatory_workflow_process>`,
 	];

@@ -70,11 +70,6 @@ export const CODE_BUILDER_GET_NODE_TYPES_TOOL: BuilderToolBase = {
 	displayTitle: 'Getting node definitions',
 };
 
-export const CODE_BUILDER_GET_SUGGESTED_NODES_TOOL: BuilderToolBase = {
-	toolName: 'get_suggested_nodes',
-	displayTitle: 'Getting suggested nodes',
-};
-
 export const CODE_BUILDER_THINK_TOOL: BuilderToolBase = {
 	toolName: 'think',
 	displayTitle: 'Reasoning',

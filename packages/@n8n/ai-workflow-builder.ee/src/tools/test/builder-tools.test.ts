@@ -147,10 +147,6 @@ jest.mock('@/code-builder/constants', () => ({
 		toolName: 'get_node_types',
 		displayTitle: 'Getting node definitions',
 	},
-	CODE_BUILDER_GET_SUGGESTED_NODES_TOOL: {
-		toolName: 'get_suggested_nodes',
-		displayTitle: 'Getting suggested nodes',
-	},
 }));
 
 describe('builder-tools', () => {
@@ -168,14 +164,14 @@ describe('builder-tools', () => {
 				featureFlags: { templateExamples: true },
 			});
 
-			// 23 tools: best_practices, workflow_examples, node_search, node_details, add_node,
+			// 22 tools: best_practices, workflow_examples, node_search, node_details, add_node,
 			// connect_nodes, remove_connection, remove_node, rename_node, update_node_parameters,
 			// get_node_parameter, validate_structure, validate_configuration,
 			// get_execution_schema, get_execution_logs, get_expression_data_mapping,
 			// get_workflow_overview, get_node_context,
-			// + 5 CodeBuilderAgent tools: str_replace_based_edit_tool, validate_workflow,
-			// search_nodes, get_node_types, get_suggested_nodes
-			expect(tools).toHaveLength(23);
+			// + 4 CodeBuilderAgent tools: str_replace_based_edit_tool, validate_workflow,
+			// search_nodes, get_node_types
+			expect(tools).toHaveLength(22);
 			expect(getAddNodeToolBase).toHaveBeenCalledWith(parsedNodeTypes);
 		});
 
@@ -185,7 +181,7 @@ describe('builder-tools', () => {
 				featureFlags: { templateExamples: false },
 			});
 
-			expect(tools).toHaveLength(22);
+			expect(tools).toHaveLength(21);
 		});
 
 		it('should exclude workflow examples tool when feature flag is not provided', () => {
@@ -193,7 +189,7 @@ describe('builder-tools', () => {
 				nodeTypes: parsedNodeTypes,
 			});
 
-			expect(tools).toHaveLength(22);
+			expect(tools).toHaveLength(21);
 		});
 
 		it('should work with empty node types array', () => {
@@ -201,7 +197,7 @@ describe('builder-tools', () => {
 				nodeTypes: [],
 			});
 
-			expect(tools).toHaveLength(22);
+			expect(tools).toHaveLength(21);
 			expect(getAddNodeToolBase).toHaveBeenCalledWith([]);
 		});
 

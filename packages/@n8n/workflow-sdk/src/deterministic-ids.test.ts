@@ -124,6 +124,117 @@ describe('Deterministic Node ID Generation', () => {
 			expect(id1).toBe(id2);
 		});
 
+		it('should preserve correct connections when nodes have duplicate names that get auto-renamed', () => {
+			// Two nodes with the same config name - the second will be auto-renamed to "Process 1"
+			const processA = node({
+				type: 'n8n-nodes-base.set',
+				version: 3.4,
+				config: { name: 'Process' },
+			});
+			const processB = node({
+				type: 'n8n-nodes-base.set',
+				version: 3.4,
+				config: { name: 'Process' }, // Will become "Process 1"
+			});
+			const downstream = node({
+				type: 'n8n-nodes-base.httpRequest',
+				version: 4.2,
+				config: { name: 'Send Data' },
+			});
+
+			const wf = workflow('test-workflow-id', 'Test Workflow').add(
+				trigger({
+					type: 'n8n-nodes-base.manualTrigger',
+					version: 1,
+					config: { name: 'Start' },
+				})
+					.to(processA)
+					.to(processB)
+					.to(downstream),
+			);
+
+			wf.regenerateNodeIds();
+			const json = wf.toJSON();
+
+			// Verify auto-rename happened
+			const nodeNames = json.nodes.map((n) => n.name);
+			expect(nodeNames).toContain('Process');
+			expect(nodeNames).toContain('Process 1');
+
+			// "Process" should connect to "Process 1" (not to itself or "Send Data")
+			expect(json.connections['Process']?.main?.[0]?.[0]?.node).toBe('Process 1');
+
+			// "Process 1" should connect to "Send Data", NOT "Process"
+			expect(json.connections['Process 1']?.main?.[0]?.[0]?.node).toBe('Send Data');
+
+			// "Process 1" should have exactly 1 connection on output 0
+			expect(json.connections['Process 1']?.main?.[0]).toHaveLength(1);
+		});
+
+		it('should not create spurious connections after regenerateNodeIds with duplicate names and branching', () => {
+			// Mimics the purchase-request-approval bug: two same-named nodes on
+			// different branches with different downstream targets
+			const approvalA = node({
+				type: 'n8n-nodes-base.set',
+				version: 3.4,
+				config: { name: 'Approval' },
+			});
+			const approvalB = node({
+				type: 'n8n-nodes-base.set',
+				version: 3.4,
+				config: { name: 'Approval' }, // Will become "Approval 1"
+			});
+			const targetA = node({
+				type: 'n8n-nodes-base.httpRequest',
+				version: 4.2,
+				config: { name: 'Target A' },
+			});
+			const targetB = node({
+				type: 'n8n-nodes-base.httpRequest',
+				version: 4.2,
+				config: { name: 'Target B' },
+			});
+			const router = node({
+				type: 'n8n-nodes-base.set',
+				version: 3.4,
+				config: { name: 'Router' },
+			});
+
+			const wf = workflow('test-workflow-id', 'Test Workflow')
+				.add(
+					trigger({
+						type: 'n8n-nodes-base.manualTrigger',
+						version: 1,
+						config: { name: 'Start' },
+					}).to(router),
+				)
+				.add(router.output(0).to(approvalA.to(targetA)))
+				.add(router.output(1).to(approvalB.to(targetB)));
+
+			wf.regenerateNodeIds();
+			const json = wf.toJSON();
+
+			// "Approval" should connect ONLY to "Target A"
+			const approvalConns = json.connections['Approval']?.main?.[0] ?? [];
+			expect(approvalConns).toHaveLength(1);
+			expect(approvalConns[0]?.node).toBe('Target A');
+
+			// "Approval 1" should connect ONLY to "Target B"
+			const approval1Conns = json.connections['Approval 1']?.main?.[0] ?? [];
+			expect(approval1Conns).toHaveLength(1);
+			expect(approval1Conns[0]?.node).toBe('Target B');
+
+			// Router output 0 should connect ONLY to "Approval"
+			const routerOut0 = json.connections['Router']?.main?.[0] ?? [];
+			expect(routerOut0).toHaveLength(1);
+			expect(routerOut0[0]?.node).toBe('Approval');
+
+			// Router output 1 should connect ONLY to "Approval 1"
+			const routerOut1 = json.connections['Router']?.main?.[1] ?? [];
+			expect(routerOut1).toHaveLength(1);
+			expect(routerOut1[0]?.node).toBe('Approval 1');
+		});
+
 		it('should replace existing random ID with deterministic ID', () => {
 			// This test verifies that regenerateNodeIds() replaces existing random IDs
 			// with deterministic ones based on workflow ID, node type, and node name

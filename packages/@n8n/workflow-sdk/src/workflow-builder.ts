@@ -44,6 +44,7 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 	private _pinData?: Record<string, IDataObject[]>;
 	private _meta?: { templateId?: string; instanceId?: string; [key: string]: unknown };
 	private _registry?: PluginRegistry;
+	private _staleIdToKeyMap?: Map<string, string>;
 
 	constructor(
 		id: string,
@@ -319,8 +320,10 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 			if (typeof graphNode.instance.getConnections === 'function') {
 				const nodeConns = graphNode.instance.getConnections();
 				for (const { target, outputIndex, targetInputIndex } of nodeConns) {
-					// Resolve target node name - handles both NodeInstance and composites
-					const targetName = this.resolveTargetNodeName(target);
+					// Resolve target node name - handles both NodeInstance and composites.
+					// Pass _staleIdToKeyMap so stale target references (from pre-clone
+					// instances after regenerateNodeIds) resolve to the correct map key.
+					const targetName = this.resolveTargetNodeName(target, this._staleIdToKeyMap);
 					if (!targetName) continue;
 
 					const mainConns =
@@ -339,6 +342,8 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 				}
 			}
 		}
+		// Clear stale mapping after use — only valid for one merge cycle
+		this._staleIdToKeyMap = undefined;
 	}
 
 	/**
@@ -351,9 +356,15 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 	 */
 	regenerateNodeIds(): void {
 		const newNodes = new Map<string, GraphNode>();
+		// Build mapping from old instance IDs to map keys BEFORE cloning.
+		// Cloned instances' _connections still reference original target instances
+		// with old IDs. This mapping allows mergeInstanceConnections() to resolve
+		// those stale references to the correct map key (important for auto-renamed nodes).
+		const staleIdToKeyMap = new Map<string, string>();
 
 		for (const [mapKey, graphNode] of this._nodes) {
 			const instance = graphNode.instance;
+			staleIdToKeyMap.set(instance.id, mapKey);
 			const newId = generateDeterministicNodeId(this.id, instance.type, instance.name);
 
 			// Clone the instance with the new deterministic ID
@@ -365,6 +376,7 @@ class WorkflowBuilderImpl implements WorkflowBuilder {
 			});
 		}
 
+		this._staleIdToKeyMap = staleIdToKeyMap;
 		// Replace the nodes map
 		this._nodes = newNodes;
 	}

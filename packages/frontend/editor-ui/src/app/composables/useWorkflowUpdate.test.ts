@@ -350,6 +350,75 @@ describe('useWorkflowUpdate', () => {
 				expect(workflowsStore.setNodes).toHaveBeenCalled();
 				expect(workflowsStore.setConnections).toHaveBeenCalled();
 			});
+
+			it('should apply executeOnce when updated node has it set', async () => {
+				const existingNode = createTestNode({
+					id: 'node-1',
+					name: 'HTTP Request',
+					type: 'n8n-nodes-base.httpRequest',
+					position: [100, 200],
+					parameters: { url: 'http://example.com' },
+				}) as INodeUi;
+
+				workflowsStore.allNodes = [existingNode];
+
+				const mockWorkflowObject = {
+					nodes: { 'HTTP Request': { ...existingNode } },
+					connectionsBySourceNode: {},
+					renameNode: vi.fn(),
+				};
+				workflowsStore.cloneWorkflowObject = vi.fn().mockReturnValue(mockWorkflowObject);
+
+				const { updateWorkflow } = useWorkflowUpdate();
+
+				await updateWorkflow({
+					nodes: [
+						{
+							id: 'node-1',
+							name: 'HTTP Request',
+							type: 'n8n-nodes-base.httpRequest',
+							typeVersion: 1,
+							position: [0, 0],
+							parameters: { url: 'http://example.com' },
+							executeOnce: true,
+						},
+					],
+					connections: {},
+				});
+
+				expect(workflowsStore.setNodes).toHaveBeenCalled();
+				const setNodesCall = workflowsStore.setNodes.mock.calls[0][0];
+				expect(setNodesCall[0].executeOnce).toBe(true);
+			});
+
+			it('should pass executeOnce through to addNodes for new nodes', async () => {
+				const newNode = createTestNode({
+					id: 'new-node-1',
+					name: 'HTTP Request',
+					type: 'n8n-nodes-base.httpRequest',
+				});
+
+				mockCanvasOperations.addNodes.mockResolvedValue([
+					{ ...newNode, executeOnce: true } as INodeUi,
+				]);
+
+				const { updateWorkflow } = useWorkflowUpdate();
+
+				await updateWorkflow({
+					nodes: [
+						{
+							...newNode,
+							executeOnce: true,
+						},
+					],
+					connections: {},
+				});
+
+				expect(mockCanvasOperations.addNodes).toHaveBeenCalledWith(
+					[expect.objectContaining({ executeOnce: true })],
+					expect.any(Object),
+				);
+			});
 		});
 
 		describe('node renaming', () => {

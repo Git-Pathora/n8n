@@ -301,6 +301,62 @@ const mockOutputParserStructuredNode: INodeTypeDescription = {
 	properties: [],
 };
 
+// Mock operation-only node (like Remove Duplicates V2 — has operation but no resource)
+const mockRemoveDuplicatesNode: INodeTypeDescription = {
+	name: 'n8n-nodes-base.removeDuplicates',
+	displayName: 'Remove Duplicates',
+	description: 'Delete items with matching field values',
+	group: ['transform'],
+	version: 2,
+	defaults: { name: 'Remove Duplicates' },
+	inputs: ['main'],
+	outputs: ['main'],
+	properties: [
+		{
+			displayName: 'Operation',
+			name: 'operation',
+			type: 'options',
+			noDataExpression: true,
+			options: [
+				{
+					name: 'Remove Items Repeated Within Current Input',
+					value: 'removeDuplicateInputItems',
+					description: 'Remove duplicates from incoming items',
+				},
+				{
+					name: 'Remove Items Processed in Previous Executions',
+					value: 'removeItemsSeenInPreviousExecutions',
+					description: 'Deduplicate items already seen in previous executions',
+				},
+				{
+					name: 'Clear Deduplication History',
+					value: 'clearDeduplicationHistory',
+					description: 'Wipe the store of previous items',
+				},
+			],
+			default: 'removeDuplicateInputItems',
+		},
+		{
+			displayName: 'Mode',
+			name: 'mode',
+			type: 'options',
+			default: 'cleanDatabase',
+			displayOptions: {
+				show: {
+					operation: ['clearDeduplicationHistory'],
+				},
+			},
+			options: [
+				{
+					name: 'Clean Database',
+					value: 'cleanDatabase',
+					description: 'Clear all values stored for a key in the database',
+				},
+			],
+		},
+	],
+};
+
 // Mock node that references Code node as related (for testing discriminators in related nodes)
 const mockCodeRunnerNode: INodeTypeDescription = {
 	name: 'n8n-nodes-base.codeRunner',
@@ -696,6 +752,32 @@ describe('CodeBuilderSearchTool', () => {
 
 			// Should show how to call get_node_types with discriminators
 			expect(result).toMatch(/get_node_types.*nodeId.*freshservice.*resource.*operation/s);
+		});
+
+		it('should include operation discriminator for operation-only nodes', async () => {
+			const nodeTypeParser = new NodeTypeParser([mockRemoveDuplicatesNode]);
+			const tool = createCodeBuilderSearchTool(nodeTypeParser);
+
+			const result = await tool.invoke({ queries: ['remove duplicates'] });
+
+			// Should include discriminator section with operation type
+			expect(result).toContain('Discriminators:');
+			expect(result).toContain('operation:');
+
+			// Should show all 3 operation values with descriptions
+			expect(result).toContain('removeDuplicateInputItems');
+			expect(result).toContain('Remove duplicates from incoming items');
+			expect(result).toContain('removeItemsSeenInPreviousExecutions');
+			expect(result).toContain('Deduplicate items already seen in previous executions');
+			expect(result).toContain('clearDeduplicationHistory');
+			expect(result).toContain('Wipe the store of previous items');
+
+			// Should NOT show the subordinate mode discriminator
+			expect(result).not.toContain('cleanDatabase');
+
+			// Should include usage hint
+			expect(result).toContain('get_node_types');
+			expect(result).toMatch(/operation.*removeDuplicateInputItems/s);
 		});
 
 		it('should include discriminators for related nodes', async () => {

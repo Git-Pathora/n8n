@@ -1,6 +1,10 @@
 import { NodeConnectionTypes, type INodeTypeDescription } from 'n8n-workflow';
 
-import { extractModeDiscriminator, type ModeInfo } from '../discriminator-utils';
+import {
+	extractModeDiscriminator,
+	extractOperationOnlyDiscriminator,
+	type ModeInfo,
+} from '../discriminator-utils';
 
 // Mock vector store node with mode discriminator that includes outputConnectionType
 const mockVectorStoreNode: INodeTypeDescription = {
@@ -243,5 +247,162 @@ describe('extractModeDiscriminator', () => {
 			expect(modeB!.description).toBe('Description of mode B');
 			expect(modeB!.builderHint).toBeUndefined();
 		});
+	});
+});
+
+// Mock operation-only node (like Remove Duplicates V2)
+const mockOperationOnlyNode: INodeTypeDescription = {
+	name: 'n8n-nodes-base.removeDuplicates',
+	displayName: 'Remove Duplicates',
+	description: 'Delete items with matching field values',
+	group: ['transform'],
+	version: 2,
+	defaults: { name: 'Remove Duplicates' },
+	inputs: ['main'],
+	outputs: ['main'],
+	properties: [
+		{
+			displayName: 'Operation',
+			name: 'operation',
+			type: 'options',
+			noDataExpression: true,
+			options: [
+				{
+					name: 'Remove Items Repeated Within Current Input',
+					value: 'removeDuplicateInputItems',
+					description: 'Remove duplicates from incoming items',
+				},
+				{
+					name: 'Remove Items Processed in Previous Executions',
+					value: 'removeItemsSeenInPreviousExecutions',
+					description: 'Deduplicate items already seen in previous executions',
+				},
+				{
+					name: 'Clear Deduplication History',
+					value: 'clearDeduplicationHistory',
+					description: 'Wipe the store of previous items',
+				},
+			],
+			default: 'removeDuplicateInputItems',
+		},
+		{
+			displayName: 'Mode',
+			name: 'mode',
+			type: 'options',
+			default: 'cleanDatabase',
+			displayOptions: {
+				show: {
+					operation: ['clearDeduplicationHistory'],
+				},
+			},
+			options: [
+				{
+					name: 'Clean Database',
+					value: 'cleanDatabase',
+					description: 'Clear all values stored for a key in the database',
+				},
+			],
+		},
+	],
+};
+
+// Mock node with both resource and operation
+const mockResourceAndOperationNode: INodeTypeDescription = {
+	name: 'n8n-nodes-base.googleSheets',
+	displayName: 'Google Sheets',
+	description: 'Read, update and write data to Google Sheets',
+	group: ['transform'],
+	version: 4,
+	defaults: { name: 'Google Sheets' },
+	inputs: ['main'],
+	outputs: ['main'],
+	properties: [
+		{
+			displayName: 'Resource',
+			name: 'resource',
+			type: 'options',
+			options: [{ name: 'Sheet', value: 'sheet' }],
+			default: 'sheet',
+		},
+		{
+			displayName: 'Operation',
+			name: 'operation',
+			type: 'options',
+			options: [
+				{ name: 'Append Row', value: 'append' },
+				{ name: 'Read Rows', value: 'read' },
+			],
+			default: 'append',
+			displayOptions: { show: { resource: ['sheet'] } },
+		},
+	],
+};
+
+describe('extractOperationOnlyDiscriminator', () => {
+	it('should extract operations from a node with operation but no resource', () => {
+		const result = extractOperationOnlyDiscriminator(mockOperationOnlyNode, 2);
+
+		expect(result).not.toBeNull();
+		expect(result!.operations).toHaveLength(3);
+		expect(result!.operations.map((op) => op.value)).toEqual([
+			'removeDuplicateInputItems',
+			'removeItemsSeenInPreviousExecutions',
+			'clearDeduplicationHistory',
+		]);
+	});
+
+	it('should include displayName and description for each operation', () => {
+		const result = extractOperationOnlyDiscriminator(mockOperationOnlyNode, 2);
+
+		expect(result).not.toBeNull();
+
+		const firstOp = result!.operations.find((op) => op.value === 'removeDuplicateInputItems');
+		expect(firstOp!.displayName).toBe('Remove Items Repeated Within Current Input');
+		expect(firstOp!.description).toBe('Remove duplicates from incoming items');
+	});
+
+	it('should return null for nodes with both resource and operation', () => {
+		const result = extractOperationOnlyDiscriminator(mockResourceAndOperationNode, 4);
+
+		expect(result).toBeNull();
+	});
+
+	it('should return null for nodes without operation property', () => {
+		const result = extractOperationOnlyDiscriminator(mockCodeNode, 2);
+
+		expect(result).toBeNull();
+	});
+
+	it('should return null for nodes with no properties', () => {
+		const emptyNode: INodeTypeDescription = {
+			name: 'n8n-nodes-base.empty',
+			displayName: 'Empty',
+			description: 'Empty node',
+			group: ['transform'],
+			version: 1,
+			defaults: { name: 'Empty' },
+			inputs: ['main'],
+			outputs: ['main'],
+			properties: [],
+		};
+
+		const result = extractOperationOnlyDiscriminator(emptyNode, 1);
+
+		expect(result).toBeNull();
+	});
+});
+
+describe('extractModeDiscriminator - subordinate mode guard', () => {
+	it('should return null for mode properties subordinate to operation', () => {
+		const result = extractModeDiscriminator(mockOperationOnlyNode, 2);
+
+		expect(result).toBeNull();
+	});
+
+	it('should still extract top-level mode properties without displayOptions dependencies', () => {
+		const result = extractModeDiscriminator(mockCodeNode, 2);
+
+		expect(result).not.toBeNull();
+		expect(result!.modes).toHaveLength(2);
 	});
 });

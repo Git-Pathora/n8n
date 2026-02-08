@@ -50,12 +50,14 @@ export function extractModeDiscriminator(
 		return null;
 	}
 
-	// Find the mode property
+	// Find the mode property (skip modes subordinate to operation or resource)
 	const modeProperty = properties.find(
 		(prop) =>
 			prop.name === 'mode' &&
 			prop.type === 'options' &&
-			isPropertyVisibleForVersion(prop, nodeVersion),
+			isPropertyVisibleForVersion(prop, nodeVersion) &&
+			!prop.displayOptions?.show?.operation &&
+			!prop.displayOptions?.show?.resource,
 	);
 
 	if (!modeProperty?.options) {
@@ -89,6 +91,85 @@ export function extractModeDiscriminator(
 	}
 
 	return { modes };
+}
+
+/**
+ * Represents a single operation option for operation-only nodes
+ */
+export interface OperationOnlyInfo {
+	value: string;
+	displayName: string;
+	description?: string;
+	builderHint?: IParameterBuilderHint;
+}
+
+/**
+ * Represents operation-only discriminator information
+ */
+export interface OperationOnlyDiscriminatorInfo {
+	operations: OperationOnlyInfo[];
+}
+
+/**
+ * Extract operation discriminator from nodes that have operation but no resource property.
+ * These nodes (e.g. Remove Duplicates) use operation as their top-level discriminator.
+ */
+export function extractOperationOnlyDiscriminator(
+	nodeType: INodeTypeDescription,
+	nodeVersion: number,
+): OperationOnlyDiscriminatorInfo | null {
+	const properties = nodeType.properties;
+	if (!properties || properties.length === 0) {
+		return null;
+	}
+
+	// Must NOT have a resource property (otherwise extractResourceOperations handles it)
+	const hasResource = properties.some(
+		(prop) =>
+			prop.name === 'resource' &&
+			prop.type === 'options' &&
+			isPropertyVisibleForVersion(prop, nodeVersion),
+	);
+	if (hasResource) {
+		return null;
+	}
+
+	// Find a standalone operation property
+	const operationProperty = properties.find(
+		(prop) =>
+			prop.name === 'operation' &&
+			prop.type === 'options' &&
+			isPropertyVisibleForVersion(prop, nodeVersion),
+	);
+
+	if (!operationProperty?.options) {
+		return null;
+	}
+
+	const operations: OperationOnlyInfo[] = operationProperty.options
+		.filter(
+			(
+				opt,
+			): opt is {
+				name: string;
+				value: string;
+				description?: string;
+				builderHint?: IParameterBuilderHint;
+			} =>
+				typeof opt === 'object' && opt !== null && 'value' in opt && typeof opt.value === 'string',
+		)
+		.map((opt) => ({
+			value: opt.value,
+			displayName: opt.name,
+			description: opt.description,
+			builderHint: opt.builderHint,
+		}));
+
+	if (operations.length === 0) {
+		return null;
+	}
+
+	return { operations };
 }
 
 /**

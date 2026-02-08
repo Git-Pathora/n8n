@@ -21,7 +21,11 @@ import {
 	type ResourceInfo,
 	type OperationInfo,
 } from '../../utils/resource-operation-extractor';
-import { extractModeDiscriminator, type ModeInfo } from '../utils/discriminator-utils';
+import {
+	extractModeDiscriminator,
+	extractOperationOnlyDiscriminator,
+	type ModeInfo,
+} from '../utils/discriminator-utils';
 import type { NodeTypeParser, ParsedNodeType } from '../utils/node-type-parser';
 
 /**
@@ -100,8 +104,9 @@ interface DiscriminatorResourceInfo {
  * Discriminator info structure for search results
  */
 interface DiscriminatorInfo {
-	type: 'resource_operation' | 'mode' | 'none';
+	type: 'resource_operation' | 'operation' | 'mode' | 'none';
 	resources?: DiscriminatorResourceInfo[];
+	operations?: DiscriminatorOperationInfo[];
 	modes?: ModeInfo[];
 }
 
@@ -331,6 +336,22 @@ function getDiscriminatorInfo(
 		}
 	}
 
+	// Check for operation-only pattern (operation without resource)
+	const operationOnly = extractOperationOnlyDiscriminator(nodeType, version);
+	if (operationOnly && operationOnly.operations.length > 0) {
+		const operations: DiscriminatorOperationInfo[] = operationOnly.operations
+			.filter((op) => op.value !== '__CUSTOM_API_CALL__')
+			.map((op) => ({
+				value: op.value,
+				description: op.description,
+				builderHint: op.builderHint,
+			}));
+
+		if (operations.length > 0) {
+			return { type: 'operation', operations };
+		}
+	}
+
 	// Check for mode pattern
 	const modeInfo = extractModeDiscriminator(nodeType, version);
 	if (modeInfo && modeInfo.modes.length > 0) {
@@ -382,6 +403,25 @@ function formatDiscriminatorInfo(info: DiscriminatorInfo, nodeId: string): strin
 		lines.push('  Use get_node_types with discriminators:');
 		lines.push(
 			`    get_node_types({ nodeIds: [{ nodeId: "${nodeId}", resource: "${firstResource?.value}", operation: "${firstOp}" }] })`,
+		);
+	} else if (info.type === 'operation' && info.operations) {
+		lines.push('    operation:');
+		for (const op of info.operations) {
+			lines.push(`      - ${op.value}`);
+			if (op.description) {
+				lines.push(`        ${op.description}`);
+			}
+			if (op.builderHint) {
+				lines.push(`        @builderHint ${op.builderHint.message}`);
+			}
+		}
+
+		// Add usage hint
+		const firstOp = info.operations[0]?.value ?? 'default';
+		lines.push('');
+		lines.push('  Use get_node_types with discriminators:');
+		lines.push(
+			`    get_node_types({ nodeIds: [{ nodeId: "${nodeId}", operation: "${firstOp}" }] })`,
 		);
 	} else if (info.type === 'mode' && info.modes) {
 		lines.push('    mode:');

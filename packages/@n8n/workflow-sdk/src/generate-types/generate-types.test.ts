@@ -51,6 +51,7 @@ interface NodeProperty {
 		hide?: Record<string, unknown[]>;
 	};
 	typeOptions?: Record<string, unknown>;
+	noDataExpression?: boolean;
 	modes?: Array<{
 		name: string;
 		displayName?: string;
@@ -801,6 +802,157 @@ describe('generate-types', () => {
 			const result = generateTypes.mapPropertyType(prop);
 			expect(result).toContain('__rl: true');
 			expect(result).not.toContain('PlaceholderValue');
+		});
+
+		describe('noDataExpression', () => {
+			it('should return string without Expression wrapper when noDataExpression is true', () => {
+				const prop: NodeProperty = {
+					name: 'resource',
+					displayName: 'Resource',
+					type: 'string',
+					default: '',
+					noDataExpression: true,
+				};
+				const result = generateTypes.mapPropertyType(prop);
+				expect(result).toBe('string');
+				expect(result).not.toContain('Expression');
+				expect(result).not.toContain('PlaceholderValue');
+			});
+
+			it('should return number without Expression wrapper when noDataExpression is true', () => {
+				const prop: NodeProperty = {
+					name: 'limit',
+					displayName: 'Limit',
+					type: 'number',
+					default: 10,
+					noDataExpression: true,
+				};
+				const result = generateTypes.mapPropertyType(prop);
+				expect(result).toBe('number');
+				expect(result).not.toContain('Expression');
+			});
+
+			it('should return boolean without Expression wrapper when noDataExpression is true', () => {
+				const prop: NodeProperty = {
+					name: 'enabled',
+					displayName: 'Enabled',
+					type: 'boolean',
+					default: false,
+					noDataExpression: true,
+				};
+				const result = generateTypes.mapPropertyType(prop);
+				expect(result).toBe('boolean');
+				expect(result).not.toContain('Expression');
+			});
+
+			it('should return options literals without Expression wrapper when noDataExpression is true', () => {
+				const prop: NodeProperty = {
+					name: 'resource',
+					displayName: 'Resource',
+					type: 'options',
+					options: [
+						{ name: 'Contact', value: 'contact' },
+						{ name: 'Deal', value: 'deal' },
+					],
+					default: 'contact',
+					noDataExpression: true,
+				};
+				const result = generateTypes.mapPropertyType(prop);
+				expect(result).toBe("'contact' | 'deal'");
+				expect(result).not.toContain('Expression');
+			});
+
+			it('should return json type without Expression wrapper when noDataExpression is true', () => {
+				const prop: NodeProperty = {
+					name: 'data',
+					displayName: 'Data',
+					type: 'json',
+					default: '',
+					noDataExpression: true,
+				};
+				const result = generateTypes.mapPropertyType(prop);
+				expect(result).toBe('IDataObject | string');
+				expect(result).not.toContain('Expression');
+			});
+
+			it('should return dateTime without Expression wrapper when noDataExpression is true', () => {
+				const prop: NodeProperty = {
+					name: 'date',
+					displayName: 'Date',
+					type: 'dateTime',
+					default: '',
+					noDataExpression: true,
+				};
+				const result = generateTypes.mapPropertyType(prop);
+				expect(result).toBe('string');
+				expect(result).not.toContain('Expression');
+			});
+
+			it('should return color without Expression wrapper when noDataExpression is true', () => {
+				const prop: NodeProperty = {
+					name: 'color',
+					displayName: 'Color',
+					type: 'color',
+					default: '#000000',
+					noDataExpression: true,
+				};
+				const result = generateTypes.mapPropertyType(prop);
+				expect(result).toBe('string');
+				expect(result).not.toContain('Expression');
+			});
+
+			it('should return dynamic options without Expression wrapper when noDataExpression is true', () => {
+				const prop: NodeProperty = {
+					name: 'field',
+					displayName: 'Field',
+					type: 'options',
+					default: '',
+					noDataExpression: true,
+					typeOptions: { loadOptionsMethod: 'getFields' },
+				};
+				const result = generateTypes.mapPropertyType(prop);
+				expect(result).toBe('string');
+				expect(result).not.toContain('Expression');
+			});
+
+			it('should not affect multiOptions (already has no Expression wrapper)', () => {
+				const prop: NodeProperty = {
+					name: 'tags',
+					displayName: 'Tags',
+					type: 'multiOptions',
+					options: [
+						{ name: 'A', value: 'a' },
+						{ name: 'B', value: 'b' },
+					],
+					default: [],
+					noDataExpression: true,
+				};
+				const result = generateTypes.mapPropertyType(prop);
+				expect(result).toBe("Array<'a' | 'b'>");
+			});
+
+			it('should still include Expression wrapper when noDataExpression is false', () => {
+				const prop: NodeProperty = {
+					name: 'url',
+					displayName: 'URL',
+					type: 'string',
+					default: '',
+					noDataExpression: false,
+				};
+				const result = generateTypes.mapPropertyType(prop);
+				expect(result).toContain('Expression');
+			});
+
+			it('should still include Expression wrapper when noDataExpression is undefined', () => {
+				const prop: NodeProperty = {
+					name: 'url',
+					displayName: 'URL',
+					type: 'string',
+					default: '',
+				};
+				const result = generateTypes.mapPropertyType(prop);
+				expect(result).toContain('Expression');
+			});
 		});
 	});
 

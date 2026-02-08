@@ -1122,3 +1122,119 @@ describe('hasRequiredSubnodeFields behavior', () => {
 		expect(code).not.toMatch(/subnodes:.*\.optional\(\)/);
 	});
 });
+
+describe('mapPropertyToZodSchema with noDataExpression', () => {
+	it('returns z.string() for string type when noDataExpression is true', () => {
+		const prop: NodeProperty = {
+			name: 'resource',
+			displayName: 'Resource',
+			type: 'string',
+			default: '',
+			noDataExpression: true,
+		};
+		const schema = mapPropertyToZodSchema(prop);
+		expect(schema).toBe('z.string()');
+	});
+
+	it('returns z.number() for number type when noDataExpression is true', () => {
+		const prop: NodeProperty = {
+			name: 'limit',
+			displayName: 'Limit',
+			type: 'number',
+			default: 10,
+			noDataExpression: true,
+		};
+		const schema = mapPropertyToZodSchema(prop);
+		expect(schema).toBe('z.number()');
+	});
+
+	it('returns z.boolean() for boolean type when noDataExpression is true', () => {
+		const prop: NodeProperty = {
+			name: 'enabled',
+			displayName: 'Enabled',
+			type: 'boolean',
+			default: false,
+			noDataExpression: true,
+		};
+		const schema = mapPropertyToZodSchema(prop);
+		expect(schema).toBe('z.boolean()');
+	});
+
+	it('returns option literals without expressionSchema when noDataExpression is true', () => {
+		const prop: NodeProperty = {
+			name: 'resource',
+			displayName: 'Resource',
+			type: 'options',
+			options: [
+				{ name: 'Contact', value: 'contact' },
+				{ name: 'Deal', value: 'deal' },
+			],
+			default: 'contact',
+			noDataExpression: true,
+		};
+		const schema = mapPropertyToZodSchema(prop);
+		expect(schema).toContain("z.literal('contact')");
+		expect(schema).toContain("z.literal('deal')");
+		expect(schema).not.toContain('expressionSchema');
+	});
+
+	it('returns z.string() for dateTime type when noDataExpression is true', () => {
+		const prop: NodeProperty = {
+			name: 'date',
+			displayName: 'Date',
+			type: 'dateTime',
+			default: '',
+			noDataExpression: true,
+		};
+		const schema = mapPropertyToZodSchema(prop);
+		expect(schema).toBe('z.string()');
+	});
+
+	it('returns z.string() for color type when noDataExpression is true', () => {
+		const prop: NodeProperty = {
+			name: 'color',
+			displayName: 'Color',
+			type: 'color',
+			default: '#000000',
+			noDataExpression: true,
+		};
+		const schema = mapPropertyToZodSchema(prop);
+		expect(schema).toBe('z.string()');
+	});
+
+	it('returns z.string() for dynamic options when noDataExpression is true', () => {
+		const prop: NodeProperty = {
+			name: 'field',
+			displayName: 'Field',
+			type: 'options',
+			default: '',
+			noDataExpression: true,
+			typeOptions: { loadOptionsMethod: 'getFields' },
+		};
+		const schema = mapPropertyToZodSchema(prop);
+		expect(schema).toBe('z.string()');
+	});
+
+	it('still returns stringOrExpression when noDataExpression is false', () => {
+		const prop: NodeProperty = {
+			name: 'url',
+			displayName: 'URL',
+			type: 'string',
+			default: '',
+			noDataExpression: false,
+		};
+		const schema = mapPropertyToZodSchema(prop);
+		expect(schema).toBe('stringOrExpression');
+	});
+
+	it('still returns stringOrExpression when noDataExpression is undefined', () => {
+		const prop: NodeProperty = {
+			name: 'url',
+			displayName: 'URL',
+			type: 'string',
+			default: '',
+		};
+		const schema = mapPropertyToZodSchema(prop);
+		expect(schema).toBe('stringOrExpression');
+	});
+});

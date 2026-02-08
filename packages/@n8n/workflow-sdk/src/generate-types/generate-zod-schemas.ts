@@ -349,6 +349,14 @@ function generateResourceLocatorZodSchema(prop: NodeProperty): string {
  * Map a nested property to its Zod schema code (for collection/fixedCollection inner properties)
  */
 function mapNestedPropertyToZodSchema(prop: NodeProperty): string {
+	const result = mapNestedPropertyToZodSchemaInner(prop);
+	if (prop.noDataExpression) {
+		return stripExpressionFromZodSchema(result);
+	}
+	return result;
+}
+
+function mapNestedPropertyToZodSchemaInner(prop: NodeProperty): string {
 	// Skip display-only types
 	if (['notice', 'curlImport', 'credentials'].includes(prop.type)) {
 		return '';
@@ -514,6 +522,27 @@ function generateCollectionZodSchema(prop: NodeProperty): string {
  * are strings like "={{ $json.field }}").
  */
 export function mapPropertyToZodSchema(prop: NodeProperty): string {
+	const result = mapPropertyToZodSchemaInner(prop);
+	if (prop.noDataExpression) {
+		return stripExpressionFromZodSchema(result);
+	}
+	return result;
+}
+
+/**
+ * Strip expression support from a Zod schema code string.
+ * Used when noDataExpression is true.
+ */
+function stripExpressionFromZodSchema(schema: string): string {
+	// Replace OrExpression helpers with plain types
+	if (schema === 'stringOrExpression') return 'z.string()';
+	if (schema === 'numberOrExpression') return 'z.number()';
+	if (schema === 'booleanOrExpression') return 'z.boolean()';
+	// Remove expressionSchema from z.union([..., expressionSchema])
+	return schema.replace(/,\s*expressionSchema/g, '');
+}
+
+function mapPropertyToZodSchemaInner(prop: NodeProperty): string {
 	// Special handling for known credentialsSelect fields with fixed values
 	if (prop.type === 'credentialsSelect' && prop.name === 'genericAuthType') {
 		const literals = GENERIC_AUTH_TYPE_VALUES.map((v) => `z.literal('${v}')`);

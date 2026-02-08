@@ -639,6 +639,17 @@ function mapNestedPropertyType(
 	prop: NodeProperty,
 	discriminatorContext?: DiscriminatorCombination,
 ): string {
+	const result = mapNestedPropertyTypeInner(prop, discriminatorContext);
+	if (prop.noDataExpression) {
+		return stripExpressionFromType(result);
+	}
+	return result;
+}
+
+function mapNestedPropertyTypeInner(
+	prop: NodeProperty,
+	discriminatorContext?: DiscriminatorCombination,
+): string {
 	// Handle dynamic options (loadOptionsMethod)
 	if (prop.typeOptions?.loadOptionsMethod || prop.typeOptions?.loadOptionsDependsOn) {
 		// Dynamic options fallback to string, but preserve complex types
@@ -1043,9 +1054,31 @@ function generateCollectionType(
 }
 
 /**
+ * Strip Expression<...> and PlaceholderValue from a type string.
+ * Used when noDataExpression is true to produce plain types.
+ */
+function stripExpressionFromType(typeStr: string): string {
+	return typeStr
+		.replace(/\s*\|\s*Expression<[^>]+>/g, '')
+		.replace(/\s*\|\s*PlaceholderValue/g, '')
+		.trim();
+}
+
+/**
  * Map n8n property types to TypeScript types with Expression wrappers
  */
 export function mapPropertyType(
+	prop: NodeProperty,
+	discriminatorContext?: DiscriminatorCombination,
+): string {
+	const result = mapPropertyTypeInner(prop, discriminatorContext);
+	if (prop.noDataExpression) {
+		return stripExpressionFromType(result);
+	}
+	return result;
+}
+
+function mapPropertyTypeInner(
 	prop: NodeProperty,
 	discriminatorContext?: DiscriminatorCombination,
 ): string {

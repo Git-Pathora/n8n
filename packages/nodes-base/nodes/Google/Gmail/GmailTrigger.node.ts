@@ -152,6 +152,10 @@ export class GmailTrigger implements INodeType {
 						type: 'string',
 						default: '',
 						placeholder: 'has:attachment',
+						builderHint: {
+							message:
+								'Always set a search query to filter emails. Uses Gmail search syntax, e.g. "from:example@gmail.com", "subject:invoice", "has:attachment", "label:important", "newer_than:1d". Combine with spaces for AND: "from:shop@example.com subject:delivery". Without this filter, ALL incoming emails will trigger the workflow.',
+						},
 						hint: 'Use the same format as in the Gmail search box. <a href="https://support.google.com/mail/answer/7190?hl=en">More info</a>.',
 						description: 'Only return messages matching the specified query',
 					},

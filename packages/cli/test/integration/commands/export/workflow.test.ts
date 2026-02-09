@@ -323,7 +323,7 @@ test('should work with --pretty flag (existing behavior)', async () => {
 	expect(fileContents).toMatch(/\s{2}/);
 });
 
-test('should use historical name when set in workflow history', async () => {
+test('should include workflowHistory with historical name when set', async () => {
 	const workflow = await createWorkflowWithTriggerAndHistory({
 		name: 'Original Name',
 	});
@@ -348,11 +348,15 @@ test('should use historical name when set in workflow history', async () => {
 
 	const exportedData = JSON.parse(fs.readFileSync(outputFile, 'utf-8'))[0];
 
-	expect(exportedData.name).toBe('Version 2 Historical Name');
+	expect(exportedData.name).toBe('Current Name');
 	expect(exportedData.versionId).toBe(version2Id);
+	expect(exportedData.workflowHistory).toEqual({
+		name: 'Version 2 Historical Name',
+		description: null,
+	});
 });
 
-test('should use historical description when set in workflow history', async () => {
+test('should include workflowHistory with historical description when set', async () => {
 	const workflow = await createWorkflowWithTriggerAndHistory({
 		description: 'Original Description',
 	});
@@ -377,6 +381,10 @@ test('should use historical description when set in workflow history', async () 
 
 	const exportedData = JSON.parse(fs.readFileSync(outputFile, 'utf-8'))[0];
 
-	expect(exportedData.description).toBe('Version 2 Historical Description');
+	expect(exportedData.description).toBe('Current Description');
 	expect(exportedData.versionId).toBe(version2Id);
+	expect(exportedData.workflowHistory).toEqual({
+		name: null,
+		description: 'Version 2 Historical Description',
+	});
 });

@@ -153,12 +153,11 @@ export class ExportWorkflowsCommand extends BaseCommand<z.infer<typeof flagsSche
 				workflow.connections = workflowHistory.connections;
 				workflow.versionId = workflowHistory.versionId;
 
-				if (workflowHistory.name !== null) {
-					workflow.name = workflowHistory.name;
-				}
-				if (workflowHistory.description !== null) {
-					workflow.description = workflowHistory.description;
-				}
+				// Add workflowHistory metadata for version name and description
+				(workflow as any).workflowHistory = {
+					name: workflowHistory.name,
+					description: workflowHistory.description,
+				};
 			}
 		}
 

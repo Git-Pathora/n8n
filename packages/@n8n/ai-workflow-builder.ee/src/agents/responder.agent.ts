@@ -2,6 +2,7 @@ import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import type { BaseMessage } from '@langchain/core/messages';
 import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import type { RunnableConfig } from '@langchain/core/runnables';
+import type { Logger } from '@n8n/backend-common';
 import type { ReactAgent } from 'langchain';
 import { createAgent } from 'langchain';
 
@@ -33,6 +34,7 @@ export interface ResponderAgentConfig {
 	llm: BaseChatModel;
 	/** Enable introspection tool for diagnostic data collection. */
 	enableIntrospection?: boolean;
+	logger?: Logger;
 }
 
 /**
@@ -182,7 +184,7 @@ export class ResponderAgent {
 	constructor(config: ResponderAgentConfig) {
 		this.enableIntrospection = config.enableIntrospection === true;
 
-		const tools = this.enableIntrospection ? [createIntrospectTool().tool] : [];
+		const tools = this.enableIntrospection ? [createIntrospectTool(config.logger).tool] : [];
 
 		this.agent = createAgent({
 			model: config.llm,

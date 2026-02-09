@@ -31,6 +31,7 @@ jest.mock('src/adapters/langchain-chat-model', () => ({
 
 const { ChatOpenAI } = jest.requireMock('@langchain/openai');
 const { LangchainAdapter } = jest.requireMock('src/adapters/langchain-chat-model');
+const { getProxyAgent } = jest.requireMock('src/utils/http-proxy-agent');
 
 describe('supplyModel', () => {
 	const mockCtx = {
@@ -153,6 +154,27 @@ describe('supplyModel', () => {
 
 			// Empty providerTools should not set metadata.tools
 			expect((result.response as any).metadata).toEqual({});
+		});
+
+		it('sets timeout in OpenAI class and in fetchOptions', () => {
+			supplyModel(mockCtx, {
+				type: 'openai' as const,
+				baseUrl: 'https://api.openai.com',
+				model: 'gpt-4',
+				apiKey: 'key',
+				timeout: 12345,
+			});
+
+			expect(getProxyAgent).toHaveBeenCalledWith('https://api.openai.com', {
+				headersTimeout: 12345,
+				bodyTimeout: 12345,
+			});
+
+			expect(ChatOpenAI).toHaveBeenCalledWith(
+				expect.objectContaining({
+					timeout: 12345,
+				}),
+			);
 		});
 	});
 

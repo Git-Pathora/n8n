@@ -17,11 +17,11 @@ export function useQuickConnect() {
 	/**
 	 * Check if quick connect is configured for a credential type.
 	 */
-	function hasQuickConnect(credentialTypeName: string, nodeType?: string): boolean {
+	function hasQuickConnect(credentialTypeName: string, nodeType: string): boolean {
 		return quickConnectOptions.value.some(
 			(option) =>
 				option.credentialType === credentialTypeName &&
-				(nodeType === undefined || option.packageName === nodeType.split('.')[0]),
+				option.packageName === nodeType.split('.')[0],
 		);
 	}
 

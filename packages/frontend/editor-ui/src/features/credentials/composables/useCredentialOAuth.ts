@@ -1,5 +1,7 @@
 import { useToast } from '@/app/composables/useToast';
 import { useI18n } from '@n8n/i18n';
+import { createResultError, createResultOk, type Result } from 'n8n-workflow';
+
 import { useCredentialsStore } from '../credentials.store';
 import type { ICredentialsResponse } from '../credentials.types';
 
@@ -15,10 +17,7 @@ export function useCredentialOAuth() {
 	/**
 	 * Get parent types for a credential type (e.g., googleSheetsOAuth2Api extends googleOAuth2Api extends oAuth2Api).
 	 */
-	function getParentTypes(
-		credentialTypeName: string,
-		visited = new Set<string>(),
-	): string[] {
+	function getParentTypes(credentialTypeName: string, visited = new Set<string>()): string[] {
 		if (visited.has(credentialTypeName)) return [];
 		visited.add(credentialTypeName);
 
@@ -84,91 +83,79 @@ export function useCredentialOAuth() {
 		return requiredProperties.every((prop) => overwrittenProperties.includes(prop.name));
 	}
 
-	/**
-	 * Authorize OAuth credentials by opening a popup and listening for callback.
-	 * Returns true if OAuth was successful, false if cancelled or failed.
-	 */
-	async function authorize(credential: ICredentialsResponse): Promise<boolean> {
-		const credentialTypeName = credential.type;
-		const types = getParentTypes(credentialTypeName);
+	// ---------------------------------------------------------------------------
+	// authorize() helpers
+	// ---------------------------------------------------------------------------
 
-		let url: string | undefined;
+	async function getOAuthAuthorizationUrl(
+		credential: ICredentialsResponse,
+	): Promise<Result<string, 'api-error' | 'no-url'>> {
+		const parentTypes = getParentTypes(credential.type);
+
 		try {
-			if (credentialTypeName === 'oAuth2Api' || types.includes('oAuth2Api')) {
-				url = await credentialsStore.oAuth2Authorize(credential);
-			} else if (credentialTypeName === 'oAuth1Api' || types.includes('oAuth1Api')) {
-				url = await credentialsStore.oAuth1Authorize(credential);
+			if (credential.type === 'oAuth2Api' || parentTypes.includes('oAuth2Api')) {
+				return createResultOk(await credentialsStore.oAuth2Authorize(credential));
+			}
+			if (credential.type === 'oAuth1Api' || parentTypes.includes('oAuth1Api')) {
+				return createResultOk(await credentialsStore.oAuth1Authorize(credential));
 			}
 		} catch (error) {
 			toast.showError(
 				error,
 				i18n.baseText('credentialEdit.credentialEdit.showError.generateAuthorizationUrl.title'),
 			);
-			return false;
+			return createResultError('api-error' as const);
 		}
 
-		if (!url) {
-			toast.showError(
-				new Error(i18n.baseText('credentialEdit.credentialEdit.showError.invalidOAuthUrl.message')),
-				i18n.baseText('credentialEdit.credentialEdit.showError.invalidOAuthUrl.title'),
-			);
-			return false;
-		}
+		return createResultError('no-url' as const);
+	}
 
+	function isValidHttpUrl(url: string): boolean {
 		try {
-			const parsedUrl = new URL(url);
-			if (!['http:', 'https:'].includes(parsedUrl.protocol)) {
-				throw new Error('Invalid protocol');
-			}
+			const parsed = new URL(url);
+			return ['http:', 'https:'].includes(parsed.protocol);
 		} catch {
-			toast.showError(
-				new Error(i18n.baseText('credentialEdit.credentialEdit.showError.invalidOAuthUrl.message')),
-				i18n.baseText('credentialEdit.credentialEdit.showError.invalidOAuthUrl.title'),
-			);
 			return false;
 		}
+	}
 
+	function showOAuthUrlError(): void {
+		toast.showError(
+			new Error(i18n.baseText('credentialEdit.credentialEdit.showError.invalidOAuthUrl.message')),
+			i18n.baseText('credentialEdit.credentialEdit.showError.invalidOAuthUrl.title'),
+		);
+	}
+
+	function openOAuthPopup(url: string, signal?: AbortSignal): Window | null {
 		const params =
 			'scrollbars=no,resizable=yes,status=no,titlebar=no,location=no,toolbar=no,menubar=no,width=500,height=700';
-		const oauthPopup = window.open(url, 'OAuth Authorization', params);
+		const popup = window.open(url, 'OAuth Authorization', params);
 
-		if (!oauthPopup) {
-			toast.showError(
-				new Error(i18n.baseText('credentialEdit.credentialEdit.showError.invalidOAuthUrl.message')),
-				i18n.baseText('credentialEdit.credentialEdit.showError.invalidOAuthUrl.title'),
-			);
-			return false;
-		}
+		signal?.addEventListener('abort', () => {
+			popup?.close();
+		});
 
+		return popup;
+	}
+
+	async function waitForOAuthCallback(popup: Window, signal?: AbortSignal): Promise<boolean> {
 		return await new Promise((resolve) => {
 			const oauthChannel = new BroadcastChannel('oauth-callback');
 			let settled = false;
-			let pollTimer: ReturnType<typeof setInterval> | undefined;
 
-			function cleanup() {
-				if (pollTimer !== undefined) {
-					clearInterval(pollTimer);
-					pollTimer = undefined;
-				}
-				oauthChannel.close();
-			}
-
-			function settle(result: boolean) {
+			const settle = (result: boolean) => {
 				if (settled) return;
 				settled = true;
-				cleanup();
+				oauthChannel.close();
 				resolve(result);
-			}
+			};
 
-			// Poll for popup being closed without completing OAuth (user clicked X)
-			pollTimer = setInterval(() => {
-				if (oauthPopup.closed) {
-					settle(false);
-				}
-			}, 500);
+			signal?.addEventListener('abort', () => {
+				settle(false);
+			});
 
 			oauthChannel.addEventListener('message', (event: MessageEvent) => {
-				oauthPopup.close();
+				popup.close();
 
 				if (event.data === 'success') {
 					toast.showMessage({
@@ -178,15 +165,45 @@ export function useCredentialOAuth() {
 					settle(true);
 				} else {
 					toast.showMessage({
-						title: i18n.baseText(
-							'nodeCredentials.oauth.accountConnectionFailed',
-						),
+						title: i18n.baseText('nodeCredentials.oauth.accountConnectionFailed'),
 						type: 'error',
 					});
 					settle(false);
 				}
 			});
 		});
+	}
+
+	// ---------------------------------------------------------------------------
+	// Public
+	// ---------------------------------------------------------------------------
+
+	/**
+	 * Authorize OAuth credentials by opening a popup and listening for callback.
+	 * Returns true if OAuth was successful, false if cancelled or failed.
+	 */
+	async function authorize(
+		credential: ICredentialsResponse,
+		signal?: AbortSignal,
+	): Promise<boolean> {
+		const urlResult = await getOAuthAuthorizationUrl(credential);
+		if (!urlResult.ok) {
+			if (urlResult.error === 'no-url') showOAuthUrlError();
+			return false;
+		}
+
+		if (!isValidHttpUrl(urlResult.result)) {
+			showOAuthUrlError();
+			return false;
+		}
+
+		const popup = openOAuthPopup(urlResult.result, signal);
+		if (!popup) {
+			showOAuthUrlError();
+			return false;
+		}
+
+		return await waitForOAuthCallback(popup, signal);
 	}
 
 	return {

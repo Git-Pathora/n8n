@@ -113,6 +113,8 @@ const toast = useToast();
 const subscribedToCredentialType = ref('');
 const filter = ref('');
 const listeningForAuthChange = ref(false);
+const oauthAbortController = ref<AbortController | null>(null);
+const pendingCredentialId = ref<string | null>(null);
 const selectRefs = ref<Array<InstanceType<typeof N8nSelect>>>([]);
 
 const node = computed(() => props.node);
@@ -233,6 +235,17 @@ onMounted(() => {
 			if (!listeningForActions.includes(name)) {
 				return;
 			}
+
+			if (name === 'createNewCredential') {
+				// If store update is skipped, it means the credential creation is part of an OAuth flow
+				// the store will be updated on OAuth success, so we can ignore this action here
+				const options = args[3];
+
+				if (options?.skipStoreUpdate) {
+					return;
+				}
+			}
+
 			const current = selected.value[credentialType];
 			let credentialsOfType: ICredentialsResponse[] = [];
 			if (props.showAll) {
@@ -282,6 +295,13 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
 	ndvEventBus.off('credential.createNew', onCreateAndAssignNewCredential);
+
+	if (oauthAbortController.value) {
+		oauthAbortController.value.abort();
+	}
+	if (pendingCredentialId.value) {
+		void credentialsStore.deleteCredential({ id: pendingCredentialId.value });
+	}
 });
 
 function getSelectedId(type: INodeCredentialDescription) {
@@ -535,9 +555,12 @@ function showStandardEmptyState(type: INodeCredentialDescription): boolean {
 }
 
 async function onQuickConnectSignIn(credentialTypeName: string) {
+	if (hasQuickConnect(credentialTypeName, props.node.type)) {
+		// TODO: Implement quick connect flows here
+		return;
+	}
+
 	if (!isOAuthCredentialType(credentialTypeName)) {
-		// Non-OAuth: fall back to opening the credential modal for manual setup
-		createNewCredential(credentialTypeName, true, false);
 		return;
 	}
 
@@ -556,7 +579,7 @@ async function onQuickConnectSignIn(credentialTypeName: string) {
 				type: credentialTypeName,
 				data: {},
 			},
-			undefined,
+			projectsStore.currentProject?.id,
 			undefined,
 			{ skipStoreUpdate: true },
 		);
@@ -565,9 +588,15 @@ async function onQuickConnectSignIn(credentialTypeName: string) {
 		return;
 	}
 
+	const controller = new AbortController();
+	oauthAbortController.value = controller;
+	pendingCredentialId.value = credential.id;
 	subscribedToCredentialType.value = credentialTypeName;
 
-	const success = await authorize(credential);
+	const success = await authorize(credential, controller.signal);
+
+	oauthAbortController.value = null;
+	pendingCredentialId.value = null;
 
 	// Track telemetry
 	telemetry.track('User saved credentials', {

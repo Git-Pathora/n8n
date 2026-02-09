@@ -2,19 +2,17 @@
  * Schema Validator
  *
  * Dynamically loads and applies Zod schemas for node configuration validation.
- * Uses generated schemas from ~/.n8n/generated-types/ by default.
+ * Schemas are loaded from `nodeDefinitionDirs` configured via `setSchemaBaseDirs()`.
  */
 
-import * as os from 'os';
 import * as path from 'path';
 import type { ZodSchema, ZodIssue } from 'zod';
 
 // Import all schema helpers for factory function support
 import * as schemaHelpers from './schema-helpers';
 
-// Default path to generated schemas
-const DEFAULT_SCHEMA_BASE_PATH = path.join(os.homedir(), '.n8n', 'generated-types');
-let schemaBasePath = DEFAULT_SCHEMA_BASE_PATH;
+// Directories to search for generated schemas (set via setSchemaBaseDirs)
+let schemaBaseDirs: string[] = [];
 
 // Cache for loaded schemas (either ZodSchema or factory function)
 // Factory functions receive all schema helpers as parameters
@@ -35,18 +33,19 @@ export interface SchemaValidationResult {
 }
 
 /**
- * Get the current schema base path
+ * Get the current schema base directories
  */
-export function getSchemaBasePath(): string {
-	return schemaBasePath;
+export function getSchemaBaseDirs(): string[] {
+	return schemaBaseDirs;
 }
 
 /**
- * Set a custom schema base path (useful for testing)
+ * Set the directories to search for generated schemas.
+ * These should be the same `nodeDefinitionDirs` that `get_node_types` uses.
  */
-export function setSchemaBasePath(basePath: string): void {
-	schemaBasePath = basePath;
-	// Clear cache when base path changes
+export function setSchemaBaseDirs(dirs: string[]): void {
+	schemaBaseDirs = dirs;
+	// Clear cache when dirs change
 	schemaCache.clear();
 }
 
@@ -146,33 +145,15 @@ function tryLoadSchemaModule(schemaPath: string): Record<string, unknown> | null
 }
 
 /**
- * Try to load a schema for a specific node type and version
- * @returns SchemaOrFactory if found, null otherwise
+ * Try to resolve a schema from a loaded module
+ * @returns SchemaOrFactory if a valid schema export is found, null otherwise
  */
-function tryLoadSchemaForNodeType(nodeType: string, version: number): SchemaOrFactory | null {
-	const { pkg, nodeName } = nodeTypeToPathComponents(nodeType);
-	const versionStr = versionToString(version);
-	const isLangchain = pkg === 'n8n-nodes-langchain';
-
-	// Try flat structure first: nodes/{pkg}/{nodeName}/{version}.schema.js
-	const flatSchemaPath = path.join(schemaBasePath, 'nodes', pkg, nodeName, `${versionStr}.schema`);
-	// Try split structure: nodes/{pkg}/{nodeName}/{version}/index.schema.js
-	const splitSchemaPath = path.join(
-		schemaBasePath,
-		'nodes',
-		pkg,
-		nodeName,
-		versionStr,
-		'index.schema',
-	);
-
-	// Try flat structure first, then split structure
-	const schemaModule = tryLoadSchemaModule(flatSchemaPath) ?? tryLoadSchemaModule(splitSchemaPath);
-
-	if (!schemaModule) {
-		return null;
-	}
-
+function resolveSchemaFromModule(
+	schemaModule: Record<string, unknown>,
+	nodeName: string,
+	versionStr: string,
+	isLangchain: boolean,
+): SchemaOrFactory | null {
 	// Build the expected names to find the right export
 	const expectedSchemaName = buildExpectedSchemaName(nodeName, versionStr, isLangchain);
 	const expectedFactoryName = buildExpectedFactoryName(nodeName, versionStr, isLangchain);
@@ -220,6 +201,39 @@ function tryLoadSchemaForNodeType(nodeType: string, version: number): SchemaOrFa
 	}
 
 	// No ConfigSchema found
+	return null;
+}
+
+/**
+ * Try to load a schema for a specific node type and version.
+ * Searches all configured `schemaBaseDirs` in order.
+ * @returns SchemaOrFactory if found, null otherwise
+ */
+function tryLoadSchemaForNodeType(nodeType: string, version: number): SchemaOrFactory | null {
+	const { pkg, nodeName } = nodeTypeToPathComponents(nodeType);
+	const versionStr = versionToString(version);
+	const isLangchain = pkg === 'n8n-nodes-langchain';
+
+	for (const baseDir of schemaBaseDirs) {
+		// Try flat structure first: nodes/{pkg}/{nodeName}/{version}.schema.js
+		const flatSchemaPath = path.join(baseDir, 'nodes', pkg, nodeName, `${versionStr}.schema`);
+		// Try split structure: nodes/{pkg}/{nodeName}/{version}/index.schema.js
+		const splitSchemaPath = path.join(baseDir, 'nodes', pkg, nodeName, versionStr, 'index.schema');
+
+		// Try flat structure first, then split structure
+		const schemaModule =
+			tryLoadSchemaModule(flatSchemaPath) ?? tryLoadSchemaModule(splitSchemaPath);
+
+		if (!schemaModule) {
+			continue;
+		}
+
+		const result = resolveSchemaFromModule(schemaModule, nodeName, versionStr, isLangchain);
+		if (result) {
+			return result;
+		}
+	}
+
 	return null;
 }
 

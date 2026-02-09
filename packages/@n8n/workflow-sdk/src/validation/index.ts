@@ -6,6 +6,8 @@ import { validateNodeConfig } from './schema-validator';
 import { isStickyNoteType, isHttpRequestType } from '../constants/node-types';
 import type { WorkflowBuilder, WorkflowJSON } from '../types/base';
 
+export { setSchemaBaseDirs } from './schema-validator';
+
 /**
  * Validation error codes
  */

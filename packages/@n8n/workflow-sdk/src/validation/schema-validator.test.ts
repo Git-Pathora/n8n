@@ -1,11 +1,12 @@
 import {
 	validateNodeConfig,
 	loadSchema,
-	setSchemaBasePath,
-	getSchemaBasePath,
+	setSchemaBaseDirs,
+	getSchemaBaseDirs,
 } from './schema-validator';
 
 // Check if generated schemas are available (they're generated locally, not in CI)
+// Schema loading requires dirs to be configured - check with current dirs
 const schemasAvailable = loadSchema('n8n-nodes-base.set', 2) !== null;
 
 // Helper to conditionally run tests that require schemas
@@ -17,15 +18,15 @@ function itIfSchemas(name: string, fn: jest.ProvidesCallback) {
 }
 
 describe('schema-validator', () => {
-	// Store original path to restore after tests
-	let originalBasePath: string;
+	// Store original dirs to restore after tests
+	let originalBaseDirs: string[];
 
 	beforeAll(() => {
-		originalBasePath = getSchemaBasePath();
+		originalBaseDirs = getSchemaBaseDirs();
 	});
 
 	afterAll(() => {
-		setSchemaBasePath(originalBasePath);
+		setSchemaBaseDirs(originalBaseDirs);
 	});
 
 	describe('loadSchema', () => {
@@ -35,7 +36,7 @@ describe('schema-validator', () => {
 		});
 
 		itIfSchemas('loads schema for flat version structure (e.g., set v2)', () => {
-			// Uses generated schemas at ~/.n8n/generated-types/
+			// Uses generated schemas from configured schemaBaseDirs
 			// SetV2ConfigSchema in nodes/n8n-nodes-base/set/v2.schema.js
 			const schema = loadSchema('n8n-nodes-base.set', 2);
 			expect(schema).not.toBeNull();
@@ -174,23 +175,23 @@ describe('schema-validator', () => {
 		});
 	});
 
-	describe('setSchemaBasePath', () => {
-		it('allows setting a custom schema base path', () => {
-			const customPath = '/custom/path/to/schemas';
-			setSchemaBasePath(customPath);
-			expect(getSchemaBasePath()).toBe(customPath);
+	describe('setSchemaBaseDirs', () => {
+		it('allows setting custom schema base dirs', () => {
+			const customDirs = ['/custom/path/to/schemas'];
+			setSchemaBaseDirs(customDirs);
+			expect(getSchemaBaseDirs()).toEqual(customDirs);
 		});
 
 		itIfSchemas('affects schema loading behavior', () => {
 			// Set to a non-existent path
-			setSchemaBasePath('/nonexistent/path');
+			setSchemaBaseDirs(['/nonexistent/path']);
 
 			// Schema that would normally be found should now be null
 			const schema = loadSchema('n8n-nodes-base.set', 2);
 			expect(schema).toBeNull();
 
 			// Restore for other tests
-			setSchemaBasePath(originalBasePath);
+			setSchemaBaseDirs(originalBaseDirs);
 		});
 	});
 });

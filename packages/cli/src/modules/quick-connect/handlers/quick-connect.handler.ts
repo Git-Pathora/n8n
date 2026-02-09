@@ -1,3 +1,4 @@
+import type { User } from '@n8n/db';
 import { Service } from '@n8n/di';
 import type { ICredentialDataDecryptedObject } from 'n8n-workflow';
 
@@ -17,9 +18,13 @@ export interface IQuickConnectHandler {
 	 * Fetches credential data from the third-party service.
 	 * Used only for backend-based Quick connect flows.
 	 * @param config - Configuration for this particular Quick connect option
+	 * @param user - The user requesting the credential
 	 * @returns The credential data to be saved
 	 */
-	getCredentialData?(config: QuickConnectOption): Promise<ICredentialDataDecryptedObject>;
+	getCredentialData?(
+		config: QuickConnectOption,
+		user: User,
+	): Promise<ICredentialDataDecryptedObject>;
 }
 
 /**

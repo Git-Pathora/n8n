@@ -66,7 +66,7 @@ export class QuickConnectService {
 
 		let credentialData: ICredentialDataDecryptedObject;
 		try {
-			credentialData = await handler.getCredentialData(option);
+			credentialData = await handler.getCredentialData(option, user);
 		} catch (error) {
 			this.logger.error('Failed to fetch credential data from third-party', {
 				error,

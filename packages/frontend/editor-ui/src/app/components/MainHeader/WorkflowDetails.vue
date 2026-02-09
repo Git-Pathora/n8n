@@ -15,6 +15,7 @@ import { useMessage } from '@/app/composables/useMessage';
 import { useTelemetry } from '@/app/composables/useTelemetry';
 import { useToast } from '@/app/composables/useToast';
 import { useWorkflowSaving } from '@/app/composables/useWorkflowSaving';
+import { injectWorkflowState } from '@/app/composables/useWorkflowState';
 import { nodeViewEventBus } from '@/app/event-bus';
 import type { IWorkflowDb } from '@/Interface';
 import type { FolderShortInfo } from '@/features/core/folders/folders.types';
@@ -41,6 +42,10 @@ import { useSettingsStore } from '@/app/stores/settings.store';
 import { useUIStore } from '@/app/stores/ui.store';
 import { useWorkflowsStore } from '@/app/stores/workflows.store';
 import { useWorkflowsListStore } from '@/app/stores/workflowsList.store';
+import {
+	useWorkflowDocumentStore,
+	createWorkflowDocumentId,
+} from '@/app/stores/workflowDocument.store';
 
 const WORKFLOW_NAME_BP_TO_WIDTH: { [key: string]: number } = {
 	XS: 150,
@@ -83,10 +88,10 @@ const message = useMessage();
 const toast = useToast();
 const documentTitle = useDocumentTitle();
 const workflowSaving = useWorkflowSaving({ router });
+const workflowState = injectWorkflowState();
 
 const isTagsEditEnabled = ref(false);
 const appliedTagIds = ref<string[]>([]);
-const tagsSaving = ref(false);
 const workflowHeaderActionsRef =
 	useTemplateRef<InstanceType<typeof WorkflowHeaderDraftPublishActions>>('workflowHeaderActions');
 const tagsEventBus = createEventBus();
@@ -153,15 +158,12 @@ function onTagsEditEnable() {
 	}, 0);
 }
 
-async function onTagsBlur() {
+function onTagsBlur() {
 	const current = props.tags;
 	const tags = appliedTagIds.value;
 	if (!hasChanged(current, tags)) {
 		isTagsEditEnabled.value = false;
 
-		return;
-	}
-	if (tagsSaving.value) {
 		return;
 	}
 
@@ -172,18 +174,21 @@ async function onTagsBlur() {
 
 	collaborationStore.requestWriteAccess();
 
-	tagsSaving.value = true;
+	const workflowDocumentId = createWorkflowDocumentId(props.id);
+	const workflowDocumentStore = useWorkflowDocumentStore(workflowDocumentId);
+	workflowDocumentStore.setTags(tags);
+	workflowState.setWorkflowTagIds(tags);
+	uiStore.markStateDirty();
 
-	const saved = await workflowSaving.saveCurrentWorkflow({ tags });
+	// Schedule autosave (debounced)
+	workflowSaving.autoSaveWorkflow();
+
 	telemetry.track('User edited workflow tags', {
 		workflow_id: props.id,
 		new_tag_count: tags.length,
 	});
 
-	tagsSaving.value = false;
-	if (saved) {
-		isTagsEditEnabled.value = false;
-	}
+	isTagsEditEnabled.value = false;
 }
 
 function onTagsEditEsc() {
@@ -197,7 +202,7 @@ function onNameToggle() {
 	}
 }
 
-async function onNameSubmit(name: string) {
+function onNameSubmit(name: string) {
 	const newName = name.trim();
 	if (!newName) {
 		toast.showMessage({
@@ -215,13 +220,13 @@ async function onNameSubmit(name: string) {
 		return;
 	}
 
-	uiStore.addActiveAction('workflowSaving');
+	// Update workflow name in store and mark state as dirty
+	workflowState.setWorkflowName({ newName, setStateDirty: true });
 
-	const saved = await workflowSaving.saveCurrentWorkflow({ name });
-	if (saved) {
-		documentTitle.setDocumentTitle(newName, 'IDLE');
-	}
-	uiStore.removeActiveAction('workflowSaving');
+	// Schedule autosave (debounced)
+	workflowSaving.autoSaveWorkflow();
+
+	documentTitle.setDocumentTitle(newName, 'IDLE');
 	renameInput.value?.forceCancel();
 }
 

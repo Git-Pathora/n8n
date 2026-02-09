@@ -150,7 +150,7 @@ export function useWorkflowSaving({
 	}
 
 	async function saveCurrentWorkflow(
-		{ id, name, tags }: { id?: string; name?: string; tags?: string[] } = {},
+		{ id }: { id?: string } = {},
 		redirect = true,
 		forceSave = false,
 		autosaved = false,
@@ -166,16 +166,14 @@ export function useWorkflowSaving({
 		const uiContext = getQueryParam(router.currentRoute.value.query, 'uiContext');
 
 		// Prevent concurrent saves - if a save is already in progress, skip this one
-		// for autosaves (they will be rescheduled), or wait for non-autosaves
-		if (uiStore.isActionActive.workflowSaving) {
+		// for autosaves (they will be rescheduled), or wait for pending save to complete
+		if (autosaveStore.pendingAutoSave) {
 			if (autosaved) {
 				// Autosave will be rescheduled by the finally block of the in-progress save
 				return true;
 			}
-			// For manual saves, wait for the pending autosave to complete first
-			if (autosaveStore.pendingAutoSave) {
-				await autosaveStore.pendingAutoSave;
-			}
+			// Wait for the pending save to complete first to avoid race conditions
+			await autosaveStore.pendingAutoSave;
 		}
 
 		// Check if workflow needs to be saved as new (doesn't exist in store yet)
@@ -184,7 +182,7 @@ export function useWorkflowSaving({
 			: null;
 		if (!currentWorkflow || !existingWorkflow?.id) {
 			const workflowId = await saveAsNewWorkflow(
-				{ name, tags, parentFolderId, uiContext, autosaved },
+				{ parentFolderId, uiContext, autosaved },
 				redirect,
 			);
 			return !!workflowId;
@@ -205,14 +203,6 @@ export function useWorkflowSaving({
 			// via the browser back button, encountering our warning dialog with the new route already set
 			if (workflowDataRequest.id !== currentWorkflow) {
 				throw new Error('Attempted to save a workflow different from the current workflow');
-			}
-
-			if (name) {
-				workflowDataRequest.name = name.trim();
-			}
-
-			if (tags) {
-				workflowDataRequest.tags = tags;
 			}
 
 			workflowDataRequest.versionId = workflowsStore.workflowVersionId;
@@ -238,17 +228,6 @@ export function useWorkflowSaving({
 				workflowData.checksum,
 			);
 			workflowState.setWorkflowProperty('updatedAt', workflowData.updatedAt);
-
-			if (name) {
-				workflowState.setWorkflowName({ newName: workflowData.name, setStateDirty: false });
-			}
-
-			if (tags) {
-				const tagIds = convertWorkflowTagsToIds(workflowData.tags);
-				const workflowDocumentId = createWorkflowDocumentId(currentWorkflow);
-				const workflowDocumentStore = useWorkflowDocumentStore(workflowDocumentId);
-				workflowDocumentStore.setTags(tagIds);
-			}
 
 			// Only mark state clean if no new changes were made during the save
 			if (uiStore.dirtyStateSetCount === dirtyCountBeforeSave) {
@@ -306,7 +285,7 @@ export function useWorkflowSaving({
 					);
 
 					if (overwrite === MODAL_CONFIRM) {
-						return await saveCurrentWorkflow({ id, name, tags }, redirect, true);
+						return await saveCurrentWorkflow({ id }, redirect, true);
 					}
 				}
 

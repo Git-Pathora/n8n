@@ -536,7 +536,7 @@ describe('useWorkflowSaving', () => {
 			);
 		});
 
-		it('should convert tags from ITag[] to string[] when tags param is provided', async () => {
+		it('should include tags from store when saving workflow', async () => {
 			const workflow = createTestWorkflow({
 				id: 'w5',
 				nodes: [createTestNode({ type: CHAT_TRIGGER_NODE_TYPE, disabled: false })],
@@ -570,7 +570,7 @@ describe('useWorkflowSaving', () => {
 				workflowState: mockWorkflowState as WorkflowState,
 			});
 
-			await saveCurrentWorkflow({ id: 'w5', tags: ['tag1', 'tag2'] }, true, false, false);
+			await saveCurrentWorkflow({ id: 'w5' }, true, false, false);
 
 			// Tags are now managed by workflowDocumentStore, not workflowState
 			expect(workflowsStore.updateWorkflow).toHaveBeenCalledWith(

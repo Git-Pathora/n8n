@@ -3,6 +3,23 @@
   "version": "2.7.0",
   "description": "",
   "main": "index.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.js"
+    },
+    "./mcp/core": {
+      "types": "./dist/nodes/mcp/McpTrigger/index.d.ts",
+      "import": "./dist/nodes/mcp/McpTrigger/index.js",
+      "require": "./dist/nodes/mcp/McpTrigger/index.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "mcp/core": ["./dist/nodes/mcp/McpTrigger/index.d.ts"]
+    }
+  },
   "scripts": {
     "clean": "rimraf dist .turbo",
     "dev": "pnpm run watch",
@@ -216,6 +233,7 @@
     "@microsoft/agents-hosting": "1.1.0-alpha.85",
     "@modelcontextprotocol/sdk": "1.25.2",
     "@mozilla/readability": "0.6.0",
+    "@n8n/ai-utilities": "workspace:*",
     "@n8n/client-oauth2": "workspace:*",
     "@n8n/config": "workspace:*",
     "@n8n/di": "workspace:*",

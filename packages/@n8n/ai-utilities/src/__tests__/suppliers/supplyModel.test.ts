@@ -1,6 +1,6 @@
 import type { ISupplyDataFunctions } from 'n8n-workflow';
 
-import { supplyModel } from './supplyModel';
+import { supplyModel } from 'src/suppliers/supplyModel';
 
 const mockLangchainAdapterInstance = { __brand: 'LangchainAdapter' };
 
@@ -11,26 +11,26 @@ jest.mock('@langchain/openai', () => ({
 	}),
 }));
 
-jest.mock('../utils/http-proxy-agent', () => ({
+jest.mock('src/utils/http-proxy-agent', () => ({
 	getProxyAgent: jest.fn().mockReturnValue({ __agent: true }),
 }));
 
-jest.mock('../utils/n8n-llm-tracing', () => ({
+jest.mock('src/utils/n8n-llm-tracing', () => ({
 	N8nLlmTracing: jest.fn().mockImplementation(function (this: unknown) {
 		return this;
 	}),
 }));
 
-jest.mock('../utils/failed-attempt-handler/n8nLlmFailedAttemptHandler', () => ({
+jest.mock('src/utils/failed-attempt-handler/n8nLlmFailedAttemptHandler', () => ({
 	makeN8nLlmFailedAttemptHandler: jest.fn().mockReturnValue(jest.fn()),
 }));
 
-jest.mock('../adapters/langchain-chat-model', () => ({
+jest.mock('src/adapters/langchain-chat-model', () => ({
 	LangchainAdapter: jest.fn().mockImplementation(() => mockLangchainAdapterInstance),
 }));
 
 const { ChatOpenAI } = jest.requireMock('@langchain/openai');
-const { LangchainAdapter } = jest.requireMock('../adapters/langchain-chat-model');
+const { LangchainAdapter } = jest.requireMock('src/adapters/langchain-chat-model');
 
 describe('supplyModel', () => {
 	const mockCtx = {

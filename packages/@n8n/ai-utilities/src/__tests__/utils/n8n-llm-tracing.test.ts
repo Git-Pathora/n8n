@@ -4,19 +4,19 @@ import type { LLMResult } from '@langchain/core/outputs';
 import type { INode, ISupplyDataFunctions } from 'n8n-workflow';
 import { NodeConnectionTypes, NodeOperationError } from 'n8n-workflow';
 
-import { N8nLlmTracing } from './n8n-llm-tracing';
+import { N8nLlmTracing } from '../../utils/n8n-llm-tracing';
 
 // Mock the dependencies
-jest.mock('./log-ai-event', () => ({
+jest.mock('src/utils/log-ai-event', () => ({
 	logAiEvent: jest.fn(),
 }));
 
-jest.mock('./tokenizer/token-estimator', () => ({
+jest.mock('src/utils/tokenizer/token-estimator', () => ({
 	estimateTokensFromStringList: jest.fn().mockResolvedValue(100),
 }));
 
-const { logAiEvent } = jest.requireMock('./log-ai-event');
-const { estimateTokensFromStringList } = jest.requireMock('./tokenizer/token-estimator');
+const { logAiEvent } = jest.requireMock('src/utils/log-ai-event');
+const { estimateTokensFromStringList } = jest.requireMock('src/utils/tokenizer/token-estimator');
 
 describe('N8nLlmTracing', () => {
 	let mockExecutionFunctions: jest.Mocked<ISupplyDataFunctions>;

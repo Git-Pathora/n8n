@@ -1,5 +1,5 @@
-import type { ServerSentEventMessage } from './sse';
-import { parseSSEStream } from './sse';
+import type { ServerSentEventMessage } from '../../utils/sse';
+import { parseSSEStream } from '../../utils/sse';
 
 describe('parseSSEStream', () => {
 	// Helper to create a ReadableStream from string chunks

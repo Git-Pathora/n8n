@@ -1,4 +1,4 @@
-import { n8nDefaultFailedAttemptHandler } from './n8nDefaultFailedAttemptHandler';
+import { n8nDefaultFailedAttemptHandler } from '../../../utils/failed-attempt-handler/n8nDefaultFailedAttemptHandler';
 
 class MockHttpError extends Error {
 	response: { status: number };

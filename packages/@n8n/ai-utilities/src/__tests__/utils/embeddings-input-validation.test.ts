@@ -4,7 +4,7 @@ import { NodeOperationError } from 'n8n-workflow';
 import {
 	validateEmbedQueryInput,
 	validateEmbedDocumentsInput,
-} from './embeddings-input-validation';
+} from 'src/utils/embeddings-input-validation';
 
 describe('validateEmbedQueryInput', () => {
 	const mockNode: INode = {

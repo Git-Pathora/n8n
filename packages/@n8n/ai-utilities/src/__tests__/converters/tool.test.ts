@@ -1,7 +1,7 @@
 import type { JSONSchema7 } from 'json-schema';
 import { z } from 'zod';
 
-import { fromLcTool, getParametersJsonSchema } from './tool';
+import { fromLcTool, getParametersJsonSchema } from '../../converters/tool';
 
 describe('fromLcTool', () => {
 	it('converts StructuredTool (schema + invoke) to N8n function tool', () => {

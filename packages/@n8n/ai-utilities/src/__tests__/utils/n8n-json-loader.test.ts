@@ -3,14 +3,14 @@ import type { TextSplitter } from '@langchain/textsplitters';
 import type { IExecuteFunctions, INode, INodeExecutionData } from 'n8n-workflow';
 import { NodeOperationError } from 'n8n-workflow';
 
-import { N8nJsonLoader } from './n8n-json-loader';
+import { N8nJsonLoader } from '../../utils/n8n-json-loader';
 
 // Mock the helpers module
-jest.mock('./helpers', () => ({
+jest.mock('src/utils/helpers', () => ({
 	getMetadataFiltersValues: jest.fn(),
 }));
 
-const { getMetadataFiltersValues } = jest.requireMock('./helpers');
+const { getMetadataFiltersValues } = jest.requireMock('src/utils/helpers');
 
 describe('N8nJsonLoader', () => {
 	let mockContext: jest.Mocked<IExecuteFunctions>;

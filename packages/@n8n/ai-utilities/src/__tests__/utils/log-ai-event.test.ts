@@ -1,6 +1,6 @@
 import type { AiEvent, IDataObject, IExecuteFunctions, ISupplyDataFunctions } from 'n8n-workflow';
 
-import { logAiEvent } from './log-ai-event';
+import { logAiEvent } from 'src/utils/log-ai-event';
 
 describe('logAiEvent', () => {
 	let mockExecuteFunctions: jest.Mocked<IExecuteFunctions | ISupplyDataFunctions>;

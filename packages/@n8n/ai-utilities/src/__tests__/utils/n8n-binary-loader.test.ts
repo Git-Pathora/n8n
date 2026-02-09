@@ -4,10 +4,10 @@ import type { IBinaryData, IExecuteFunctions, INode, INodeExecutionData } from '
 import { BINARY_ENCODING, NodeOperationError } from 'n8n-workflow';
 import { Readable } from 'stream';
 
-import { N8nBinaryLoader } from './n8n-binary-loader';
+import { N8nBinaryLoader } from 'src/utils/n8n-binary-loader';
 
 // Mock the helpers module
-jest.mock('./helpers', () => ({
+jest.mock('src/utils/helpers', () => ({
 	getMetadataFiltersValues: jest.fn(),
 }));
 
@@ -48,7 +48,7 @@ jest.mock('@langchain/community/document_loaders/fs/pdf', () => ({
 	})),
 }));
 
-const { getMetadataFiltersValues } = jest.requireMock('./helpers');
+const { getMetadataFiltersValues } = jest.requireMock('src/utils/helpers');
 
 describe('N8nBinaryLoader', () => {
 	let mockContext: jest.MockedObjectDeep<IExecuteFunctions>;

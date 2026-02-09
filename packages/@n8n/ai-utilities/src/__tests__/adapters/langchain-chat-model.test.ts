@@ -4,9 +4,9 @@ import type { ISupplyDataFunctions } from 'n8n-workflow';
 
 import type { GenerateResult, StreamChunk } from 'src/types/output';
 
-import { LangchainAdapter } from './langchain-chat-model';
+import { LangchainAdapter } from '../../adapters/langchain-chat-model';
 
-jest.mock('../converters/tool', () => ({
+jest.mock('src/converters/tool', () => ({
 	fromLcTool: jest.fn().mockImplementation((t: { name?: string }) => ({
 		type: 'function' as const,
 		name: t?.name ?? 'tool',
@@ -15,21 +15,20 @@ jest.mock('../converters/tool', () => ({
 	})),
 }));
 
-jest.mock('../utils/n8n-llm-tracing', () => ({
+jest.mock('src/utils/n8n-llm-tracing', () => ({
 	N8nLlmTracing: jest.fn().mockImplementation(function (this: unknown) {
 		return this;
 	}),
 }));
 
-jest.mock('../utils/failed-attempt-handler/n8nLlmFailedAttemptHandler', () => ({
+jest.mock('src/utils/failed-attempt-handler/n8nLlmFailedAttemptHandler', () => ({
 	makeN8nLlmFailedAttemptHandler: jest.fn().mockReturnValue(jest.fn()),
 }));
 
-const { fromLcMessage } = jest.requireMock('../converters/message');
-const { fromLcTool } = jest.requireMock('../converters/tool');
-const { N8nLlmTracing } = jest.requireMock('../utils/n8n-llm-tracing');
+const { fromLcTool } = jest.requireMock('src/converters/tool');
+const { N8nLlmTracing } = jest.requireMock('src/utils/n8n-llm-tracing');
 const { makeN8nLlmFailedAttemptHandler } = jest.requireMock(
-	'../utils/failed-attempt-handler/n8nLlmFailedAttemptHandler',
+	'src/utils/failed-attempt-handler/n8nLlmFailedAttemptHandler',
 );
 
 function createMockChatModel(

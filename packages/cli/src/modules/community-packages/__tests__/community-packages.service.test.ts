@@ -944,7 +944,7 @@ describe('CommunityPackagesService', () => {
 			await communityPackagesService.installPackage(PACKAGE_NAME, '1.0.0');
 
 			expect(nodeDefinitionGenerator.generateForPackage).toHaveBeenCalledTimes(1);
-			expect(nodeDefinitionGenerator.generateForPackage.mock.calls[0]![0]).toBe(PACKAGE_NAME);
+			expect(nodeDefinitionGenerator.generateForPackage.mock.calls[0][0]).toBe(PACKAGE_NAME);
 		});
 
 		test('should remove node definitions after removing a community package', async () => {

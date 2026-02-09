@@ -12,7 +12,7 @@ import { useDebounceFn } from '@vueuse/core';
 import { NodeConnectionTypes, type INode, type INodeTypeDescription } from 'n8n-workflow';
 import type { ChatHubToolDto } from '@n8n/api-types';
 import { computed, ref, watch } from 'vue';
-import { DEBOUNCE_TIME, getDebounceTime } from '@/app/constants';
+import { AGENT_TOOL_NODE_TYPE, DEBOUNCE_TIME, getDebounceTime } from '@/app/constants';
 import { useChatStore } from '@/features/ai/chatHub/chat.store';
 import { useToast } from '@/app/composables/useToast';
 
@@ -23,6 +23,9 @@ defineProps<{
 		onConfirm: (tools: INode[]) => void;
 	};
 }>();
+
+/** Tool node types that should not be available in the Chat Hub tool selector. */
+const CHAT_HUB_EXCLUDED_TOOL_TYPES: string[] = [AGENT_TOOL_NODE_TYPE];
 
 const i18n = useI18n();
 const nodeTypesStore = useNodeTypesStore();
@@ -50,7 +53,10 @@ const availableToolTypes = computed<INodeTypeDescription[]>(() => {
 
 	return toolTypeNames
 		.map((name) => nodeTypesStore.getNodeType(name))
-		.filter((nodeType): nodeType is INodeTypeDescription => nodeType !== null);
+		.filter(
+			(nodeType): nodeType is INodeTypeDescription =>
+				nodeType !== null && !CHAT_HUB_EXCLUDED_TOOL_TYPES.includes(nodeType.name),
+		);
 });
 
 const filteredConfiguredTools = computed(() => {

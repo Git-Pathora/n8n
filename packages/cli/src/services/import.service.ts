@@ -158,12 +158,15 @@ export class ImportService {
 			// Always create workflow history for the current version
 			// This is needed to be able to activate the workflow later
 			for (const workflow of insertedWorkflows) {
+				const workflowHistory: any = workflow;
 				await tx.insert(WorkflowHistory, {
 					versionId: workflow.versionId,
 					workflowId: workflow.id,
 					nodes: workflow.nodes,
 					connections: workflow.connections,
 					authors: 'import',
+					name: workflowHistory.workflowHistory?.name ?? null,
+					description: workflowHistory.workflowHistory?.description ?? null,
 				});
 			}
 

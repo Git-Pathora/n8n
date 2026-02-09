@@ -166,7 +166,7 @@ export class DiscoverySubgraph extends BaseSubgraph<
 
 		// Conditionally add introspect tool if feature flag is enabled
 		if (enableIntrospection) {
-			baseTools.push(createIntrospectTool());
+			baseTools.push(createIntrospectTool(config.logger));
 		}
 
 		// Conditionally add documentation and workflow examples tools if feature flag is enabled

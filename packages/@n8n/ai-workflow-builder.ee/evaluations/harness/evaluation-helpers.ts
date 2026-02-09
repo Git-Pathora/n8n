@@ -2,7 +2,6 @@ import type { Callbacks } from '@langchain/core/callbacks/manager';
 import { getLangchainCallbacks } from 'langsmith/langchain';
 import { v4 as uuid } from 'uuid';
 
-import type { IntrospectionEvent } from '@/tools/introspect.tool';
 import type { SimpleWorkflow } from '@/types/workflow';
 import type { BuilderFeatureFlags, ChatPayload } from '@/workflow-builder-agent';
 
@@ -138,7 +137,7 @@ export function createWorkflowGenerator(options: WorkflowGeneratorOptions): Work
 
 		// Collect introspection events as a side-effect if collector is provided
 		if (introspectionCollector) {
-			const events = (state.values.introspectionEvents ?? []) as IntrospectionEvent[];
+			const events = state.values.introspectionEvents ?? [];
 			introspectionCollector.addEvents(events);
 		}
 

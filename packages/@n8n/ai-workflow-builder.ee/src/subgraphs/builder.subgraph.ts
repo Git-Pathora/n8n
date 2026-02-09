@@ -204,7 +204,7 @@ export class BuilderSubgraph extends BaseSubgraph<
 
 		// Conditionally add introspect tool if feature flag is enabled
 		if (enableIntrospection) {
-			baseTools.push(createIntrospectTool());
+			baseTools.push(createIntrospectTool(config.logger));
 		}
 
 		// Conditionally add example tools if feature flag is enabled

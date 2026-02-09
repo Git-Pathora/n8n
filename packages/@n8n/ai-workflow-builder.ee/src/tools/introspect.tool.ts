@@ -1,5 +1,6 @@
 import type { BaseMessage, AIMessage } from '@langchain/core/messages';
 import { tool } from '@langchain/core/tools';
+import type { Logger } from '@n8n/backend-common';
 import { z } from 'zod';
 
 import { ValidationError, ToolExecutionError } from '@/errors';
@@ -96,7 +97,7 @@ export const INTROSPECT_TOOL: BuilderToolBase = {
  * This tool provides a structured way for the AI to report issues with
  * instructions, helping developers identify problematic patterns in prompts.
  */
-export function createIntrospectTool() {
+export function createIntrospectTool(logger?: Logger) {
 	const dynamicTool = tool(
 		(input: unknown, config) => {
 			const reporter = createProgressReporter(
@@ -113,15 +114,13 @@ export function createIntrospectTool() {
 
 				// Log structured diagnostic data for analysis
 				// Events are extracted from AIMessage tool_calls in transformOutput
-				console.log(
-					JSON.stringify({
-						tool: 'introspect',
-						timestamp,
-						category,
-						issue,
-						source,
-					}),
-				);
+				logger?.debug('Introspection event', {
+					tool: 'introspect',
+					timestamp,
+					category,
+					issue,
+					source,
+				});
 
 				reporter.start(validatedInput);
 

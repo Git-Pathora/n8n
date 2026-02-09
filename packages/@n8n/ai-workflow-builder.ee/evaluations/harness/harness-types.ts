@@ -99,7 +99,7 @@ export interface TestCase {
  * Configuration for an evaluation run.
  */
 export interface RunConfigBase {
-	/** Function to generate workflow from prompt. */
+	/** Function to generate workflow from prompt */
 	generateWorkflow: (prompt: string) => Promise<SimpleWorkflow>;
 	/** Evaluators to run on each generated workflow */
 	evaluators: Array<Evaluator<EvaluationContext>>;

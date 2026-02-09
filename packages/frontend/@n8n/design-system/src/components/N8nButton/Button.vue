@@ -24,14 +24,14 @@ const props = withDefaults(defineProps<ButtonProps>(), {
 // Map legacy size values to current ones
 const effectiveSize = computed(() => {
 	if (props.size === 'mini' || props.size === 'xmini') return 'xsmall';
-	return props.size ?? 'medium';
+	return props.size;
 });
 
 // Map legacy variant values to current ones
 const effectiveVariant = computed(() => {
 	if (props.variant === 'highlight') return 'ghost';
 	if (props.variant === 'highlight-fill') return 'ghost';
-	return props.variant ?? 'subtle';
+	return props.variant;
 });
 
 const computedIconSize = computed((): IconSize | undefined => {
@@ -61,8 +61,7 @@ const classes = computed(() =>
 		props.loading && $style.loading,
 		props.iconOnly && $style.iconOnly,
 		props.disabled && $style.disabled,
-		props.icon && $style.withIcon,
-		props.class, // Include custom class from props
+		props.class,
 	),
 );
 
@@ -88,16 +87,17 @@ const handleClick = (event: MouseEvent) => {
 <template>
 	<component
 		:is="componentTag"
+		v-bind="attrs"
 		:type="buttonType"
 		:href="href"
 		:rel="href ? 'nofollow noopener noreferrer' : undefined"
 		:disabled="componentTag === 'button' ? isDisabled || undefined : undefined"
 		:aria-disabled="isDisabled || undefined"
 		:aria-busy="loading || undefined"
+		:tabindex="componentTag === 'a' && isDisabled ? -1 : undefined"
 		:class="classes"
 		aria-live="polite"
 		@click="handleClick"
-		v-bind="attrs"
 	>
 		<Transition name="n8n-button-fade">
 			<div v-if="loading" :class="$style['loading-container']">
@@ -410,11 +410,5 @@ const handleClick = (event: MouseEvent) => {
 	to {
 		transform: rotate(360deg);
 	}
-}
-
-.withIcon {
-	display: inline-flex;
-	justify-content: center;
-	align-items: center;
 }
 </style>

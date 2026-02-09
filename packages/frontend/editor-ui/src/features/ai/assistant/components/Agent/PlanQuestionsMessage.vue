@@ -288,7 +288,7 @@ function goToNext() {
 				<div :class="$style.navigation">
 					<N8nButton
 						v-if="!isFirstQuestion"
-						type="secondary"
+						variant="subtle"
 						size="small"
 						:disabled="disabled"
 						@click="goToPrevious"

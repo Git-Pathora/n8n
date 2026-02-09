@@ -30,7 +30,7 @@ exports[`N8nPromptInput > rendering > should render correctly with default props
           <button
             aria-disabled="true"
             aria-live="polite"
-            class="button button solid small iconOnly disabled withIcon sendButton"
+            class="button button solid small iconOnly disabled sendButton"
             data-test-id="send-message-button"
             disabled=""
             type="button"
@@ -111,7 +111,7 @@ exports[`N8nPromptInput > rendering > should render streaming state without disa
           
           <button
             aria-live="polite"
-            class="button button solid small iconOnly withIcon stopButton"
+            class="button button solid small iconOnly stopButton"
             data-test-id="send-message-button"
             type="button"
           >

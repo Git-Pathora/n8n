@@ -49,6 +49,15 @@ jest.mock('@/utils/stream-processor', () => ({
 	formatMessages: jest.fn(),
 }));
 
+// Mock the multi-agent workflow to avoid needing real LLM instances for the planner agent
+jest.mock('@/multi-agent-workflow-subgraphs', () => ({
+	createMultiAgentWorkflowWithSubgraphs: jest.fn().mockReturnValue({
+		stream: jest.fn(),
+		getState: jest.fn(),
+		updateState: jest.fn(),
+	}),
+}));
+
 import { CodeWorkflowBuilder } from '@/code-builder/code-workflow-builder';
 import type { StreamOutput } from '@/types/streaming';
 import {

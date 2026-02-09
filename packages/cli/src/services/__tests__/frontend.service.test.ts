@@ -238,6 +238,7 @@ describe('FrontendService', () => {
 					},
 				},
 				authCookie: { secure: false },
+				communityNodesEnabled: false,
 				previewMode: false,
 				enterprise: { saml: false, ldap: false, oidc: false },
 			};
@@ -266,6 +267,7 @@ describe('FrontendService', () => {
 					},
 				},
 				authCookie: { secure: false },
+				communityNodesEnabled: false,
 				previewMode: false,
 				enterprise: { saml: false, ldap: false, oidc: false },
 				mfa: {

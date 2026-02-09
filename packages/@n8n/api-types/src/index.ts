@@ -1,3 +1,5 @@
+export { z } from 'zod';
+export { Z, type ZodClass } from './zod-class';
 export type * from './datetime';
 export * from './dto';
 export type * from './push';
@@ -6,6 +8,7 @@ export type * from './frontend-settings';
 export type * from './user';
 export type * from './api-keys';
 export type * from './community-node-types';
+export type * from './quick-connect';
 export {
 	chatHubConversationModelSchema,
 	type ChatModelDto,
@@ -60,6 +63,9 @@ export {
 	type ChatArtifactCreateCommand,
 	type ChatArtifactEditCommand,
 	type ChatMessageContentChunk,
+	type ChatHubMessageButton,
+	chatHubMessageWithButtonsSchema,
+	type ChatHubMessageWithButtons,
 } from './chat-hub';
 
 export type {

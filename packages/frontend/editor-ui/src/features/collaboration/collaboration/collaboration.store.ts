@@ -54,6 +54,10 @@ export const useCollaborationStore = defineStore(STORES.COLLABORATION, () => {
 
 	const pushStoreEventListenerRemovalFn = ref<(() => void) | null>(null);
 
+	// Track the workflowId we're currently collaborating on
+	// This is needed because workflowsStore.workflowId may change before terminate() is called
+	const collaboratingWorkflowId = ref<string | null>(null);
+
 	// Callback for refreshing the canvas after workflow updates
 	let refreshCanvasCallback: ((workflow: IWorkflowDb) => void) | null = null;
 
@@ -93,13 +97,13 @@ export const useCollaborationStore = defineStore(STORES.COLLABORATION, () => {
 	}
 
 	function notifyWorkflowOpened() {
-		if (!workflowsStore.isWorkflowSaved[workflowsStore.workflowId]) return;
-		pushStore.send({ type: 'workflowOpened', workflowId: workflowsStore.workflowId });
+		if (!collaboratingWorkflowId.value) return;
+		pushStore.send({ type: 'workflowOpened', workflowId: collaboratingWorkflowId.value });
 	}
 
 	function notifyWorkflowClosed() {
-		if (!workflowsStore.isWorkflowSaved[workflowsStore.workflowId]) return;
-		pushStore.send({ type: 'workflowClosed', workflowId: workflowsStore.workflowId });
+		if (!collaboratingWorkflowId.value) return;
+		pushStore.send({ type: 'workflowClosed', workflowId: collaboratingWorkflowId.value });
 
 		collaborators.value = collaborators.value.filter(
 			({ user }) => user.id !== usersStore.currentUserId,
@@ -126,14 +130,14 @@ export const useCollaborationStore = defineStore(STORES.COLLABORATION, () => {
 	};
 
 	const sendWriteLockHeartbeat = () => {
-		if (!isCurrentUserWriter.value) {
+		if (!isCurrentUserWriter.value || !collaboratingWorkflowId.value) {
 			stopWriteLockHeartbeat();
 			return;
 		}
 
 		pushStore.send({
 			type: 'writeAccessHeartbeat',
-			workflowId: workflowsStore.workflowId,
+			workflowId: collaboratingWorkflowId.value,
 		});
 	};
 
@@ -194,10 +198,14 @@ export const useCollaborationStore = defineStore(STORES.COLLABORATION, () => {
 			return true;
 		}
 
+		if (!collaboratingWorkflowId.value) {
+			return false;
+		}
+
 		try {
 			pushStore.send({
 				type: 'writeAccessRequested',
-				workflowId: workflowsStore.workflowId,
+				workflowId: collaboratingWorkflowId.value,
 			});
 		} catch {
 			return false;
@@ -210,10 +218,14 @@ export const useCollaborationStore = defineStore(STORES.COLLABORATION, () => {
 		currentWriterId.value = null;
 		stopWriteLockHeartbeat();
 
+		if (!collaboratingWorkflowId.value) {
+			return true;
+		}
+
 		try {
 			pushStore.send({
 				type: 'writeAccessReleaseRequested',
-				workflowId: workflowsStore.workflowId,
+				workflowId: collaboratingWorkflowId.value,
 			});
 			return true;
 		} catch {
@@ -254,30 +266,17 @@ export const useCollaborationStore = defineStore(STORES.COLLABORATION, () => {
 	}
 
 	async function handleWorkflowUpdate() {
-		console.log('[Collaboration] handleWorkflowUpdate called');
-		console.log('[Collaboration] isCurrentUserWriter:', isCurrentUserWriter.value);
-		console.log('[Collaboration] currentWriterId:', currentWriterId.value);
-		console.log('[Collaboration] currentUserId:', usersStore.currentUserId);
-
-		if (isCurrentUserWriter.value) {
-			console.log('[Collaboration] Skipping update - current user is writer');
+		if (isCurrentUserWriter.value || !collaboratingWorkflowId.value) {
 			return;
 		}
 
 		try {
-			console.log('[Collaboration] Fetching workflow:', workflowsStore.workflowId);
 			// Fetch the latest workflow data
-			const updatedWorkflow = await workflowsListStore.fetchWorkflow(workflowsStore.workflowId);
-			console.log('[Collaboration] Fetched workflow:', updatedWorkflow);
+			const updatedWorkflow = await workflowsListStore.fetchWorkflow(collaboratingWorkflowId.value);
 
 			// Refresh the canvas with the new workflow data
-			console.log('[Collaboration] refreshCanvasCallback exists:', !!refreshCanvasCallback);
 			if (refreshCanvasCallback) {
-				console.log('[Collaboration] Calling refreshCanvasCallback');
 				refreshCanvasCallback(updatedWorkflow);
-				console.log('[Collaboration] refreshCanvasCallback completed');
-			} else {
-				console.log('[Collaboration] WARNING: No refreshCanvasCallback registered!');
 			}
 			return true;
 		} catch (error) {
@@ -297,16 +296,12 @@ export const useCollaborationStore = defineStore(STORES.COLLABORATION, () => {
 	}
 
 	async function initialize() {
-		console.log('[Collaboration] initialize called');
-		console.log(
-			'[Collaboration] pushStoreEventListenerRemovalFn exists:',
-			!!pushStoreEventListenerRemovalFn.value,
-		);
-
 		if (pushStoreEventListenerRemovalFn.value) {
-			console.log('[Collaboration] Already initialized, returning early');
 			return;
 		}
+
+		// Store the workflowId we're collaborating on
+		collaboratingWorkflowId.value = workflowsStore.workflowId;
 
 		// Fetch current write-lock state from backend to restore state after page refresh
 		const writeLockUserId = await fetchWriteLockState();
@@ -323,12 +318,9 @@ export const useCollaborationStore = defineStore(STORES.COLLABORATION, () => {
 		}
 
 		pushStoreEventListenerRemovalFn.value = pushStore.addEventListener((event) => {
-			console.log('[Collaboration] Event listener received:', event.type, event);
-			console.log('[Collaboration] Current workflowId:', workflowsStore.workflowId);
-
 			if (
 				event.type === 'collaboratorsChanged' &&
-				event.data.workflowId === workflowsStore.workflowId
+				event.data.workflowId === collaboratingWorkflowId.value
 			) {
 				collaborators.value = event.data.collaborators;
 				handleWriteLockHolderLeft();
@@ -337,7 +329,7 @@ export const useCollaborationStore = defineStore(STORES.COLLABORATION, () => {
 
 			if (
 				event.type === 'writeAccessAcquired' &&
-				event.data.workflowId === workflowsStore.workflowId
+				event.data.workflowId === collaboratingWorkflowId.value
 			) {
 				currentWriterId.value = event.data.userId;
 
@@ -355,7 +347,7 @@ export const useCollaborationStore = defineStore(STORES.COLLABORATION, () => {
 
 			if (
 				event.type === 'writeAccessReleased' &&
-				event.data.workflowId === workflowsStore.workflowId
+				event.data.workflowId === collaboratingWorkflowId.value
 			) {
 				currentWriterId.value = null;
 				stopWriteLockHeartbeat();
@@ -363,23 +355,14 @@ export const useCollaborationStore = defineStore(STORES.COLLABORATION, () => {
 				return;
 			}
 
-			if (event.type === 'workflowUpdated') {
-				console.log('[Collaboration] workflowUpdated event received');
-				console.log('[Collaboration] Event workflowId:', event.data.workflowId);
-				console.log('[Collaboration] Store workflowId:', workflowsStore.workflowId);
-				console.log('[Collaboration] Match:', event.data.workflowId === workflowsStore.workflowId);
-
-				if (event.data.workflowId === workflowsStore.workflowId) {
-					console.log('[Collaboration] Calling handleWorkflowUpdate');
-					void handleWorkflowUpdate();
-				} else {
-					console.log('[Collaboration] Skipping - workflowId mismatch');
-				}
+			if (
+				event.type === 'workflowUpdated' &&
+				event.data.workflowId === collaboratingWorkflowId.value
+			) {
+				void handleWorkflowUpdate();
 				return;
 			}
 		});
-
-		console.log('[Collaboration] Event listener registered successfully');
 
 		addBeforeUnloadEventBindings();
 		notifyWorkflowOpened();
@@ -405,6 +388,9 @@ export const useCollaborationStore = defineStore(STORES.COLLABORATION, () => {
 		if (unloadTimeout.value) {
 			clearTimeout(unloadTimeout.value);
 		}
+		collaboratingWorkflowId.value = null;
+		currentWriterId.value = null;
+		collaborators.value = [];
 	}
 
 	return {

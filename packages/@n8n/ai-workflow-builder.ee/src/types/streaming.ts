@@ -1,6 +1,8 @@
 /**
  * Agent message chunk for streaming
  */
+import type { PlanOutput, PlannerQuestion } from './planning';
+
 export interface AgentMessageChunk {
 	role: 'assistant';
 	type: 'message';
@@ -40,6 +42,19 @@ export interface ExecutionRequestChunk {
 	reason: string;
 }
 
+export interface QuestionsChunk {
+	role: 'assistant';
+	type: 'questions';
+	introMessage?: string;
+	questions: PlannerQuestion[];
+}
+
+export interface PlanChunk {
+	role: 'assistant';
+	type: 'plan';
+	plan: PlanOutput;
+}
+
 /**
  * Session messages chunk for persistence
  * Contains the full message history for saving to session storage
@@ -58,13 +73,17 @@ export type StreamChunk =
 	| ToolProgressChunk
 	| WorkflowUpdateChunk
 	| ExecutionRequestChunk
-	| SessionMessagesChunk;
+	| SessionMessagesChunk
+	| QuestionsChunk
+	| PlanChunk;
 
 /**
  * Stream output containing messages
  */
 export interface StreamOutput {
 	messages: StreamChunk[];
+	/** Optional interrupt id for deduping repeated interrupt emissions */
+	interruptId?: string;
 }
 
 /**

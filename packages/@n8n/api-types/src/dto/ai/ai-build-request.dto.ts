@@ -1,6 +1,7 @@
 import type { IRunExecutionData, IWorkflowBase, NodeExecutionSchema } from 'n8n-workflow';
 import { z } from 'zod';
-import { Z } from 'zod-class';
+
+import { Z } from '../../zod-class';
 
 export interface ExpressionValue {
 	expression: string;
@@ -65,7 +66,10 @@ export class AiBuilderChatRequestDto extends Z.class({
 			.object({
 				templateExamples: z.boolean().optional(),
 				codeBuilder: z.boolean().optional(),
+				planMode: z.boolean().optional(),
 			})
 			.optional(),
+		mode: z.enum(['build', 'plan']).optional(),
+		resumeData: z.union([z.record(z.unknown()), z.array(z.unknown())]).optional(),
 	}),
 }) {}

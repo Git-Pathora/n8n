@@ -30,6 +30,8 @@ export async function createBuilderPayload(
 		executionData?: IRunExecutionData['resultData'];
 		workflow?: IWorkflowDb;
 		nodesForSchema?: string[];
+		mode?: 'build' | 'plan';
+		isPlanModeEnabled?: boolean;
 		allowSendingParameterValues?: boolean;
 	} = {},
 ): Promise<ChatRequest.UserChatMessage> {
@@ -75,6 +77,7 @@ export async function createBuilderPayload(
 			posthogStore.getVariant(AI_BUILDER_TEMPLATE_EXAMPLES_EXPERIMENT.name) ===
 			AI_BUILDER_TEMPLATE_EXAMPLES_EXPERIMENT.variant,
 		codeBuilder: isCodeBuilderEnabled,
+		planMode: options.isPlanModeEnabled ?? false,
 	};
 
 	if (options.nodesForSchema?.length) {
@@ -97,6 +100,7 @@ export async function createBuilderPayload(
 		quickReplyType: options.quickReplyType,
 		workflowContext,
 		featureFlags,
+		mode: options.mode,
 	};
 }
 

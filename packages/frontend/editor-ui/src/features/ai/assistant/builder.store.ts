@@ -41,6 +41,13 @@ import { useWorkflowSaving } from '@/app/composables/useWorkflowSaving';
 import { useUIStore } from '@/app/stores/ui.store';
 import { useDocumentTitle } from '@/app/composables/useDocumentTitle';
 import { useBrowserNotifications } from '@/app/composables/useBrowserNotifications';
+import { usePostHog } from '@/app/stores/posthog.store';
+import { AI_BUILDER_PLAN_MODE_EXPERIMENT } from '@/app/constants/experiments';
+import type { PlanMode } from '@/features/ai/assistant/assistant.types';
+import {
+	isPlanModePlanMessage,
+	isPlanModeQuestionsMessage,
+} from '@/features/ai/assistant/assistant.types';
 
 const INFINITE_CREDITS = -1;
 export const ENABLED_VIEWS = BUILDER_ENABLED_VIEWS;
@@ -57,7 +64,9 @@ export type WorkflowBuilderJourneyEventType =
 	| 'browser_notification_ask_permission'
 	| 'browser_notification_accept'
 	| 'browser_notification_dismiss'
-	| 'browser_generation_done_notified';
+	| 'browser_generation_done_notified'
+	| 'user_switched_builder_mode'
+	| 'user_clicked_implement_plan';
 
 interface WorkflowBuilderJourneyEventProperties {
 	node_type?: string;
@@ -68,6 +77,7 @@ interface WorkflowBuilderJourneyEventProperties {
 	revert_version_id?: string;
 	no_versions_reverted?: number;
 	completion_type?: 'workflow-ready' | 'input-needed';
+	mode?: 'plan' | 'build';
 }
 
 interface WorkflowBuilderJourneyPayload extends ITelemetryTrackProperties {
@@ -81,6 +91,8 @@ interface WorkflowBuilderJourneyPayload extends ITelemetryTrackProperties {
 interface EndOfStreamingTrackingPayload {
 	userMessageId: string;
 	startWorkflowJson: string;
+	revertVersion?: { id: string; createdAt: string };
+	planApproved?: boolean;
 }
 
 interface UserSubmittedBuilderMessageTrackingPayload
@@ -100,6 +112,7 @@ interface UserSubmittedBuilderMessageTrackingPayload
 	error_message?: string;
 	error_node_type?: string;
 	code_builder?: boolean;
+	mode?: 'plan' | 'build';
 }
 
 export const useBuilderStore = defineStore(STORES.BUILDER, () => {
@@ -109,6 +122,7 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 	const builderThinkingMessage = ref<string | undefined>();
 	const streamingAbortController = ref<AbortController | null>(null);
 	const initialGeneration = ref<boolean>(false);
+	const builderMode = ref<'build' | 'plan'>('build');
 	const creditsQuota = ref<number | undefined>();
 	const creditsClaimed = ref<number | undefined>();
 	const manualExecStatsInBetweenMessages = ref<{ success: number; error: number }>({
@@ -154,6 +168,7 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 	const {
 		processAssistantMessages,
 		createUserMessage,
+		createUserAnswersMessage,
 		createAssistantMessage,
 		createErrorMessage,
 		clearMessages,
@@ -215,6 +230,49 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 
 	const hasMessages = computed(() => chatMessages.value.length > 0);
 
+	const isPlanModeAvailable = computed(() => {
+		const variant = posthogStore.getVariant(AI_BUILDER_PLAN_MODE_EXPERIMENT.name);
+		return variant === true || variant === AI_BUILDER_PLAN_MODE_EXPERIMENT.variant;
+	});
+
+	/**
+	 * Finds the last interrupt message (questions or plan) by searching backwards.
+	 * This is more robust than checking only the last message, because error messages
+	 * or other messages can be appended after an interrupt.
+	 */
+	const pendingInterruptMessage = computed(() => {
+		for (let i = chatMessages.value.length - 1; i >= 0; i--) {
+			const msg = chatMessages.value[i];
+			if (isPlanModeQuestionsMessage(msg) || isPlanModePlanMessage(msg)) {
+				return msg;
+			}
+			// Stop searching if we hit a user message — any interrupt before that is already resolved
+			if (msg.role === 'user') break;
+		}
+		return null;
+	});
+
+	const isInterrupted = computed(() => pendingInterruptMessage.value !== null);
+
+	/**
+	 * True when there's a pending plan awaiting user decision.
+	 * Unlike questions, users can still type in chat when a plan is pending.
+	 */
+	const hasPendingPlan = computed(() => {
+		const msg = pendingInterruptMessage.value;
+		return msg ? isPlanModePlanMessage(msg) : false;
+	});
+
+	/**
+	 * True when chat input should be disabled.
+	 * Only questions require disabling input (user must answer via UI).
+	 * Plans allow chat input (typing a message means modifying the plan).
+	 */
+	const shouldDisableChatInput = computed(() => {
+		const msg = pendingInterruptMessage.value;
+		return msg ? isPlanModeQuestionsMessage(msg) : false;
+	});
+
 	// Chat management functions
 	/**
 	 * Resets the entire chat session to initial state.
@@ -228,6 +286,13 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 		lastUserMessageId.value = undefined;
 		loadedSessionsForWorkflowId.value = undefined;
 		hasHadSuccessfulExecution.value = false;
+		builderMode.value = 'build';
+	}
+
+	function setBuilderMode(mode: 'build' | 'plan') {
+		if (mode === 'plan' && !isPlanModeAvailable.value) return;
+		builderMode.value = mode;
+		trackWorkflowBuilderJourney('user_switched_builder_mode', { mode });
 	}
 
 	function incrementManualExecutionStats(type: 'success' | 'error') {
@@ -276,7 +341,7 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 			return;
 		}
 
-		const { userMessageId } = currentStreamingMessage.value;
+		const { userMessageId, planApproved } = currentStreamingMessage.value;
 
 		telemetry.track('End of response from builder', {
 			user_message_id: userMessageId,
@@ -284,6 +349,8 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 			session_id: trackingSessionId.value,
 			tab_visible: document.visibilityState === 'visible',
 			code_builder: isCodeBuilder.value,
+			mode: builderMode.value,
+			...(planApproved ? { plan_approved: true } : {}),
 			...getWorkflowModifications(currentStreamingMessage.value),
 			...payload,
 			...getTodosToTrack(),
@@ -355,9 +422,18 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 
 		trackEndBuilderResponse(payload);
 
-		// Capture userMessageId before clearing currentStreamingMessage
+		// Capture state before clearing currentStreamingMessage
 		const userMessageId = currentStreamingMessage.value?.userMessageId;
+		const { revertVersion } = currentStreamingMessage.value ?? {};
 		currentStreamingMessage.value = undefined;
+
+		// Only show "Restore version" on user messages that triggered a workflow modification.
+		// During planning or question phases no workflow changes happen, so skip it.
+		if (userMessageId && revertVersion && hasWorkflowUpdateInCurrentBatch(userMessageId)) {
+			chatMessages.value = chatMessages.value.map((msg) =>
+				msg.id === userMessageId ? { ...msg, revertVersion } : msg,
+			);
+		}
 
 		const wasAborted = payload && 'aborted' in payload && payload.aborted;
 
@@ -431,8 +507,12 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 		userMessage: string,
 		messageId: string,
 		revertVersion?: { id: string; createdAt: string },
+		planAnswers?: PlanMode.QuestionResponse[],
 	) {
-		const userMsg = createUserMessage(userMessage, messageId, revertVersion);
+		// If we have plan answers, create a custom user answers message instead of text
+		const userMsg = planAnswers
+			? createUserAnswersMessage(planAnswers, messageId)
+			: createUserMessage(userMessage, messageId, revertVersion);
 		chatMessages.value = clearRatingLogic([...chatMessages.value, userMsg]);
 		addLoadingAssistantMessage(locale.baseText('aiAssistant.thinkingSteps.thinking'));
 		streaming.value = true;
@@ -468,6 +548,7 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 		errorMessage?: string;
 		errorNodeType?: string;
 		executionStatus?: string;
+		mode?: 'plan' | 'build';
 	}) {
 		const {
 			text,
@@ -478,6 +559,7 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 			errorMessage,
 			errorNodeType,
 			executionStatus,
+			mode,
 		} = options;
 
 		const trackingPayload: UserSubmittedBuilderMessageTrackingPayload = {
@@ -491,6 +573,7 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 			manual_exec_error_count_since_prev_msg: manualExecStatsInBetweenMessages.value.error,
 			user_message_id: userMessageId,
 			code_builder: isCodeBuilder.value,
+			mode,
 			...getTodosToTrack(),
 		};
 
@@ -566,9 +649,20 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 		errorMessage?: string;
 		errorNodeType?: string;
 		executionStatus?: string;
+		resumeData?: unknown;
+		mode?: 'build' | 'plan';
+		/** Plan mode answers for custom message display */
+		planAnswers?: PlanMode.QuestionResponse[];
 	}) {
 		if (streaming.value) {
 			return;
+		}
+
+		// If there's a pending plan and user is sending a chat message (not a resumeData action),
+		// automatically treat it as a plan modification request.
+		// Avoid mutating the caller's object - reassign to a shallow copy.
+		if (hasPendingPlan.value && options.resumeData === undefined) {
+			options = { ...options, resumeData: { action: 'modify', feedback: options.text } };
 		}
 
 		let revertVersion;
@@ -589,6 +683,8 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 			type = 'message',
 			errorNodeType,
 			executionStatus,
+			resumeData,
+			mode,
 		} = options;
 
 		// Set initial generation flag if provided
@@ -599,9 +695,17 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 		lastUserMessageId.value = userMessageId;
 		const currentWorkflowJson = getWorkflowSnapshot();
 
+		const planApproved =
+			typeof resumeData === 'object' &&
+			resumeData !== null &&
+			'action' in resumeData &&
+			(resumeData as { action: string }).action === 'approve';
+
 		currentStreamingMessage.value = {
 			userMessageId,
 			startWorkflowJson: currentWorkflowJson,
+			revertVersion,
+			...(planApproved ? { planApproved: true } : {}),
 		};
 
 		trackUserSubmittedBuilderMessage({
@@ -613,20 +717,30 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 			errorMessage,
 			errorNodeType,
 			executionStatus,
+			mode: builderMode.value,
 		});
 
 		resetManualExecutionStats();
 
-		prepareForStreaming(text, userMessageId, revertVersion);
+		prepareForStreaming(text, userMessageId, undefined, options.planAnswers);
 
 		const executionResult = workflowsStore.workflowExecutionData?.data?.resultData;
+		const modeForPayload =
+			resumeData !== undefined
+				? mode
+				: (mode ?? (builderMode.value === 'plan' ? 'plan' : undefined));
 		const payload = await createBuilderPayload(text, userMessageId, {
 			quickReplyType,
 			workflow: workflowsStore.workflow,
 			executionData: executionResult,
 			nodesForSchema: Object.keys(workflowsStore.nodesByName),
+			mode: modeForPayload,
+			isPlanModeEnabled: isPlanModeAvailable.value,
 			allowSendingParameterValues: settings.settings.ai.allowSendingParameterValues,
 		});
+		if (resumeData !== undefined) {
+			payload.resumeData = resumeData;
+		}
 
 		const retry = createRetryHandler(userMessageId, async () => await sendChatMessage(options));
 
@@ -664,6 +778,59 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 		} catch (e: unknown) {
 			handleServiceError(e, userMessageId, retry);
 		}
+	}
+
+	async function resumeWithQuestionsAnswers(answers: PlanMode.QuestionResponse[]) {
+		if (!isInterrupted.value) return;
+
+		const text = locale.baseText('aiAssistant.builder.planMode.actions.submitAnswers');
+		await sendChatMessage({
+			text,
+			resumeData: answers,
+			planAnswers: answers,
+		});
+	}
+
+	async function resumeWithPlanDecision(decision: {
+		action: 'approve' | 'reject' | 'modify';
+		feedback?: string;
+	}) {
+		if (!isInterrupted.value) return;
+
+		const feedback = decision.feedback?.trim();
+
+		if (decision.action === 'approve') {
+			trackWorkflowBuilderJourney('user_clicked_implement_plan');
+			await sendChatMessage({
+				text: locale.baseText('aiAssistant.builder.planMode.actions.implement'),
+				resumeData: decision,
+				mode: 'build',
+			});
+			// Only switch mode after the message is sent successfully
+			builderMode.value = 'build';
+			return;
+		}
+
+		if (decision.action === 'modify') {
+			await sendChatMessage({
+				text: feedback
+					? locale.baseText('aiAssistant.builder.planMode.actions.modifyWithFeedback', {
+							interpolate: { feedback },
+						})
+					: locale.baseText('aiAssistant.builder.planMode.actions.modify'),
+				resumeData: decision,
+			});
+			return;
+		}
+
+		await sendChatMessage({
+			text: feedback
+				? locale.baseText('aiAssistant.builder.planMode.actions.rejectWithFeedback', {
+						interpolate: { feedback },
+					})
+				: locale.baseText('aiAssistant.builder.planMode.actions.reject'),
+			resumeData: decision,
+		});
 	}
 
 	/**
@@ -732,6 +899,17 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 					.filter((msg) => msg.type !== 'workflow-updated');
 
 				chatMessages.value = convertedMessages;
+
+				// Restore builderMode from loaded messages:
+				// If any plan-mode interrupt is present, the user was in plan mode
+				const hasPlanModeMessages = convertedMessages.some(
+					(msg) =>
+						msg.role === 'assistant' &&
+						(isPlanModeQuestionsMessage(msg) || isPlanModePlanMessage(msg)),
+				);
+				if (hasPlanModeMessages) {
+					builderMode.value = 'plan';
+				}
 
 				// Restore lastUserMessageId from the loaded session for telemetry tracking
 				const lastUserMsg = [...convertedMessages]
@@ -950,6 +1128,11 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 		builderThinkingMessage,
 		isAIBuilderEnabled,
 		isCodeBuilder,
+		builderMode,
+		isPlanModeAvailable,
+		isInterrupted,
+		hasPendingPlan,
+		shouldDisableChatInput,
 		workflowPrompt,
 		toolMessages,
 		workflowMessages,
@@ -970,7 +1153,10 @@ export const useBuilderStore = defineStore(STORES.BUILDER, () => {
 		unpinAllNodes,
 		abortStreaming,
 		resetBuilderChat,
+		setBuilderMode,
 		sendChatMessage,
+		resumeWithQuestionsAnswers,
+		resumeWithPlanDecision,
 		loadSessions,
 		getWorkflowSnapshot,
 		fetchBuilderCredits,

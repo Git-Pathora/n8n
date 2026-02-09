@@ -652,8 +652,9 @@ Rules:
 - Use unique variable names — never reuse builder function names (e.g. \`node\`, \`trigger\`) as variable names
 - Use descriptive node names (Good: "Fetch Weather Data", "Check Temperature"; Bad: "HTTP Request", "Set", "If")
 - Credentials: \`credentials: {{ slackApi: newCredential('Slack Bot') }}\` — type must match what the node expects
-- Expressions: use \`expr()\` for any \`{{{{ }}}}\` syntax
+- Expressions: use \`expr()\` for any \`{{{{ }}}}\` syntax  — always use single or double quotes, NOT backtick template literals
   - e.g. \`expr('Hello {{{{ $json.name }}}}')\` or \`expr("{{{{ $('Node').item.json.field }}}}")\`
+	- For multiline expressions, use string concatenation: \`expr('Line 1\\n' + 'Line 2 {{{{ $json.value }}}}')\`
 - Every node MUST have an \`output\` property with sample data — following nodes depend on it for expressions
 - Do NOT add or edit comments. Comments are ignored and not shared with user. Use sticky(...) to provide guidance.
 

@@ -18,6 +18,7 @@ import { NODE_SEARCH_TOOL } from './node-search.tool';
 import { REMOVE_CONNECTION_TOOL } from './remove-connection.tool';
 import { REMOVE_NODE_TOOL } from './remove-node.tool';
 import { RENAME_NODE_TOOL } from './rename-node.tool';
+import { SECURITY_SCAN_TOOL } from './security-scan.tool';
 import { UPDATING_NODE_PARAMETER_TOOL } from './update-node-parameters.tool';
 import { VALIDATE_CONFIGURATION_TOOL } from './validate-configuration.tool';
 import { VALIDATE_STRUCTURE_TOOL } from './validate-structure.tool';
@@ -61,6 +62,8 @@ export function getBuilderToolsForDisplay({
 		// Workflow context tools
 		GET_WORKFLOW_OVERVIEW_TOOL,
 		GET_NODE_CONTEXT_TOOL,
+		// Security tools
+		SECURITY_SCAN_TOOL,
 	);
 
 	return tools;

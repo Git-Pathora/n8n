@@ -154,7 +154,8 @@ export class ExportWorkflowsCommand extends BaseCommand<z.infer<typeof flagsSche
 				workflow.versionId = workflowHistory.versionId;
 
 				// Add workflowHistory metadata for version name and description
-				(workflow as any).workflowHistory = {
+				// @ts-expect-error - Adding dynamic property for export
+				workflow.workflowHistory = {
 					name: workflowHistory.name,
 					description: workflowHistory.description,
 				};

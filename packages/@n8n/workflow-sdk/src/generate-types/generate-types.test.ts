@@ -6,6 +6,7 @@
  */
 
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 
 import type * as GenerateTypesModule from '../generate-types/generate-types';
@@ -4432,7 +4433,6 @@ describe('generate-types', () => {
 // =============================================================================
 
 describe('orchestrateGeneration', () => {
-	const os = require('os');
 	const outputDir = path.join(os.tmpdir(), `n8n-test-orchestrate-${Date.now()}`);
 	let mod: typeof GenerateTypesModule;
 

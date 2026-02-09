@@ -12,6 +12,8 @@
 import * as fs from 'fs';
 import * as path from 'path';
 
+import { jsonParse } from 'n8n-workflow';
+
 import type { NodeTypeDescription } from './generate-types';
 import { orchestrateGeneration } from './generate-types';
 
@@ -34,7 +36,7 @@ export async function generateNodeDefinitions(
 	}
 
 	const content = await fs.promises.readFile(nodesJsonPath, 'utf-8');
-	const nodes = JSON.parse(content) as NodeTypeDescription[];
+	const nodes = jsonParse<NodeTypeDescription[]>(content);
 
 	const result = await orchestrateGeneration({ nodes, outputDir });
 	console.log(`Generated node definitions for ${result.nodeCount} nodes in ${outputDir}`);

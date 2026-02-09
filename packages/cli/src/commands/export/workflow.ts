@@ -8,6 +8,7 @@ import path from 'path';
 import { z } from 'zod';
 
 import { BaseCommand } from '../base-command';
+import '../../zod-alias-support';
 
 type WorkflowWithHistory = WorkflowEntity & {
 	workflowHistory?: {
@@ -25,7 +26,11 @@ const flagsSchema = z.object({
 		)
 		.optional(),
 	id: z.string().describe('The ID of the workflow to export').optional(),
-	output: z.string().describe('Output file name or directory if using separate files').optional(),
+	output: z
+		.string()
+		.alias('o')
+		.describe('Output file name or directory if using separate files')
+		.optional(),
 	pretty: z.boolean().describe('Format the output in an easier to read fashion').optional(),
 	separate: z
 		.boolean()

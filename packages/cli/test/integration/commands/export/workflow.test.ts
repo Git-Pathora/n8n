@@ -11,7 +11,6 @@ import fs from 'fs';
 import { nanoid } from 'nanoid';
 import os from 'os';
 import path from 'path';
-
 import { ExportWorkflowsCommand } from '@/commands/export/workflow';
 import { LoadNodesAndCredentials } from '@/load-nodes-and-credentials';
 import { setupTestCommand } from '@test-integration/utils/test-command';
@@ -52,15 +51,6 @@ test('should reject --version with --all flag', async () => {
 	const outputFile = path.join(testOutputDir, 'output.json');
 
 	await command.run(['--all', `--version=${workflow.versionId}`, `--output=${outputFile}`]);
-
-	expect(fs.existsSync(outputFile)).toBe(false);
-});
-
-test('should reject --published with --all flag', async () => {
-	await createWorkflowWithTriggerAndHistory();
-	const outputFile = path.join(testOutputDir, 'output.json');
-
-	await command.run(['--all', '--published', `--output=${outputFile}`]);
 
 	expect(fs.existsSync(outputFile)).toBe(false);
 });
@@ -321,6 +311,29 @@ test('should work with --pretty flag (existing behavior)', async () => {
 	const fileContents = fs.readFileSync(outputFile, 'utf-8');
 	expect(fileContents).toContain('\n');
 	expect(fileContents).toMatch(/\s{2}/);
+});
+
+test('should export all published versions with --all --published', async () => {
+	const workflow1 = await createWorkflowWithTriggerAndHistory({ name: 'Published Workflow' });
+	const publishedVersionId = workflow1.versionId;
+	await setActiveVersion(workflow1.id, publishedVersionId);
+
+	const draftVersionId = nanoid();
+	workflow1.versionId = draftVersionId;
+	workflow1.activeVersionId = publishedVersionId;
+	await Container.get(WorkflowRepository).save(workflow1);
+	await createWorkflowHistory(workflow1);
+
+	const workflow2 = await createWorkflowWithTriggerAndHistory({ name: 'Unpublished Workflow' });
+
+	const outputFile = path.join(testOutputDir, 'output.json');
+	await command.run(['--all', '--published', `--output=${outputFile}`]);
+
+	const exportedData = JSON.parse(fs.readFileSync(outputFile, 'utf-8'));
+
+	expect(exportedData).toHaveLength(1);
+	expect(exportedData[0].name).toBe('Published Workflow');
+	expect(exportedData[0].versionId).toBe(publishedVersionId);
 });
 
 test('should include workflowHistory with historical name when set', async () => {

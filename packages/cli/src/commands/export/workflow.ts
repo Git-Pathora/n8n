@@ -71,8 +71,8 @@ export class ExportWorkflowsCommand extends BaseCommand<z.infer<typeof flagsSche
 			return;
 		}
 
-		if ((flags.version || flags.published) && flags.all) {
-			this.logger.info('Version flags (--version, --published) cannot be used with --all flag.');
+		if (flags.version && flags.all) {
+			this.logger.info('--version flag cannot be used with --all flag.');
 			return;
 		}
 
@@ -171,6 +171,52 @@ export class ExportWorkflowsCommand extends BaseCommand<z.infer<typeof flagsSche
 					name: workflowHistory.name,
 					description: workflowHistory.description,
 				};
+			}
+		}
+
+		// Handle --all --published: export all workflows in their published versions
+		if (flags.all && flags.published) {
+			const workflowsToExport = [];
+			for (const workflow of workflows) {
+				if (!workflow.activeVersionId) {
+					this.logger.warn(
+						`Skipping workflow "${workflow.name}" (${workflow.id}) - no published version`,
+					);
+					continue;
+				}
+
+				// If published version is not the current draft, fetch it from history
+				if (workflow.activeVersionId !== workflow.versionId) {
+					const workflowHistory = await Container.get(WorkflowHistoryRepository).findOne({
+						where: {
+							workflowId: workflow.id,
+							versionId: workflow.activeVersionId,
+						},
+					});
+
+					if (workflowHistory) {
+						workflow.nodes = workflowHistory.nodes;
+						workflow.connections = workflowHistory.connections;
+						workflow.versionId = workflowHistory.versionId;
+
+						// Add workflowHistory metadata for version name and description
+						(workflow as WorkflowWithHistory).workflowHistory = {
+							name: workflowHistory.name,
+							description: workflowHistory.description,
+						};
+					}
+				}
+
+				workflowsToExport.push(workflow);
+			}
+
+			// Replace workflows array with only the published ones
+			workflows.length = 0;
+			workflows.push(...workflowsToExport);
+
+			if (workflows.length === 0) {
+				this.logger.info('No workflows with published versions found.');
+				return;
 			}
 		}
 

@@ -1,6 +1,16 @@
 import { deepCopy } from 'n8n-workflow';
 
-import { node, trigger, sticky, placeholder, newCredential, merge } from './node-builder';
+import { splitInBatches } from '../control-flow-builders/split-in-batches';
+import {
+	node,
+	trigger,
+	sticky,
+	placeholder,
+	newCredential,
+	merge,
+	ifElse,
+	switchCase,
+} from './node-builder';
 import { languageModel, memory, tool, outputParser } from './subnode-builders';
 
 describe('Node Builder', () => {
@@ -288,6 +298,58 @@ describe('Node Builder', () => {
 		it('should use explicit name when provided', () => {
 			const s = sticky('## My Content', { name: 'Custom Sticky Name' });
 			expect(s.name).toBe('Custom Sticky Name');
+		});
+
+		it('should not crash when nodes array contains a SplitInBatchesBuilder', () => {
+			const sibNode = node({
+				type: 'n8n-nodes-base.splitInBatches',
+				version: 1,
+				config: { name: 'SIB', position: [500, 400] },
+			});
+			const sibBuilder = splitInBatches(sibNode);
+
+			const s = sticky('## Batch Processing', [sibBuilder as never], { color: 3 });
+
+			expect(s.type).toBe('n8n-nodes-base.stickyNote');
+			expect(s.config.parameters?.content).toBe('## Batch Processing');
+			// Should use the sibNode's position for bounding box
+			expect(s.config.position).toEqual([450, 350]);
+		});
+
+		it('should not crash when nodes array contains an IfElseBuilder', () => {
+			const ifNode = ifElse({ version: 2, config: { name: 'IF Check', position: [300, 200] } });
+			const target = node({
+				type: 'n8n-nodes-base.set',
+				version: 3.4,
+				config: { name: 'Set', position: [600, 200] },
+			});
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- IF nodes always have onTrue
+			const builder = ifNode.onTrue!(target);
+
+			const s = sticky('## Conditional Logic', [builder as never]);
+
+			expect(s.type).toBe('n8n-nodes-base.stickyNote');
+			expect(s.config.parameters?.content).toBe('## Conditional Logic');
+			// Should use ifNode's position for bounding box
+			expect(s.config.position).toEqual([250, 150]);
+		});
+
+		it('should not crash when nodes array contains a SwitchCaseBuilder', () => {
+			const sw = switchCase({ version: 3.2, config: { name: 'Route', position: [400, 300] } });
+			const target = node({
+				type: 'n8n-nodes-base.set',
+				version: 3.4,
+				config: { name: 'Set', position: [700, 300] },
+			});
+			// eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- Switch nodes always have onCase
+			const builder = sw.onCase!(0, target);
+
+			const s = sticky('## Routing', [builder as never]);
+
+			expect(s.type).toBe('n8n-nodes-base.stickyNote');
+			expect(s.config.parameters?.content).toBe('## Routing');
+			// Should use switchNode's position for bounding box
+			expect(s.config.position).toEqual([350, 250]);
 		});
 	});
 

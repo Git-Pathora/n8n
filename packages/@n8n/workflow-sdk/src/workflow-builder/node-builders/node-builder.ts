@@ -922,12 +922,33 @@ function calculateNodesBoundingBox(nodes: Array<NodeInstance<string, string, unk
 } | null {
 	if (nodes.length === 0) return null;
 
+	// Normalize builder objects to their underlying NodeInstance
+	const normalizedNodes = nodes
+		.map((item): NodeInstance<string, string, unknown> | null => {
+			if (isSplitInBatchesBuilder(item)) {
+				return extractSplitInBatchesBuilder(item).sibNode;
+			}
+			if (isIfElseBuilder(item)) {
+				return item.ifNode;
+			}
+			if (isSwitchCaseBuilder(item)) {
+				return item.switchNode;
+			}
+			if (item.config) {
+				return item;
+			}
+			return null;
+		})
+		.filter((n): n is NodeInstance<string, string, unknown> => n !== null);
+
+	if (normalizedNodes.length === 0) return null;
+
 	let minX = Infinity;
 	let minY = Infinity;
 	let maxX = -Infinity;
 	let maxY = -Infinity;
 
-	for (const node of nodes) {
+	for (const node of normalizedNodes) {
 		const pos = node.config.position ?? [0, 0];
 		const x = pos[0];
 		const y = pos[1];

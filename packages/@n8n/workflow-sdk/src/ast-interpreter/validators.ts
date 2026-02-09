@@ -62,6 +62,9 @@ export const ALLOWED_METHODS = new Set([
 	'onEachBatch',
 	'onDone',
 
+	// Connection methods
+	'connect',
+
 	// Internal methods
 	'toJSON',
 	'validate',
@@ -93,6 +96,52 @@ const DANGEROUS_GLOBALS = new Set([
 	'Buffer',
 	'Reflect',
 	'Proxy',
+
+	// Built-in constructors (defense-in-depth)
+	'Object',
+	'Array',
+	'String',
+	'Number',
+	'Boolean',
+	'Symbol',
+	'BigInt',
+
+	// Built-in objects
+	'JSON',
+	'Math',
+	'Date',
+	'RegExp',
+
+	// Collection/async types
+	'Promise',
+	'WeakRef',
+	'WeakMap',
+	'WeakSet',
+	'Map',
+	'Set',
+
+	// Binary data
+	'ArrayBuffer',
+	'SharedArrayBuffer',
+	'DataView',
+	'Atomics',
+
+	// WASM
+	'WebAssembly',
+
+	// Runtime APIs
+	'fetch',
+	'XMLHttpRequest',
+	'queueMicrotask',
+	'structuredClone',
+
+	// Error constructors
+	'Error',
+	'TypeError',
+	'RangeError',
+
+	// Logging
+	'console',
 ]);
 
 /**

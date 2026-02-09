@@ -200,24 +200,17 @@ class SDKInterpreter {
 				);
 			}
 
-			// Validate method name
+			// Validate method name against allowlist
 			if (!isAllowedMethod(methodName)) {
-				// Check if it could be a property access that returns a callable
-				// e.g., if thisArg has the method, we allow it
-				if (thisArg && typeof thisArg === 'object' && methodName in thisArg) {
-					func = (thisArg as Record<string, unknown>)[methodName];
-				} else {
-					throw new SecurityError(
-						`Method '${methodName}' is not an allowed SDK method`,
-						memberExpr.property.loc ?? undefined,
-						this.sourceCode,
-					);
-				}
-			} else {
-				// Get the method from the object
-				if (thisArg && typeof thisArg === 'object') {
-					func = (thisArg as Record<string, unknown>)[methodName];
-				}
+				throw new SecurityError(
+					`Method '${methodName}' is not an allowed SDK method`,
+					memberExpr.property.loc ?? undefined,
+					this.sourceCode,
+				);
+			}
+
+			if (thisArg && typeof thisArg === 'object') {
+				func = (thisArg as Record<string, unknown>)[methodName];
 			}
 		} else {
 			throw new UnsupportedNodeError(

@@ -553,4 +553,109 @@ describe('AST Interpreter', () => {
 			expect(toolCallArgs.config.parameters.sendTo).toContain('$fromAI');
 		});
 	});
+
+	describe('Security - method allowlist enforcement', () => {
+		let sdkFunctions: SDKFunctions;
+
+		beforeEach(() => {
+			sdkFunctions = createMockSDKFunctions();
+		});
+
+		it('should reject unlisted methods on SDK objects', () => {
+			const code = `
+				const wf = workflow('id', 'name');
+				return wf.settings({});
+			`;
+			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
+		});
+
+		it('should reject update() on node objects', () => {
+			const code = `
+				const n = node({ type: 'n8n-nodes-base.set', version: 3, config: {} });
+				return n.update({});
+			`;
+			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
+		});
+
+		it('should reject native JS string methods', () => {
+			const code = 'return "hello".toUpperCase();';
+			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
+		});
+
+		it('should reject native JS array methods', () => {
+			const code = 'return [1, 2, 3].reverse();';
+			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
+		});
+
+		it('should reject slice() on strings', () => {
+			const code = 'return "hello".slice(0, 2);';
+			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
+		});
+
+		it('should allow connect() method on workflow builder', () => {
+			const connectMock = jest.fn();
+			sdkFunctions.workflow = jest.fn(() => ({
+				connect: connectMock,
+			}));
+			const code = `
+				const wf = workflow('id', 'name');
+				return wf.connect("source", 0, "target", 0);
+			`;
+			interpretSDKCode(code, sdkFunctions);
+			expect(connectMock).toHaveBeenCalledWith('source', 0, 'target', 0);
+		});
+	});
+
+	describe('Security - dangerous globals (defense-in-depth)', () => {
+		let sdkFunctions: SDKFunctions;
+
+		beforeEach(() => {
+			sdkFunctions = createMockSDKFunctions();
+		});
+
+		it('should reject Object access', () => {
+			const code = 'return Object;';
+			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
+		});
+
+		it('should reject Array access', () => {
+			const code = 'return Array;';
+			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
+		});
+
+		it('should reject JSON access', () => {
+			const code = 'return JSON;';
+			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
+		});
+
+		it('should reject Math access', () => {
+			const code = 'return Math;';
+			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
+		});
+
+		it('should reject console access', () => {
+			const code = 'return console;';
+			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
+		});
+
+		it('should reject Promise access', () => {
+			const code = 'return Promise;';
+			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
+		});
+
+		it('should reject fetch access', () => {
+			const code = 'return fetch;';
+			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
+		});
+
+		it('should reject Error access', () => {
+			const code = 'return Error;';
+			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
+		});
+
+		it('should reject WebAssembly access', () => {
+			const code = 'return WebAssembly;';
+			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
+		});
+	});
 });

@@ -5,7 +5,7 @@
  * Covers discriminated schemas (resource/operation, mode) and non-discriminated schemas
  * with all displayOptions combinations.
  *
- * NOTE: These tests require generated schemas at ~/.n8n/generated-types/
+ * NOTE: These tests require generated schemas (configured via setSchemaBaseDirs)
  * They are skipped on CI where schemas are not available.
  */
 
@@ -25,7 +25,7 @@ function describeIfSchemas(name: string, fn: () => void) {
 
 describeIfSchemas('Schema Validation Integration', () => {
 	describe('Resource/Operation Discriminated (MS Teams v2 - task/create)', () => {
-		// Schema: ~/.n8n/generated-types/nodes/n8n-nodes-base/microsoftTeams/v2/resource_task/operation_create.schema.js
+		// Schema: nodes/n8n-nodes-base/microsoftTeams/v2/resource_task/operation_create.schema.js
 		// Required fields: groupId, planId, bucketId (resourceLocator type), title (no displayOptions)
 		// Optional field: options (no displayOptions)
 
@@ -98,7 +98,7 @@ describeIfSchemas('Schema Validation Integration', () => {
 	});
 
 	describe('Mode Discriminated (Set v3 - manual)', () => {
-		// Schema: ~/.n8n/generated-types/nodes/n8n-nodes-base/set/v3/mode_manual.schema.js
+		// Schema: nodes/n8n-nodes-base/set/v3/mode_manual.schema.js
 		// duplicateItem: optional, no displayOptions
 		// duplicateCount: optional, show: { duplicateItem: [true] }
 
@@ -140,7 +140,7 @@ describeIfSchemas('Schema Validation Integration', () => {
 	});
 
 	describe('Webhook v1 (Factory with show/hide)', () => {
-		// Schema: ~/.n8n/generated-types/nodes/n8n-nodes-base/webhook/v1.schema.js
+		// Schema: nodes/n8n-nodes-base/webhook/v1.schema.js
 		// responseData: optional, show: { responseMode: ['lastNode'] } - only visible when responseMode is 'lastNode'
 		// responseCode: optional, show: { @version: [1, 1.1] }, hide: { responseMode: ['responseNode'] }
 		// responseBinaryPropertyName: has required: true but also has default: 'data'
@@ -210,7 +210,7 @@ describeIfSchemas('Schema Validation Integration', () => {
 	});
 
 	describe('Twitter v2 (Required + hide)', () => {
-		// Schema: ~/.n8n/generated-types/nodes/n8n-nodes-base/twitter/v2/resource_user/operation_search_user.schema.js
+		// Schema: nodes/n8n-nodes-base/twitter/v2/resource_user/operation_search_user.schema.js
 		// user: has required: true but also has default: { mode: 'username', value: '' }
 		//   - Fields with defaults are optional in schema validation (the default is used at runtime)
 
@@ -261,7 +261,7 @@ describeIfSchemas('Schema Validation Integration', () => {
 	});
 
 	describe('Non-Discriminated Static (ChargebeeTrigger v1)', () => {
-		// Schema: ~/.n8n/generated-types/nodes/n8n-nodes-base/chargebeeTrigger/v1.schema.js
+		// Schema: nodes/n8n-nodes-base/chargebeeTrigger/v1.schema.js
 		// events: required array (no displayOptions, static schema)
 
 		it('validates when events array is provided', () => {
@@ -467,7 +467,7 @@ return workflow('test-id', 'Test Workflow')
 
 	describe('Subnode Validation (strict mode)', () => {
 		// OpenAI v2.1 text/response only accepts tools and memory subnodes (not outputParser)
-		// Schema: ~/.n8n/generated-types/nodes/n8n-nodes-langchain/openAi/v21/resource_text/operation_response.schema.js
+		// Schema: nodes/n8n-nodes-langchain/openAi/v21/resource_text/operation_response.schema.js
 
 		it('accepts valid subnodes (tools, memory) for OpenAI text/response', () => {
 			const result = validateNodeConfig('@n8n/n8n-nodes-langchain.openAi', 2.1, {

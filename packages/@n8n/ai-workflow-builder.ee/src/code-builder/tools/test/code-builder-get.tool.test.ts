@@ -394,7 +394,7 @@ describe('CodeBuilderGetTool', () => {
 		});
 
 		describe('validatePathWithinBase', () => {
-			const baseDir = '/home/user/.n8n/generated-types/nodes';
+			const baseDir = '/tmp/n8n-node-definitions/nodes';
 
 			it('should allow paths within base directory', () => {
 				const validPath = path.join(baseDir, 'n8n-nodes-base', 'httpRequest', 'v1.ts');

@@ -13,7 +13,8 @@
       "types": "./dist/nodes/mcp/McpTrigger/index.d.ts",
       "import": "./dist/nodes/mcp/McpTrigger/index.js",
       "require": "./dist/nodes/mcp/McpTrigger/index.js"
-    }
+    },
+    "./package.json": "./package.json"
   },
   "typesVersions": {
     "*": {

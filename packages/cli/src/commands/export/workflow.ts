@@ -1,3 +1,4 @@
+import type { WorkflowEntity } from '@n8n/db';
 import { WorkflowRepository, WorkflowHistoryRepository } from '@n8n/db';
 import { Command } from '@n8n/decorators';
 import { Container } from '@n8n/di';
@@ -7,6 +8,13 @@ import path from 'path';
 import { z } from 'zod';
 
 import { BaseCommand } from '../base-command';
+
+type WorkflowWithHistory = WorkflowEntity & {
+	workflowHistory?: {
+		name: string | null;
+		description: string | null;
+	};
+};
 
 const flagsSchema = z.object({
 	all: z.boolean().describe('Export all workflows').optional(),
@@ -154,8 +162,7 @@ export class ExportWorkflowsCommand extends BaseCommand<z.infer<typeof flagsSche
 				workflow.versionId = workflowHistory.versionId;
 
 				// Add workflowHistory metadata for version name and description
-				// @ts-expect-error - Adding dynamic property for export
-				workflow.workflowHistory = {
+				(workflow as WorkflowWithHistory).workflowHistory = {
 					name: workflowHistory.name,
 					description: workflowHistory.description,
 				};

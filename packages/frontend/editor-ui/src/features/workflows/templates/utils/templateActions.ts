@@ -30,6 +30,7 @@ export async function createWorkflowFromTemplate(opts: {
 	rootStore: ReturnType<typeof useRootStore>;
 	workflowsStore: ReturnType<typeof useWorkflowsStore>;
 	nodeTypeProvider: NodeTypeProvider;
+	readyToDemo: boolean;
 }) {
 	const { credentialOverrides, nodeTypeProvider, rootStore, template, workflowsStore } = opts;
 
@@ -50,7 +51,8 @@ export async function createWorkflowFromTemplate(opts: {
 		meta: {
 			templateId: template.id.toString(),
 		},
-		// Ignored: pinData, settings, tags, versionId
+		pinData: opts.readyToDemo ? (template.workflow.pinData ?? {}) : {},
+		// Ignored: settings, tags, versionId
 	};
 
 	const createdWorkflow = await workflowsStore.createNewWorkflow(workflowToCreate);

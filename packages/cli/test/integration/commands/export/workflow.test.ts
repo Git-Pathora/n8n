@@ -324,7 +324,7 @@ test('should export all published versions with --all --published', async () => 
 	await Container.get(WorkflowRepository).save(workflow1);
 	await createWorkflowHistory(workflow1);
 
-	const workflow2 = await createWorkflowWithTriggerAndHistory({ name: 'Unpublished Workflow' });
+	await createWorkflowWithTriggerAndHistory({ name: 'Unpublished Workflow' });
 
 	const outputFile = path.join(testOutputDir, 'output.json');
 	await command.run(['--all', '--published', `--output=${outputFile}`]);

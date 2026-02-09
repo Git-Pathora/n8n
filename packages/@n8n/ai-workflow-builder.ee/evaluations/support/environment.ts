@@ -194,17 +194,14 @@ export function resolveBuiltinNodeDefinitionDirs(): string[] {
 			const distDir = path.dirname(packageJsonPath);
 			const nodeDefsDir = path.join(distDir, 'dist', 'node-definitions');
 			if (fs.existsSync(nodeDefsDir)) {
-				console.log(`[NODE-DEFS] Resolved ${packageId}: ${nodeDefsDir}`);
 				dirs.push(nodeDefsDir);
-			} else {
-				console.log(`[NODE-DEFS] ${packageId}: dir not found at ${nodeDefsDir}`);
 			}
 		} catch {
-			console.log(`[NODE-DEFS] ${packageId}: not resolvable`);
+			// Package not installed, skip
 		}
 	}
 	if (dirs.length === 0) {
-		console.log('[NODE-DEFS] WARNING: No node definition dirs resolved — get_node_types will fail');
+		console.error('[NODE-DEFS] No node definition dirs resolved — get_node_types will fail');
 	}
 	return dirs;
 }

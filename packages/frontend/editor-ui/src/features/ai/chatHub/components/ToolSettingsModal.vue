@@ -3,6 +3,8 @@ import Modal from '@/app/components/Modal.vue';
 import NodeIcon from '@/app/components/NodeIcon.vue';
 import { useNodeHelpers } from '@/app/composables/useNodeHelpers';
 import { useNodeTypesStore } from '@/app/stores/nodeTypes.store';
+import { useCredentialsStore } from '@/features/credentials/credentials.store';
+import { useProjectsStore } from '@/features/collaboration/projects/projects.store';
 import NodeCredentials from '@/features/credentials/components/NodeCredentials.vue';
 import ParameterInputList from '@/features/ndv/parameters/components/ParameterInputList.vue';
 import { collectParametersByTab } from '@/features/ndv/shared/ndv.utils';
@@ -12,7 +14,7 @@ import { useI18n } from '@n8n/i18n';
 import { createEventBus } from '@n8n/utils/event-bus';
 import type { Workflow } from 'n8n-workflow';
 import { NodeHelpers, type INode } from 'n8n-workflow';
-import { computed, ref, shallowRef, watch } from 'vue';
+import { computed, onMounted, ref, shallowRef, watch } from 'vue';
 
 const props = defineProps<{
 	modalName: string;
@@ -25,6 +27,8 @@ const props = defineProps<{
 
 const i18n = useI18n();
 const nodeTypesStore = useNodeTypesStore();
+const credentialsStore = useCredentialsStore();
+const projectsStore = useProjectsStore();
 const nodeHelpers = useNodeHelpers();
 
 const modalBus = ref(createEventBus());
@@ -130,8 +134,27 @@ watch(
 	(initialNode) => {
 		if (initialNode) {
 			const uniqueName = makeUniqueName(initialNode.name, existingToolNames.value);
-			node.value =
+			let nodeData =
 				uniqueName !== initialNode.name ? { ...initialNode, name: uniqueName } : initialNode;
+
+			// Initialize parameters with defaults if node type is available
+			if (nodeTypeDescription.value) {
+				const defaultParameters = NodeHelpers.getNodeParameters(
+					nodeTypeDescription.value.properties ?? [],
+					nodeData.parameters ?? {},
+					true, // returnDefaults: include all default values
+					false, // returnNoneDisplayed: exclude hidden parameters
+					nodeData,
+					nodeTypeDescription.value,
+				);
+
+				nodeData = {
+					...nodeData,
+					parameters: defaultParameters ?? {},
+				};
+			}
+
+			node.value = nodeData;
 		} else {
 			node.value = initialNode;
 		}
@@ -155,6 +178,17 @@ watch(
 		}
 	},
 );
+
+onMounted(async () => {
+	// Ensure credentials are loaded for the credentials selector to work
+	const personalProject = projectsStore.personalProject;
+	if (personalProject && credentialsStore.allCredentials.length === 0) {
+		await Promise.all([
+			credentialsStore.fetchCredentialTypes(false),
+			credentialsStore.fetchAllCredentialsForWorkflow({ projectId: personalProject.id }),
+		]);
+	}
+});
 </script>
 
 <template>

@@ -107,7 +107,7 @@ export class AutoFinalizeHandler {
 			this.debugLog('AUTO_FINALIZE', 'No code exists, prompting to create');
 			pushValidationFeedback(
 				messages,
-				'Please use the text editor tool to edit the workflow code.',
+				'Please use the text editor tool to create or edit the workflow code.',
 			);
 			return { success: false, promptedForCode: true };
 		}

@@ -90,26 +90,28 @@ describe('TextEditorHandler', () => {
 	});
 
 	describe('create command', () => {
-		it('should throw error when create is called (create is not supported)', () => {
-			expect(() =>
-				handler.execute({
-					command: 'create',
-					path: '/workflow.js',
-					file_text: 'const x = 1;',
-				}),
-			).toThrow('The "create" command is not supported');
+		it('should create file when no code exists', () => {
+			const result = handler.execute({
+				command: 'create',
+				path: '/workflow.js',
+				file_text: 'const x = 1;',
+			});
+
+			expect(result).toBe('File created successfully.');
+			expect(handler.getWorkflowCode()).toBe('const x = 1;');
 		});
 
-		it('should throw error even when file already exists', () => {
+		it('should overwrite existing code', () => {
 			handler.setWorkflowCode('existing content');
 
-			expect(() =>
-				handler.execute({
-					command: 'create',
-					path: '/workflow.js',
-					file_text: 'new content',
-				}),
-			).toThrow('The "create" command is not supported');
+			const result = handler.execute({
+				command: 'create',
+				path: '/workflow.js',
+				file_text: 'new content',
+			});
+
+			expect(result).toBe('File created successfully.');
+			expect(handler.getWorkflowCode()).toBe('new content');
 		});
 	});
 

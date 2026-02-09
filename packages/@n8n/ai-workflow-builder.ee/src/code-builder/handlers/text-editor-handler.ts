@@ -154,15 +154,15 @@ export class TextEditorHandler {
 	}
 
 	/**
-	 * Handle create command - rejected, workflow code is always pre-loaded
+	 * Handle create command - create or overwrite the workflow file
 	 */
-	private handleCreate(_command: CreateCommand): string {
-		this.debugLog('CREATE', 'Create command rejected - workflow code is always pre-loaded');
-		throw new Error(
-			'The "create" command is not supported. ' +
-				'Workflow code is pre-loaded. Use "view" to see current code, ' +
-				'then text editor tools to edit it.',
-		);
+	private handleCreate(command: CreateCommand): string {
+		this.debugLog('CREATE', 'Creating workflow file', {
+			fileTextLength: command.file_text.length,
+			hadExistingCode: this.code !== null,
+		});
+		this.code = command.file_text;
+		return 'File created successfully.';
 	}
 
 	/**

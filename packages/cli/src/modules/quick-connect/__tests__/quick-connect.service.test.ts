@@ -78,7 +78,7 @@ describe('QuickConnectService', () => {
 
 			expect(result).toEqual({ id: 'cred-123' });
 			// eslint-disable-next-line @typescript-eslint/unbound-method
-			expect(handler.getCredentialData).toHaveBeenCalledWith(option);
+			expect(handler.getCredentialData).toHaveBeenCalledWith(option, mockUser);
 			// eslint-disable-next-line @typescript-eslint/unbound-method
 			expect(credentialsService.createUnmanagedCredential).toHaveBeenCalledWith(
 				{

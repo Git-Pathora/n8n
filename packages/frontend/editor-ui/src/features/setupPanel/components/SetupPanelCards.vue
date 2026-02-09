@@ -32,10 +32,15 @@ const onTestNode = (_nodeName: string) => {
 		>
 			<N8nIcon icon="list-checks" :class="$style['empty-icon']" :size="24" color="text-base" />
 			<div :class="$style['empty-text']">
-				<N8nText size="medium" color="text-base" :bold="true">
+				<N8nText
+					size="medium"
+					color="text-base"
+					:bold="true"
+					data-test-id="setup-cards-empty-heading"
+				>
 					{{ i18n.baseText('setupPanel.empty.heading') }}
 				</N8nText>
-				<N8nText size="medium" color="text-light">
+				<N8nText size="medium" color="text-light" data-test-id="setup-cards-empty-description">
 					{{ i18n.baseText('setupPanel.empty.description') }}
 				</N8nText>
 			</div>
@@ -49,7 +54,11 @@ const onTestNode = (_nodeName: string) => {
 				@credential-deselected="onCredentialDeselected(state.node.name, $event)"
 				@test-node="onTestNode(state.node.name)"
 			/>
-			<div v-if="isAllComplete" :class="$style['complete-message']">
+			<div
+				v-if="isAllComplete"
+				:class="$style['complete-message']"
+				data-test-id="setup-cards-complete-message"
+			>
 				<N8nText size="medium" color="text-base">
 					{{ i18n.baseText('setupPanel.everythingConfigured.message') }}
 				</N8nText>

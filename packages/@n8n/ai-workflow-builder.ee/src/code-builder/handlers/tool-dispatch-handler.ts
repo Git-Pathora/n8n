@@ -14,8 +14,7 @@ import type { TextEditorHandler } from './text-editor-handler';
 import type { TextEditorToolHandler } from './text-editor-tool-handler';
 import type { StrReplacement } from './text-editor.types';
 import type { ValidateToolHandler } from './validate-tool-handler';
-import type { StreamOutput, ToolProgressChunk, WorkflowUpdateChunk } from '../../types/streaming';
-import type { ParseAndValidateResult } from '../types';
+import type { StreamOutput, ToolProgressChunk } from '../../types/streaming';
 import type { WarningTracker } from '../state/warning-tracker';
 import type { EvaluationLogger } from '../utils/evaluation-logger';
 
@@ -34,21 +33,12 @@ export interface ToolCall {
 }
 
 /**
- * Parse-only function type for progressive workflow rendering
- */
-type ParseOnlyFn = (
-	code: string,
-	currentWorkflow?: WorkflowJSON,
-) => Promise<ParseAndValidateResult>;
-
-/**
  * Configuration for ToolDispatchHandler
  */
 export interface ToolDispatchHandlerConfig {
 	toolsMap: Map<string, StructuredToolInterface>;
 	toolDisplayTitles?: Map<string, string>;
 	validateToolHandler: ValidateToolHandler;
-	parseOnly?: ParseOnlyFn;
 	debugLog: DebugLogFn;
 	evalLogger?: EvaluationLogger;
 }
@@ -92,7 +82,6 @@ export class ToolDispatchHandler {
 	private toolsMap: Map<string, StructuredToolInterface>;
 	private toolDisplayTitles?: Map<string, string>;
 	private validateToolHandler: ValidateToolHandler;
-	private parseOnly?: ParseOnlyFn;
 	private debugLog: DebugLogFn;
 	private evalLogger?: EvaluationLogger;
 
@@ -100,7 +89,6 @@ export class ToolDispatchHandler {
 		this.toolsMap = config.toolsMap;
 		this.toolDisplayTitles = config.toolDisplayTitles;
 		this.validateToolHandler = config.validateToolHandler;
-		this.parseOnly = config.parseOnly;
 		this.debugLog = config.debugLog;
 		this.evalLogger = config.evalLogger;
 	}
@@ -250,35 +238,12 @@ export class ToolDispatchHandler {
 					workflowReady: result.workflowReady,
 				};
 			}
-
-			// Auto-emit workflow-updated for edits that parse successfully
-			const command = toolCall.args.command as string;
-			if (command !== 'view' && textEditorHandler) {
-				const emitResult = yield* this.tryEmitWorkflowUpdate(
-					textEditorHandler,
-					currentWorkflow,
-					messages,
-				);
-				if (emitResult) {
-					return { workflow: emitResult };
-				}
-			}
 			return {};
 		}
 
 		// Handle batch str_replace tool calls
 		if (toolCall.name === 'batch_str_replace' && textEditorHandler) {
 			yield* this.executeBatchStrReplace({ toolCall, textEditorHandler, messages });
-
-			// Auto-emit workflow-updated for edits that parse successfully
-			const emitResult = yield* this.tryEmitWorkflowUpdate(
-				textEditorHandler,
-				currentWorkflow,
-				messages,
-			);
-			if (emitResult) {
-				return { workflow: emitResult };
-			}
 			return {};
 		}
 
@@ -496,44 +461,6 @@ export class ToolDispatchHandler {
 					} as ToolProgressChunk,
 				],
 			};
-		}
-	}
-
-	/**
-	 * Try to parse current code and emit workflow-updated for progressive rendering.
-	 * On parse failure, appends the error to the last ToolMessage so the agent can see it.
-	 *
-	 * @returns The parsed WorkflowJSON if successful, undefined otherwise
-	 */
-	private async *tryEmitWorkflowUpdate(
-		textEditorHandler: TextEditorHandler,
-		currentWorkflow: WorkflowJSON | undefined,
-		messages: BaseMessage[],
-	): AsyncGenerator<StreamOutput, WorkflowJSON | undefined, unknown> {
-		if (!this.parseOnly) return undefined;
-
-		const code = textEditorHandler.getWorkflowCode();
-		if (!code) return undefined;
-
-		try {
-			const result = await this.parseOnly(code, currentWorkflow);
-			yield {
-				messages: [
-					{
-						role: 'assistant',
-						type: 'workflow-updated',
-						codeSnippet: JSON.stringify(result.workflow, null, 2),
-					} as WorkflowUpdateChunk,
-				],
-			};
-			return result.workflow;
-		} catch (error) {
-			const errorMessage = error instanceof Error ? error.message : String(error);
-			const lastMsg = messages[messages.length - 1];
-			if (lastMsg instanceof ToolMessage) {
-				lastMsg.content = `${String(lastMsg.content)}\n\nParse error after edit: ${errorMessage}`;
-			}
-			return undefined;
 		}
 	}
 }

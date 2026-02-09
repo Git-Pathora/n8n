@@ -293,42 +293,6 @@ export class ParseValidateHandler {
 	}
 
 	/**
-	 * Parse TypeScript code to WorkflowJSON without validation.
-	 * Used for skeleton mode — emits the workflow graph quickly without checking parameters.
-	 *
-	 * @param code - The TypeScript workflow code to parse
-	 * @param currentWorkflow - Optional current workflow for context (used for pin data generation)
-	 * @returns ParseAndValidateResult with workflow and empty warnings array
-	 * @throws Error if parsing fails
-	 */
-	async parseOnly(code: string, currentWorkflow?: WorkflowJSON): Promise<ParseAndValidateResult> {
-		this.debugLog('PARSE_VALIDATE', '========== PARSE-ONLY (SKELETON) ==========');
-
-		const codeToParse = stripImportStatements(code);
-
-		try {
-			this.logger?.debug('Parse-only: parsing code', { codeLength: codeToParse.length });
-			const builder = parseWorkflowCodeToBuilder(codeToParse);
-			builder.regenerateNodeIds();
-			builder.generatePinData({ beforeWorkflow: currentWorkflow });
-			const workflowJson: WorkflowJSON = builder.toJSON();
-
-			this.debugLog('PARSE_VALIDATE', 'Parse-only complete', {
-				nodeCount: workflowJson.nodes.length,
-			});
-
-			return { workflow: workflowJson, warnings: [] };
-		} catch (error) {
-			this.debugLog('PARSE_VALIDATE', 'Parse-only FAILED', {
-				errorMessage: error instanceof Error ? error.message : String(error),
-			});
-			throw new Error(
-				`Failed to parse generated workflow code: ${error instanceof Error ? error.message : 'Unknown error'}`,
-			);
-		}
-	}
-
-	/**
 	 * Extract error context with line numbers for debugging.
 	 *
 	 * @param code - The code to extract context from

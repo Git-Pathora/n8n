@@ -320,68 +320,6 @@ describe('ParseValidateHandler', () => {
 		});
 	});
 
-	describe('parseOnly', () => {
-		it('should parse code and return workflow without running validation', async () => {
-			const mockWorkflow = {
-				id: 'test',
-				name: 'Test Workflow',
-				nodes: [{ id: 'node1', name: 'Node 1', type: 'test' }],
-				connections: {},
-			};
-
-			const mockBuilder = {
-				regenerateNodeIds: jest.fn(),
-				validate: jest.fn(),
-				generatePinData: jest.fn(),
-				toJSON: jest.fn().mockReturnValue(mockWorkflow),
-			};
-
-			mockParseWorkflowCodeToBuilder.mockReturnValue(mockBuilder);
-
-			const result = await handler.parseOnly('const workflow = {}');
-
-			expect(result.workflow).toEqual(mockWorkflow);
-			expect(result.warnings).toHaveLength(0);
-			expect(mockBuilder.regenerateNodeIds).toHaveBeenCalled();
-			expect(mockBuilder.generatePinData).toHaveBeenCalled();
-			expect(mockBuilder.validate).not.toHaveBeenCalled();
-			expect(mockValidateWorkflow).not.toHaveBeenCalled();
-		});
-
-		it('should pass currentWorkflow to generatePinData', async () => {
-			const currentWorkflow = { id: 'current', name: 'Current', nodes: [], connections: {} };
-			const mockWorkflow = {
-				id: 'test',
-				name: 'Test Workflow',
-				nodes: [],
-				connections: {},
-			};
-
-			const mockBuilder = {
-				regenerateNodeIds: jest.fn(),
-				validate: jest.fn(),
-				generatePinData: jest.fn(),
-				toJSON: jest.fn().mockReturnValue(mockWorkflow),
-			};
-
-			mockParseWorkflowCodeToBuilder.mockReturnValue(mockBuilder);
-
-			await handler.parseOnly('code', currentWorkflow);
-
-			expect(mockBuilder.generatePinData).toHaveBeenCalledWith({ beforeWorkflow: currentWorkflow });
-		});
-
-		it('should throw on parse failure', async () => {
-			mockParseWorkflowCodeToBuilder.mockImplementation(() => {
-				throw new Error('Syntax error at line 5');
-			});
-
-			await expect(handler.parseOnly('invalid code')).rejects.toThrow(
-				'Failed to parse generated workflow code: Syntax error at line 5',
-			);
-		});
-	});
-
 	describe('validateExistingWorkflow', () => {
 		const nonEmptyJson = {
 			id: 'test',

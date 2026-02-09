@@ -182,8 +182,6 @@ export class CodeBuilderAgent {
 		// Initialize tool dispatch handler
 		this.toolDispatchHandler = new ToolDispatchHandler({
 			toolsMap: this.toolsMap,
-			parseOnly: async (code, currentWorkflow) =>
-				await this.parseValidateHandler.parseOnly(code, currentWorkflow),
 			toolDisplayTitles: new Map([
 				[CODE_BUILDER_SEARCH_NODES_TOOL.toolName, CODE_BUILDER_SEARCH_NODES_TOOL.displayTitle],
 				[CODE_BUILDER_GET_NODE_TYPES_TOOL.toolName, CODE_BUILDER_GET_NODE_TYPES_TOOL.displayTitle],

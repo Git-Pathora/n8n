@@ -1,10 +1,15 @@
 import type { BaseMessage } from '@langchain/core/messages';
 import type { StructuredToolInterface } from '@langchain/core/tools';
 
-import type { StreamOutput, ToolProgressChunk } from '../../../types/streaming';
+import type {
+	StreamOutput,
+	ToolProgressChunk,
+	WorkflowUpdateChunk,
+} from '../../../types/streaming';
 import { WarningTracker } from '../../state/warning-tracker';
 import type { TextEditorHandler } from '../text-editor-handler';
 import type { TextEditorToolHandler } from '../text-editor-tool-handler';
+import type { PreviewParseResult } from '../text-editor-tool-handler';
 import { ToolDispatchHandler, type ToolDispatchResult } from '../tool-dispatch-handler';
 import type { ValidateToolHandler } from '../validate-tool-handler';
 
@@ -15,6 +20,16 @@ function isToolProgressChunk(chunk: unknown): chunk is ToolProgressChunk {
 		chunk !== null &&
 		'type' in chunk &&
 		(chunk as ToolProgressChunk).type === 'tool'
+	);
+}
+
+/** Type guard for WorkflowUpdateChunk */
+function isWorkflowUpdateChunk(chunk: unknown): chunk is WorkflowUpdateChunk {
+	return (
+		typeof chunk === 'object' &&
+		chunk !== null &&
+		'type' in chunk &&
+		(chunk as WorkflowUpdateChunk).type === 'workflow-updated'
 	);
 }
 
@@ -683,6 +698,139 @@ describe('ToolDispatchHandler', () => {
 
 			expect(toolChunks[1].status).toBe('completed');
 			expect(toolChunks[1].displayTitle).toBe('Editing workflow');
+		});
+
+		it('should yield WorkflowUpdateChunk after successful batch_str_replace when parse succeeds', async () => {
+			const mockWorkflow = {
+				id: 'test',
+				name: 'Test',
+				nodes: [{ id: 'n1', name: 'Node 1', type: 'test' }],
+				connections: {},
+			};
+
+			const mockTextEditorHandler = {
+				executeBatch: jest.fn().mockReturnValue('All 1 replacements applied successfully.'),
+			} as unknown as TextEditorHandler;
+
+			const mockTextEditorToolHandler = {
+				tryParseForPreview: jest.fn().mockResolvedValue({
+					chunk: {
+						messages: [
+							{
+								role: 'assistant',
+								type: 'workflow-updated',
+								codeSnippet: JSON.stringify(mockWorkflow, null, 2),
+							},
+						],
+					},
+				} satisfies PreviewParseResult),
+			} as unknown as TextEditorToolHandler;
+
+			const handler = new ToolDispatchHandler({
+				toolsMap: new Map(),
+				validateToolHandler: mockValidateToolHandler,
+				debugLog: mockDebugLog,
+			});
+
+			const { chunks } = await collectChunks(
+				handler.dispatch({
+					toolCalls: [
+						{
+							id: 'call-bp1',
+							name: 'batch_str_replace',
+							args: { replacements: [{ old_str: 'x', new_str: 'y' }] },
+						},
+					],
+					messages: [],
+					iteration: 1,
+					warningTracker: new WarningTracker(),
+					textEditorHandler: mockTextEditorHandler,
+					textEditorToolHandler: mockTextEditorToolHandler,
+				}),
+			);
+
+			const workflowChunks = chunks.flatMap((c) => c.messages ?? []).filter(isWorkflowUpdateChunk);
+			expect(workflowChunks).toHaveLength(1);
+			expect(JSON.parse(workflowChunks[0].codeSnippet)).toEqual(mockWorkflow);
+		});
+
+		it('should append parse error to tool message when parse fails after batch_str_replace', async () => {
+			const mockTextEditorHandler = {
+				executeBatch: jest.fn().mockReturnValue('All 1 replacements applied successfully.'),
+			} as unknown as TextEditorHandler;
+
+			const mockTextEditorToolHandler = {
+				tryParseForPreview: jest.fn().mockResolvedValue({
+					parseError: 'Unexpected token',
+				} satisfies PreviewParseResult),
+			} as unknown as TextEditorToolHandler;
+
+			const handler = new ToolDispatchHandler({
+				toolsMap: new Map(),
+				validateToolHandler: mockValidateToolHandler,
+				debugLog: mockDebugLog,
+			});
+
+			const messages: BaseMessage[] = [];
+			await drainGenerator(
+				handler.dispatch({
+					toolCalls: [
+						{
+							id: 'call-bp2',
+							name: 'batch_str_replace',
+							args: { replacements: [{ old_str: 'x', new_str: 'y' }] },
+						},
+					],
+					messages,
+					iteration: 1,
+					warningTracker: new WarningTracker(),
+					textEditorHandler: mockTextEditorHandler,
+					textEditorToolHandler: mockTextEditorToolHandler,
+				}),
+			);
+
+			expect(messages).toHaveLength(1);
+			const content = messages[0].content as string;
+			expect(content).toContain('All 1 replacements applied successfully.');
+			expect(content).toContain('Parse error: Unexpected token');
+		});
+
+		it('should skip preview when textEditorToolHandler is not provided', async () => {
+			const mockTextEditorHandler = {
+				executeBatch: jest.fn().mockReturnValue('All 1 replacements applied successfully.'),
+			} as unknown as TextEditorHandler;
+
+			const handler = new ToolDispatchHandler({
+				toolsMap: new Map(),
+				validateToolHandler: mockValidateToolHandler,
+				debugLog: mockDebugLog,
+			});
+
+			const messages: BaseMessage[] = [];
+			const { chunks } = await collectChunks(
+				handler.dispatch({
+					toolCalls: [
+						{
+							id: 'call-bp3',
+							name: 'batch_str_replace',
+							args: { replacements: [{ old_str: 'x', new_str: 'y' }] },
+						},
+					],
+					messages,
+					iteration: 1,
+					warningTracker: new WarningTracker(),
+					textEditorHandler: mockTextEditorHandler,
+					// No textEditorToolHandler provided
+				}),
+			);
+
+			// No WorkflowUpdateChunk should be yielded
+			const workflowChunks = chunks.flatMap((c) => c.messages ?? []).filter(isWorkflowUpdateChunk);
+			expect(workflowChunks).toHaveLength(0);
+
+			// Only the batch result should be in messages, no parse error appended
+			expect(messages).toHaveLength(1);
+			expect(messages[0].content).toBe('All 1 replacements applied successfully.');
 		});
 	});
 });

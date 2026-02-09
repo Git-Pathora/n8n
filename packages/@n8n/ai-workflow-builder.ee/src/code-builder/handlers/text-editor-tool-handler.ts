@@ -9,7 +9,7 @@ import type { BaseMessage } from '@langchain/core/messages';
 import { ToolMessage } from '@langchain/core/messages';
 import type { WorkflowJSON } from '@n8n/workflow-sdk';
 
-import type { StreamOutput, ToolProgressChunk } from '../../types/streaming';
+import type { StreamOutput, ToolProgressChunk, WorkflowUpdateChunk } from '../../types/streaming';
 import { FIX_VALIDATION_ERRORS_INSTRUCTION } from '../constants';
 import type { WarningTracker } from '../state/warning-tracker';
 import type { ParseAndValidateResult } from '../types';
@@ -73,6 +73,16 @@ export interface TextEditorToolParams {
 export interface TextEditorToolResult {
 	workflowReady?: boolean;
 	workflow?: WorkflowJSON;
+}
+
+/**
+ * Result of a preview parse attempt after an edit command
+ */
+export interface PreviewParseResult {
+	/** WorkflowUpdateChunk if parse succeeded */
+	chunk?: StreamOutput;
+	/** Error message if parse failed */
+	parseError?: string;
 }
 
 /**
@@ -151,6 +161,18 @@ export class TextEditorToolHandler {
 					content: result,
 				}),
 			);
+
+			// Preview parse after edit commands for progressive canvas rendering
+			if (command !== 'view') {
+				const preview = await this.tryParseForPreview(currentWorkflow);
+				if (preview.chunk) {
+					yield preview.chunk;
+				}
+				if (preview.parseError) {
+					const lastMsg = messages[messages.length - 1] as ToolMessage;
+					lastMsg.content = `${lastMsg.content as string}\n\nParse error: ${preview.parseError}`;
+				}
+			}
 
 			yield this.createToolProgressChunk('completed', command, toolCallId);
 			return undefined;
@@ -270,6 +292,28 @@ export class TextEditorToolHandler {
 	}
 
 	/**
+	 * Try parsing the current code for a preview update.
+	 *
+	 * On success: returns a WorkflowUpdateChunk for progressive canvas rendering.
+	 * On error: returns the parse error message so the agent can self-correct.
+	 * If no code exists: returns empty object.
+	 */
+	async tryParseForPreview(currentWorkflow?: WorkflowJSON): Promise<PreviewParseResult> {
+		const code = this.textEditorGetCode();
+		if (!code) {
+			return {};
+		}
+
+		try {
+			const result = await this.parseAndValidate(code, currentWorkflow);
+			return { chunk: this.createWorkflowUpdateChunk(result.workflow) };
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			return { parseError: errorMessage };
+		}
+	}
+
+	/**
 	 * Create a tool progress chunk
 	 */
 	private createToolProgressChunk(
@@ -287,6 +331,21 @@ export class TextEditorToolHandler {
 					displayTitle,
 					status,
 				} as ToolProgressChunk,
+			],
+		};
+	}
+
+	/**
+	 * Create a workflow update chunk for progressive canvas rendering
+	 */
+	private createWorkflowUpdateChunk(workflow: WorkflowJSON): StreamOutput {
+		return {
+			messages: [
+				{
+					role: 'assistant',
+					type: 'workflow-updated',
+					codeSnippet: JSON.stringify(workflow, null, 2),
+				} as WorkflowUpdateChunk,
 			],
 		};
 	}

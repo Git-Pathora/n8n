@@ -243,7 +243,13 @@ export class ToolDispatchHandler {
 
 		// Handle batch str_replace tool calls
 		if (toolCall.name === 'batch_str_replace' && textEditorHandler) {
-			yield* this.executeBatchStrReplace({ toolCall, textEditorHandler, messages });
+			yield* this.executeBatchStrReplace({
+				toolCall,
+				textEditorHandler,
+				messages,
+				textEditorToolHandler,
+				currentWorkflow,
+			});
 			return {};
 		}
 
@@ -400,8 +406,11 @@ export class ToolDispatchHandler {
 		toolCall: ToolCall;
 		textEditorHandler: TextEditorHandler;
 		messages: BaseMessage[];
+		textEditorToolHandler?: TextEditorToolHandler;
+		currentWorkflow?: WorkflowJSON;
 	}): AsyncGenerator<StreamOutput, void, unknown> {
-		const { toolCall, textEditorHandler, messages } = params;
+		const { toolCall, textEditorHandler, messages, textEditorToolHandler, currentWorkflow } =
+			params;
 		const displayTitle = 'Editing workflow';
 
 		yield {
@@ -427,6 +436,18 @@ export class ToolDispatchHandler {
 					content: result,
 				}),
 			);
+
+			// Preview parse after successful batch edit for progressive canvas rendering
+			if (textEditorToolHandler) {
+				const preview = await textEditorToolHandler.tryParseForPreview(currentWorkflow);
+				if (preview.chunk) {
+					yield preview.chunk;
+				}
+				if (preview.parseError) {
+					const lastMsg = messages[messages.length - 1] as ToolMessage;
+					lastMsg.content = `${lastMsg.content as string}\n\nParse error: ${preview.parseError}`;
+				}
+			}
 
 			yield {
 				messages: [

@@ -5,7 +5,11 @@
 import type { BaseMessage } from '@langchain/core/messages';
 import { ToolMessage } from '@langchain/core/messages';
 
-import type { StreamOutput, ToolProgressChunk } from '../../../types/streaming';
+import type {
+	StreamOutput,
+	ToolProgressChunk,
+	WorkflowUpdateChunk,
+} from '../../../types/streaming';
 import { WarningTracker } from '../../state/warning-tracker';
 import { TextEditorToolHandler } from '../text-editor-tool-handler';
 
@@ -16,6 +20,16 @@ function isToolProgressChunk(chunk: unknown): chunk is ToolProgressChunk {
 		chunk !== null &&
 		'type' in chunk &&
 		(chunk as ToolProgressChunk).type === 'tool'
+	);
+}
+
+/** Type guard for WorkflowUpdateChunk */
+function isWorkflowUpdateChunk(chunk: unknown): chunk is WorkflowUpdateChunk {
+	return (
+		typeof chunk === 'object' &&
+		chunk !== null &&
+		'type' in chunk &&
+		(chunk as WorkflowUpdateChunk).type === 'workflow-updated'
 	);
 }
 
@@ -414,6 +428,183 @@ describe('TextEditorToolHandler', () => {
 			// Should have single ToolMessage with create result, no validation warnings
 			expect(messages).toHaveLength(1);
 			expect(messages[0]).toBeInstanceOf(ToolMessage);
+		});
+
+		it('should yield WorkflowUpdateChunk after successful str_replace when parse succeeds', async () => {
+			const mockWorkflow = {
+				id: 'test',
+				name: 'Test',
+				nodes: [{ id: 'n1', name: 'Node 1', type: 'test' }],
+				connections: {},
+			};
+
+			mockTextEditorExecute.mockReturnValue('Edit applied successfully.');
+			mockTextEditorGetCode.mockReturnValue('const workflow = {};');
+			mockParseAndValidate.mockResolvedValue({
+				workflow: mockWorkflow,
+				warnings: [],
+			});
+
+			const generator = handler.execute({
+				...baseParams,
+				args: { command: 'str_replace', path: '/workflow.js', old_str: 'x', new_str: 'y' },
+				messages,
+			});
+
+			const chunks: StreamOutput[] = [];
+			for await (const chunk of generator) {
+				chunks.push(chunk);
+			}
+
+			const workflowChunks = chunks.flatMap((c) => c.messages ?? []).filter(isWorkflowUpdateChunk);
+			expect(workflowChunks).toHaveLength(1);
+			expect(JSON.parse(workflowChunks[0].codeSnippet)).toEqual(mockWorkflow);
+
+			// Tool message should NOT contain parse error
+			expect(messages).toHaveLength(1);
+			expect((messages[0] as ToolMessage).content).toBe('Edit applied successfully.');
+		});
+
+		it('should yield WorkflowUpdateChunk after successful insert when parse succeeds', async () => {
+			const mockWorkflow = {
+				id: 'test',
+				name: 'Test',
+				nodes: [{ id: 'n1', name: 'Node 1', type: 'test' }],
+				connections: {},
+			};
+
+			mockTextEditorExecute.mockReturnValue('Insert applied successfully.');
+			mockTextEditorGetCode.mockReturnValue('const workflow = {};');
+			mockParseAndValidate.mockResolvedValue({
+				workflow: mockWorkflow,
+				warnings: [],
+			});
+
+			const generator = handler.execute({
+				...baseParams,
+				args: { command: 'insert', path: '/workflow.js', insert_line: 1, new_str: 'line' },
+				messages,
+			});
+
+			const chunks: StreamOutput[] = [];
+			for await (const chunk of generator) {
+				chunks.push(chunk);
+			}
+
+			const workflowChunks = chunks.flatMap((c) => c.messages ?? []).filter(isWorkflowUpdateChunk);
+			expect(workflowChunks).toHaveLength(1);
+			expect(JSON.parse(workflowChunks[0].codeSnippet)).toEqual(mockWorkflow);
+		});
+
+		it('should append parse error to tool message when parse fails after str_replace', async () => {
+			mockTextEditorExecute.mockReturnValue('Edit applied successfully.');
+			mockTextEditorGetCode.mockReturnValue('const workflow = { broken');
+			mockParseAndValidate.mockRejectedValue(new Error('Unexpected token'));
+
+			const generator = handler.execute({
+				...baseParams,
+				args: { command: 'str_replace', path: '/workflow.js', old_str: 'x', new_str: 'y' },
+				messages,
+			});
+
+			const chunks: StreamOutput[] = [];
+			for await (const chunk of generator) {
+				chunks.push(chunk);
+			}
+
+			// No WorkflowUpdateChunk should be yielded
+			const workflowChunks = chunks.flatMap((c) => c.messages ?? []).filter(isWorkflowUpdateChunk);
+			expect(workflowChunks).toHaveLength(0);
+
+			// Parse error should be appended to the tool message
+			expect(messages).toHaveLength(1);
+			const content = (messages[0] as ToolMessage).content as string;
+			expect(content).toContain('Edit applied successfully.');
+			expect(content).toContain('Parse error: Unexpected token');
+		});
+
+		it('should NOT call parse after view command', async () => {
+			mockTextEditorExecute.mockReturnValue('1: const x = 1;');
+			mockTextEditorGetCode.mockReturnValue('const x = 1;');
+
+			const generator = handler.execute({
+				...baseParams,
+				args: { command: 'view', path: '/workflow.js' },
+				messages,
+			});
+
+			for await (const _ of generator) {
+				// consume
+			}
+
+			// parseAndValidate should NOT have been called for view
+			expect(mockParseAndValidate).not.toHaveBeenCalled();
+		});
+	});
+
+	describe('tryParseForPreview', () => {
+		it('should return chunk on successful parse', async () => {
+			const mockWorkflow = {
+				id: 'test',
+				name: 'Test',
+				nodes: [{ id: 'n1', name: 'Node 1', type: 'test' }],
+				connections: {},
+			};
+
+			mockTextEditorGetCode.mockReturnValue('const workflow = {};');
+			mockParseAndValidate.mockResolvedValue({
+				workflow: mockWorkflow,
+				warnings: [],
+			});
+
+			const result = await handler.tryParseForPreview();
+
+			expect(result.chunk).toBeDefined();
+			expect(result.parseError).toBeUndefined();
+
+			const workflowChunks = (result.chunk?.messages ?? []).filter(isWorkflowUpdateChunk);
+			expect(workflowChunks).toHaveLength(1);
+			expect(JSON.parse(workflowChunks[0].codeSnippet)).toEqual(mockWorkflow);
+		});
+
+		it('should return parseError on parse failure', async () => {
+			mockTextEditorGetCode.mockReturnValue('const workflow = { broken');
+			mockParseAndValidate.mockRejectedValue(new Error('Unexpected token'));
+
+			const result = await handler.tryParseForPreview();
+
+			expect(result.chunk).toBeUndefined();
+			expect(result.parseError).toBe('Unexpected token');
+		});
+
+		it('should return empty object when no code exists', async () => {
+			mockTextEditorGetCode.mockReturnValue(null);
+
+			const result = await handler.tryParseForPreview();
+
+			expect(result.chunk).toBeUndefined();
+			expect(result.parseError).toBeUndefined();
+			expect(mockParseAndValidate).not.toHaveBeenCalled();
+		});
+
+		it('should pass currentWorkflow to parseAndValidate', async () => {
+			const currentWorkflow = { id: 'existing', name: 'Existing', nodes: [], connections: {} };
+			const mockWorkflow = {
+				id: 'test',
+				name: 'Test',
+				nodes: [],
+				connections: {},
+			};
+
+			mockTextEditorGetCode.mockReturnValue('const workflow = {};');
+			mockParseAndValidate.mockResolvedValue({
+				workflow: mockWorkflow,
+				warnings: [],
+			});
+
+			await handler.tryParseForPreview(currentWorkflow);
+
+			expect(mockParseAndValidate).toHaveBeenCalledWith('const workflow = {};', currentWorkflow);
 		});
 	});
 });

@@ -490,7 +490,7 @@
 	"chatHub.tools.selector.label.default": "Tools",
 	"chatHub.tools.selector.disabled.tooltip": "Tools are not supported by the selected model",
 	"chatHub.toolSettings.title": "Configure Tool",
-	"chatHub.toolSettings.confirm": "Add Tool",
+	"chatHub.toolSettings.confirm": "Save",
 	"chatHub.toolSettings.cancel": "Cancel",
 	"chatHub.toolsManager.title": "Tools",
 	"chatHub.toolsManager.searchPlaceholder": "Search tools...",

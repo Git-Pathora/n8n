@@ -7,15 +7,17 @@ import { useCredentialsStore } from '@/features/credentials/credentials.store';
 import { useProjectsStore } from '@/features/collaboration/projects/projects.store';
 import NodeCredentials from '@/features/credentials/components/NodeCredentials.vue';
 import ParameterInputList from '@/features/ndv/parameters/components/ParameterInputList.vue';
-import { collectParametersByTab } from '@/features/ndv/shared/ndv.utils';
-import type { INodeUpdatePropertiesInformation, IUpdateInformation } from '@/Interface';
-import { N8nButton, N8nInlineTextEdit } from '@n8n/design-system';
+import { collectParametersByTab, createCommonNodeSettings } from '@/features/ndv/shared/ndv.utils';
+import type { INodeUpdatePropertiesInformation, ITab, IUpdateInformation } from '@/Interface';
+import { N8nButton, N8nInlineTextEdit, N8nTabs, N8nText } from '@n8n/design-system';
 import { useI18n } from '@n8n/i18n';
 import { createEventBus } from '@n8n/utils/event-bus';
 import {
 	Workflow,
 	NodeHelpers,
+	deepCopy,
 	type INode,
+	type INodeParameters,
 	type INodeTypes,
 	type INodeType,
 	type IVersionedNodeType,
@@ -53,8 +55,31 @@ const nodeTypeDescription = computed(() => {
 	}
 	return nodeTypesStore.getNodeType(props.data.node.type);
 });
-const parameters = computed(
-	() => collectParametersByTab(nodeTypeDescription.value?.properties ?? [], false).params,
+type ToolSettingsTab = 'params' | 'settings';
+const activeTab = ref<ToolSettingsTab>('params');
+
+const parametersByTab = computed(() =>
+	collectParametersByTab(nodeTypeDescription.value?.properties ?? [], false),
+);
+
+const tabOptions = computed<Array<ITab<ToolSettingsTab>>>(() => [
+	{ label: i18n.baseText('nodeSettings.parameters'), value: 'params' },
+	{ label: i18n.baseText('nodeSettings.settings'), value: 'settings' },
+]);
+
+const nodeSettings = computed(() => createCommonNodeSettings(true, i18n.baseText.bind(i18n)));
+
+const settingsNodeValues = computed<INodeParameters>(() => {
+	if (!node.value) return { notes: '', notesInFlow: false, parameters: {} };
+	return {
+		notes: node.value.notes ?? '',
+		notesInFlow: node.value.notesInFlow ?? false,
+		parameters: deepCopy(node.value.parameters),
+	};
+});
+
+const showNoParametersNotice = computed(
+	() => parametersByTab.value.params.filter((item) => item.type !== 'notice').length === 0,
 );
 
 const hasParameterIssues = computed(() => {
@@ -179,6 +204,19 @@ function handleChangeParameter(updateData: IUpdateInformation) {
 	};
 }
 
+function handleChangeSettingsValue(updateData: IUpdateInformation) {
+	if (!node.value) return;
+	if (updateData.name.startsWith('parameters.')) {
+		const paramName = updateData.name.slice('parameters.'.length);
+		node.value = {
+			...node.value,
+			parameters: { ...node.value.parameters, [paramName]: updateData.value },
+		};
+	} else {
+		node.value = { ...node.value, [updateData.name]: updateData.value };
+	}
+}
+
 function handleChangeCredential(updateData: INodeUpdatePropertiesInformation) {
 	if (node.value) {
 		node.value = {
@@ -276,6 +314,7 @@ onBeforeUnmount(() => {
 		:center="true"
 		max-width="90vw"
 		min-height="250px"
+		max-height="650px"
 		:class="$style.modal"
 	>
 		<template #header>
@@ -296,23 +335,63 @@ onBeforeUnmount(() => {
 			</div>
 		</template>
 		<template #content>
-			<ParameterInputList
-				:parameters="parameters"
-				:hide-delete="true"
-				:node-values="node.parameters"
-				:is-read-only="false"
-				:node="node"
-				@value-changed="handleChangeParameter"
-			>
-				<NodeCredentials
-					:node="node"
-					:readonly="false"
-					:show-all="true"
-					:hide-issues="false"
-					@credential-selected="handleChangeCredential"
-					@value-changed="handleChangeParameter"
-				/>
-			</ParameterInputList>
+			<N8nTabs
+				:model-value="activeTab"
+				:options="tabOptions"
+				:class="$style.tabs"
+				@update:model-value="activeTab = $event"
+			/>
+
+			<div :class="$style.tabContent">
+				<!-- Parameters Tab -->
+				<div v-show="activeTab === 'params'">
+					<ParameterInputList
+						:parameters="parametersByTab.params"
+						:hide-delete="true"
+						:node-values="node.parameters"
+						:is-read-only="false"
+						:node="node"
+						@value-changed="handleChangeParameter"
+					>
+						<NodeCredentials
+							:node="node"
+							:readonly="false"
+							:show-all="true"
+							:hide-issues="false"
+							@credential-selected="handleChangeCredential"
+							@value-changed="handleChangeParameter"
+						/>
+					</ParameterInputList>
+					<div v-if="showNoParametersNotice" :class="$style.noParameters">
+						<N8nText>
+							{{ i18n.baseText('nodeSettings.thisNodeDoesNotHaveAnyParameters') }}
+						</N8nText>
+					</div>
+				</div>
+
+				<!-- Settings Tab -->
+				<div v-show="activeTab === 'settings'">
+					<ParameterInputList
+						v-if="parametersByTab.settings.length > 0"
+						:parameters="parametersByTab.settings"
+						:node-values="settingsNodeValues"
+						:is-read-only="false"
+						:hide-delete="true"
+						path="parameters"
+						:node="node"
+						@value-changed="handleChangeSettingsValue"
+					/>
+					<ParameterInputList
+						:parameters="nodeSettings"
+						:hide-delete="true"
+						:node-values="settingsNodeValues"
+						:is-read-only="false"
+						path=""
+						:node="node"
+						@value-changed="handleChangeSettingsValue"
+					/>
+				</div>
+			</div>
 		</template>
 		<template #footer>
 			<div :class="$style.footer">
@@ -337,10 +416,31 @@ onBeforeUnmount(() => {
 		padding: var(--spacing--sm) var(--spacing--md);
 	}
 
+	:global(.modal-content) {
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+	}
+
 	/* don't show "This node must be connected to an AI agent." */
 	:global(.ndv-connection-hint-notice) {
 		display: none;
 	}
+}
+
+.tabs {
+	flex-shrink: 0;
+	margin-bottom: var(--spacing--xs);
+}
+
+.noParameters {
+	margin-top: var(--spacing--xs);
+}
+
+.tabContent {
+	flex: 1;
+	overflow-y: auto;
+	min-height: 0;
 }
 
 .footer {

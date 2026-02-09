@@ -107,6 +107,23 @@ function findNodeDir(
 			return { nodesPath, nodeDir };
 		}
 	}
+
+	// Tool variant fallback: e.g. "httpRequestTool" -> "httpRequest"
+	// Tool variants share type definitions with their base node
+	if (parsed.nodeName.endsWith('Tool')) {
+		const baseName = parsed.nodeName.slice(0, -4);
+		for (const nodesPath of nodesPaths) {
+			const nodeDir = join(nodesPath, parsed.packageName, baseName);
+			if (existsSync(nodeDir)) {
+				debugLog('Found node dir via Tool variant fallback', {
+					original: parsed.nodeName,
+					resolved: baseName,
+				});
+				return { nodesPath, nodeDir };
+			}
+		}
+	}
+
 	return null;
 }
 

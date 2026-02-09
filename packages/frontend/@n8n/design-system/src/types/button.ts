@@ -10,7 +10,7 @@ export type ButtonVariant = (typeof BUTTON_VARIANT)[number];
 /** @deprecated Use 'ghost' or 'subtle' instead */
 export type LegacyButtonVariant = 'highlight' | 'highlight-fill';
 
-const BUTTON_SIZE = ['mini', 'xmini', 'small', 'medium', 'large', 'xsmall'] as const;
+const BUTTON_SIZE = ['mini', 'xmini', 'small', 'medium', 'large', 'xlarge', 'xsmall'] as const;
 export type ButtonSize = (typeof BUTTON_SIZE)[number];
 
 export interface ButtonProps {

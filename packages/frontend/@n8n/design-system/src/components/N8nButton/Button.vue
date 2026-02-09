@@ -199,13 +199,20 @@ const handleClick = (event: MouseEvent) => {
 	}
 
 	&.medium {
-		--button--height: 2.25rem;
+		--button--height: 2rem;
 		--button--padding: 0 var(--spacing--xs);
 		--button--radius: var(--radius--xs);
 		--button--font-size: var(--font-size--sm);
 	}
 
 	&.large {
+		--button--height: 2.25rem;
+		--button--padding: 0 var(--spacing--sm);
+		--button--radius: var(--radius--xs);
+		--button--font-size: var(--font-size--md);
+	}
+
+	&.xlarge {
 		--button--height: 2.5rem;
 		--button--padding: 0 var(--spacing--sm);
 		--button--radius: var(--radius--xs);
@@ -347,6 +354,12 @@ const handleClick = (event: MouseEvent) => {
 	align-items: center;
 	justify-content: center;
 	gap: var(--spacing--3xs);
+	white-space: nowrap;
+
+	/** NOTE (@heymynameisrob): Covers legacy prop label which wraps in span **/
+	> span {
+		white-space: nowrap;
+	}
 }
 
 .loading-container + .button-inner {

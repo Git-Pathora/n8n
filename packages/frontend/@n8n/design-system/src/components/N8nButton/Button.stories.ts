@@ -13,7 +13,7 @@ const meta = {
 		},
 		size: {
 			control: 'select',
-			options: ['xsmall', 'small', 'medium', 'large'],
+			options: ['xsmall', 'small', 'medium', 'large', 'xlarge'],
 		},
 		loading: {
 			control: 'boolean',
@@ -91,6 +91,8 @@ export const Size: Story = {
 				<N8nButton variant="solid" size="xsmall">XSmall</N8nButton>
 				<N8nButton variant="solid" size="small">Small</N8nButton>
 				<N8nButton variant="solid" size="medium">Medium</N8nButton>
+				<N8nButton variant="solid" size="large">Large</N8nButton>
+				<N8nButton variant="solid" size="xlarge">XLarge</N8nButton>
 			</div>
 		</div>
 		`,

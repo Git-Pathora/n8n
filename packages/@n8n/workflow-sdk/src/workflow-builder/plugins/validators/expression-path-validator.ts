@@ -145,6 +145,18 @@ function validateNodePath(
 }
 
 /**
+ * Unwrap the `json` property from an n8n output item.
+ * Output items are stored as `{ json: { field: value } }` but expressions
+ * reference fields directly (e.g. `$json.field`), so we need to unwrap.
+ */
+function unwrapItemJson(item: Record<string, unknown>): Record<string, unknown> {
+	if ('json' in item && typeof item.json === 'object' && item.json !== null) {
+		return item.json as Record<string, unknown>;
+	}
+	return item;
+}
+
+/**
  * Validator for expression paths.
  *
  * Checks for:
@@ -178,7 +190,7 @@ export const expressionPathValidator: ValidatorPlugin = {
 		for (const [mapKey, graphNode] of ctx.nodes) {
 			const output = graphNode.instance.config?.output;
 			if (output && output.length > 0) {
-				outputShapes.set(mapKey, output[0] as Record<string, unknown>);
+				outputShapes.set(mapKey, unwrapItemJson(output[0] as Record<string, unknown>));
 			}
 		}
 
@@ -187,7 +199,7 @@ export const expressionPathValidator: ValidatorPlugin = {
 			if (!outputShapes.has(mapKey)) {
 				const nodePinData = graphNode.instance.config?.pinData;
 				if (nodePinData && nodePinData.length > 0) {
-					outputShapes.set(mapKey, nodePinData[0] as Record<string, unknown>);
+					outputShapes.set(mapKey, unwrapItemJson(nodePinData[0] as Record<string, unknown>));
 				}
 			}
 		}
@@ -197,7 +209,7 @@ export const expressionPathValidator: ValidatorPlugin = {
 			for (const [nodeName, pinData] of Object.entries(ctx.pinData)) {
 				// Only use pinData if we don't already have output from config
 				if (!outputShapes.has(nodeName) && pinData.length > 0) {
-					outputShapes.set(nodeName, pinData[0] as Record<string, unknown>);
+					outputShapes.set(nodeName, unwrapItemJson(pinData[0] as Record<string, unknown>));
 				}
 			}
 		}

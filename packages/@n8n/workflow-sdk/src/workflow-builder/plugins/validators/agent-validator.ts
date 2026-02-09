@@ -58,7 +58,7 @@ export const agentValidator: ValidatorPlugin = {
 
 		// Check: No system message
 		const options = params.options as Record<string, unknown> | undefined;
-		const systemMessage = options?.systemMessage;
+		const systemMessage = options?.systemMessage ?? params.systemMessage;
 		if (
 			!systemMessage ||
 			(typeof systemMessage === 'string' && systemMessage.trim().length === 0)

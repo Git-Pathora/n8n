@@ -184,6 +184,54 @@ describe('expressionPathValidator', () => {
 			expect(issues).toHaveLength(0);
 		});
 
+		it('returns no warning when output has json wrapper and field exists inside it', () => {
+			const setNode = createMockNode('n8n-nodes-base.set', 'Set', {
+				output: [{ json: { processedField: 'value' } }] as unknown as IDataObject[],
+			});
+			const setConns = new Map<string, Map<number, ConnectionTarget[]>>();
+			setConns.set('main', new Map([[0, [conn('Consumer', 0)]]]));
+			const setGraph = createGraphNode(setNode, setConns);
+
+			const consumerNode = createMockNode('n8n-nodes-base.httpRequest', 'Consumer', {
+				parameters: { url: '={{ $json.processedField }}' },
+			});
+			const consumerGraph = createGraphNode(consumerNode);
+
+			const nodes = new Map<string, GraphNode>();
+			nodes.set('Set', setGraph);
+			nodes.set('Consumer', consumerGraph);
+
+			const ctx = createMockPluginContext(nodes);
+			const issues = expressionPathValidator.validateWorkflow!(ctx);
+
+			expect(issues).toHaveLength(0);
+		});
+
+		it('returns no warning when ctx.pinData has json wrapper', () => {
+			const triggerNode = createMockNode('n8n-nodes-base.manualTrigger', 'Trigger');
+			const triggerConns = new Map<string, Map<number, ConnectionTarget[]>>();
+			triggerConns.set('main', new Map([[0, [conn('Consumer', 0)]]]));
+			const triggerGraph = createGraphNode(triggerNode, triggerConns);
+
+			const consumerNode = createMockNode('n8n-nodes-base.set', 'Consumer', {
+				parameters: { value: '={{ $json.name }}' },
+			});
+			const consumerGraph = createGraphNode(consumerNode);
+
+			const nodes = new Map<string, GraphNode>();
+			nodes.set('Trigger', triggerGraph);
+			nodes.set('Consumer', consumerGraph);
+
+			const pinData = {
+				Trigger: [{ json: { name: 'John' } }] as unknown as IDataObject[],
+			};
+
+			const ctx = createMockPluginContext(nodes, pinData);
+			const issues = expressionPathValidator.validateWorkflow!(ctx);
+
+			expect(issues).toHaveLength(0);
+		});
+
 		it('validates $("NodeName").item.json.field references', () => {
 			const triggerNode = createMockNode('n8n-nodes-base.manualTrigger', 'Trigger');
 			const triggerGraph = createGraphNode(triggerNode);

@@ -145,6 +145,21 @@ describe('agentValidator', () => {
 			expect(issues.filter((i) => i.code === 'AGENT_NO_SYSTEM_MESSAGE')).toHaveLength(0);
 		});
 
+		it('returns no AGENT_NO_SYSTEM_MESSAGE warning when systemMessage is at top level of params', () => {
+			const node = createMockNode('@n8n/n8n-nodes-langchain.agent', {
+				parameters: {
+					promptType: 'define',
+					text: '={{ $json.input }}',
+					systemMessage: 'You are a helpful assistant.',
+				},
+			});
+			const ctx = createMockPluginContext();
+
+			const issues = agentValidator.validateNode(node, createGraphNode(node), ctx);
+
+			expect(issues.filter((i) => i.code === 'AGENT_NO_SYSTEM_MESSAGE')).toHaveLength(0);
+		});
+
 		it('returns no issues when promptType is auto', () => {
 			const node = createMockNode('@n8n/n8n-nodes-langchain.agent', {
 				parameters: { promptType: 'auto' },

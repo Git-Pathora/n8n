@@ -1,7 +1,8 @@
 <script lang="ts" setup>
 import { computed, nextTick, onMounted, watch } from 'vue';
 import { useI18n } from '@n8n/i18n';
-import { TEMPLATE_SETUP_EXPERIENCE } from '@/app/constants';
+import { SETUP_CREDENTIALS_MODAL_KEY, TEMPLATE_SETUP_EXPERIENCE } from '@/app/constants';
+import { useUIStore } from '@/app/stores/ui.store';
 import { useNodeTypesStore } from '@/app/stores/nodeTypes.store';
 import { useFocusPanelStore } from '@/app/stores/focusPanel.store';
 import { useWorkflowsStore } from '@/app/stores/workflows.store';
@@ -12,13 +13,16 @@ import { usePostHog } from '@/app/stores/posthog.store';
 import { injectWorkflowState } from '@/app/composables/useWorkflowState';
 import { useReadyToRunStore } from '@/features/workflows/readyToRun/stores/readyToRun.store';
 import { useRoute } from 'vue-router';
+import { useSetupPanelStore } from '@/features/setupPanel/setupPanel.store';
 
 const workflowsStore = useWorkflowsStore();
 const readyToRunStore = useReadyToRunStore();
 const workflowState = injectWorkflowState();
 const nodeTypesStore = useNodeTypesStore();
 const posthogStore = usePostHog();
+const uiStore = useUIStore();
 const focusPanelStore = useFocusPanelStore();
+const setupPanelStore = useSetupPanelStore();
 const i18n = useI18n();
 const route = useRoute();
 
@@ -53,6 +57,10 @@ const isNewTemplatesSetupEnabled = computed(() => {
 	);
 });
 
+const isSetupPanelFeatureEnabled = computed(() => {
+	return setupPanelStore.isFeatureEnabled;
+});
+
 const unsubscribe = watch(allCredentialsFilled, (newValue) => {
 	if (newValue) {
 		workflowState.addToWorkflowMetadata({
@@ -66,6 +74,18 @@ const unsubscribe = watch(allCredentialsFilled, (newValue) => {
 const openSetupPanel = () => {
 	focusPanelStore.setSelectedTab('setup');
 	focusPanelStore.openFocusPanel();
+};
+
+const openSetupModal = () => {
+	uiStore.openModal(SETUP_CREDENTIALS_MODAL_KEY);
+};
+
+const handleTemplateSetup = () => {
+	if (isSetupPanelFeatureEnabled.value) {
+		openSetupPanel();
+	} else if (isNewTemplatesSetupEnabled.value) {
+		openSetupModal();
+	}
 };
 
 onMounted(async () => {
@@ -82,7 +102,7 @@ onMounted(async () => {
 		!isReadyToRunWorkflow &&
 		isTemplateImportRoute.value
 	) {
-		openSetupPanel();
+		handleTemplateSetup();
 	}
 });
 </script>
@@ -95,6 +115,6 @@ onMounted(async () => {
 		size="large"
 		icon="package-open"
 		type="secondary"
-		@click="openSetupPanel()"
+		@click="handleTemplateSetup()"
 	/>
 </template>

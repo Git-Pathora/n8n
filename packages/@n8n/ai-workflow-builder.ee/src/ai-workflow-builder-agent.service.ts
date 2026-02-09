@@ -359,7 +359,7 @@ export class AiWorkflowBuilderService {
 		const threadId = SessionManagerService.generateThreadId(workflowId, userId);
 
 		// extract the last message that was sent to the user for telemetry
-		const lastAiMessage = state.values.messages.findLast(
+		const lastAiMessage = state?.values?.messages?.findLast(
 			(m: BaseMessage): m is AIMessage => m instanceof AIMessage,
 		);
 		const messageAi =
@@ -367,7 +367,8 @@ export class AiWorkflowBuilderService {
 				? lastAiMessage.content
 				: JSON.stringify(lastAiMessage?.content ?? '');
 
-		const toolMessages = state.values.messages.filter(
+		const messages = state?.values?.messages ?? [];
+		const toolMessages = messages.filter(
 			(m: BaseMessage): m is ToolMessage => m instanceof ToolMessage,
 		);
 		const toolsCalled = [
@@ -386,10 +387,10 @@ export class AiWorkflowBuilderService {
 			sequence_id: threadId,
 			message_ai: messageAi,
 			tools_called: toolsCalled,
-			techniques_categories: state.values.techniqueCategories,
-			validations: state.values.validationHistory,
+			techniques_categories: state?.values?.techniqueCategories,
+			validations: state?.values?.validationHistory,
 			// Only include templates_selected when templates were actually used
-			...(state.values.templateIds.length > 0 && {
+			...((state?.values?.templateIds?.length ?? 0) > 0 && {
 				templates_selected: state.values.templateIds,
 			}),
 			user_message_id: userMessageId,

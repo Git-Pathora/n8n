@@ -10,9 +10,8 @@ import { InterpreterError } from './errors';
 /**
  * Parse SDK code into an AST.
  *
- * The SDK code may contain `return` statements at the top level,
- * which is not valid in a regular script. We use `allowReturnOutsideFunction`
- * to allow this, treating the code as if it were inside an implicit function body.
+ * The SDK code uses `export default` to return the workflow builder result.
+ * We parse as a module to support this syntax.
  *
  * @param code - The JavaScript code to parse
  * @returns An ESTree-compliant Program AST
@@ -23,9 +22,8 @@ export function parseSDKCode(code: string): Program {
 		// Acorn's AST is compatible with ESTree, but TypeScript doesn't know that
 		return acorn.parse(code, {
 			ecmaVersion: 'latest',
-			sourceType: 'script', // SDK code is not a module
+			sourceType: 'module',
 			locations: true, // Include line/column info for error messages
-			allowReturnOutsideFunction: true, // Allow return statements at top level
 		}) as unknown as Program;
 	} catch (error) {
 		if (error instanceof SyntaxError) {

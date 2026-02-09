@@ -363,7 +363,7 @@ describe('Deterministic Node ID Generation', () => {
 			const code = `
 const start = trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: { name: 'Start' } });
 const wf = workflow('existing-workflow', 'Existing');
-return wf.add(start);
+export default wf.add(start);
 			`;
 			const builder = parseWorkflowCodeToBuilder(code);
 

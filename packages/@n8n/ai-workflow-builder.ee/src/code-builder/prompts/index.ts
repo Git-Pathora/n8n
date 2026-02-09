@@ -122,7 +122,7 @@ const processData = node({{
 }});
 
 // 2. Compose workflow
-return workflow('id', 'name')
+export default workflow('id', 'name')
   .add(startTrigger.to(fetchData.to(processData)));
 \`\`\`
 
@@ -151,7 +151,7 @@ const combineResults = merge({{
   version: 3.2,
   config: {{ name: 'Combine Results', parameters: {{ mode: 'combine', combineBy: 'combineByPosition' }} }}
 }});
-return workflow('id', 'name')
+export default workflow('id', 'name')
   .add(startTrigger.to(sourceA.to(combineResults.input(0))))
   .add(startTrigger.to(sourceB.to(combineResults.input(1))))
   .add(combineResults.to(processResults));
@@ -164,7 +164,7 @@ const allResults = merge({{
   version: 3.2,
   config: {{ name: 'All Results', parameters: {{ mode: 'append' }} }}
 }});
-return workflow('id', 'name')
+export default workflow('id', 'name')
   .add(startTrigger.to(sourceA.to(allResults.input(0))))
   .add(startTrigger.to(sourceB.to(allResults.input(1))))
   .add(allResults.to(processResults));
@@ -180,7 +180,7 @@ return workflow('id', 'name')
 // Assume other nodes are declared
 const checkValid = ifElse({{ version: 2.2, config: {{ name: 'Check Valid', parameters: {{...}} }} }});
 
-return workflow('id', 'name')
+export default workflow('id', 'name')
   .add(startTrigger.to(checkValid
     .onTrue(formatData.to(enrichData.to(saveToDb)))  // Chain 3 nodes on true branch
     .onFalse(logError)));
@@ -194,7 +194,7 @@ return workflow('id', 'name')
 // Assume other nodes are declared
 const routeByPriority = switchCase({{ version: 3.2, config: {{ name: 'Route by Priority', parameters: {{...}} }} }});
 
-return workflow('id', 'name')
+export default workflow('id', 'name')
   .add(startTrigger.to(routeByPriority
     .onCase(0, processUrgent.to(notifyTeam.to(escalate)))  // Chain of 3 nodes
     .onCase(1, processNormal)
@@ -221,7 +221,7 @@ const branch2 = node({{ type: 'n8n-nodes-base.httpRequest', ... }});
 const processResults = node({{ type: 'n8n-nodes-base.set', ... }});
 
 // Connect branches to specific merge inputs using .input(n)
-return workflow('id', 'name')
+export default workflow('id', 'name')
   .add(trigger({{ ... }}).to(branch1.to(combineResults.input(0))))  // Connect to input 0
   .add(trigger({{ ... }}).to(branch2.to(combineResults.input(1))))  // Connect to input 1
   .add(combineResults.to(processResults));  // Process merged results
@@ -261,7 +261,7 @@ const processRecord = node({{
 
 const sibNode = splitInBatches({{ version: 3, config: {{ name: 'Batch Process', parameters: {{ batchSize: 10 }}, position: [840, 300] }} }});
 
-return workflow('id', 'name')
+export default workflow('id', 'name')
   .add(startTrigger.to(fetchRecords.to(sibNode
     .onDone(finalizeResults)
     .onEachBatch(processRecord.to(nextBatch(sibNode)))
@@ -300,7 +300,7 @@ const processSchedule = node({{
   output: [{{ scheduled: true }}]
 }});
 
-return workflow('id', 'name')
+export default workflow('id', 'name')
   .add(webhookTrigger.to(processWebhook))
   .add(scheduleTrigger.to(processSchedule));
 \`\`\`
@@ -341,7 +341,7 @@ const sendNotification = node({{
   output: [{{ ok: true }}]
 }});
 
-return workflow('id', 'name')
+export default workflow('id', 'name')
   .add(webhookTrigger.to(processData))
   .add(scheduleTrigger.to(processData))
   .add(processData.to(sendNotification));
@@ -376,7 +376,7 @@ const aiAgent = node({{
   output: [{{ output: 'AI response text' }}]
 }});
 
-return workflow('ai-assistant', 'AI Assistant')
+export default workflow('ai-assistant', 'AI Assistant')
   .add(startTrigger.to(aiAgent));
 \`\`\`
 
@@ -420,7 +420,7 @@ const aiAgent = node({{
   output: [{{ output: '42' }}]
 }});
 
-return workflow('ai-calculator', 'AI Calculator')
+export default workflow('ai-calculator', 'AI Calculator')
   .add(startTrigger.to(aiAgent));
 \`\`\`
 
@@ -473,7 +473,7 @@ const aiAgent = node({{
   output: [{{ output: 'Email sent successfully' }}]
 }});
 
-return workflow('ai-email', 'AI Email Sender')
+export default workflow('ai-email', 'AI Email Sender')
   .add(startTrigger.to(aiAgent));
 \`\`\`
 </ai_agent_with_from_ai>
@@ -505,7 +505,7 @@ const aiAgent = node({{
   output: [{{ sentiment: 'positive', confidence: 0.95, summary: 'The text expresses satisfaction' }}]
 }});
 
-return workflow('ai-sentiment', 'AI Sentiment Analyzer')
+export default workflow('ai-sentiment', 'AI Sentiment Analyzer')
   .add(startTrigger.to(aiAgent));
 \`\`\`
 </ai_agent_with_structured_output>`;

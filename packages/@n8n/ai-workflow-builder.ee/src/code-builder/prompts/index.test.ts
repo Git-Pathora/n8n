@@ -41,7 +41,7 @@ describe('buildCodeBuilderPrompt', () => {
 
 			const customCode = `// Custom pre-generated code
 const start = trigger({ type: 'n8n-nodes-base.manualTrigger' });
-return workflow('', 'Test').add(start);`;
+export default workflow('', 'Test').add(start);`;
 
 			const prompt = buildCodeBuilderPrompt(workflow, undefined, {
 				preGeneratedCode: customCode,

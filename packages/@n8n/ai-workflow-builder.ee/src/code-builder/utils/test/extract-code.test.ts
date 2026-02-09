@@ -10,19 +10,19 @@ const start = trigger({
   version: 1,
   config: { name: 'Start' }
 });
-return workflow('test', 'Test').add(start);
+export default workflow('test', 'Test').add(start);
 \`\`\``;
 
 		const code = extractWorkflowCode(response);
 		expect(code).toContain('const start = trigger');
-		expect(code).toContain("return workflow('test', 'Test').add(start);");
+		expect(code).toContain("export default workflow('test', 'Test').add(start);");
 		expect(code).not.toContain('```');
 	});
 
 	it('should extract code from ts code block', () => {
 		const response = `\`\`\`ts
 const start = trigger({...});
-return workflow('test', 'Test').add(start);
+export default workflow('test', 'Test').add(start);
 \`\`\``;
 
 		const code = extractWorkflowCode(response);
@@ -33,7 +33,7 @@ return workflow('test', 'Test').add(start);
 	it('should extract code from javascript code block', () => {
 		const response = `\`\`\`javascript
 const start = trigger({...});
-return workflow('test', 'Test').add(start);
+export default workflow('test', 'Test').add(start);
 \`\`\``;
 
 		const code = extractWorkflowCode(response);
@@ -44,7 +44,7 @@ return workflow('test', 'Test').add(start);
 	it('should extract code from js code block', () => {
 		const response = `\`\`\`js
 const start = trigger({...});
-return workflow('test', 'Test').add(start);
+export default workflow('test', 'Test').add(start);
 \`\`\``;
 
 		const code = extractWorkflowCode(response);
@@ -55,7 +55,7 @@ return workflow('test', 'Test').add(start);
 	it('should extract code from code block without language tag', () => {
 		const response = `\`\`\`
 const start = trigger({...});
-return workflow('test', 'Test').add(start);
+export default workflow('test', 'Test').add(start);
 \`\`\``;
 
 		const code = extractWorkflowCode(response);
@@ -65,11 +65,11 @@ return workflow('test', 'Test').add(start);
 
 	it('should return trimmed response if no code block found', () => {
 		const response = `  const start = trigger({...});
-return workflow('test', 'Test').add(start);  `;
+export default workflow('test', 'Test').add(start);  `;
 
 		const code = extractWorkflowCode(response);
 		expect(code).toBe(`const start = trigger({...});
-return workflow('test', 'Test').add(start);`);
+export default workflow('test', 'Test').add(start);`);
 	});
 
 	it('should handle response with text before and after code block', () => {
@@ -82,7 +82,7 @@ const start = trigger({
   config: { name: 'Start', position: [240, 300] }
 });
 
-return workflow('hello-world', 'Hello World')
+export default workflow('hello-world', 'Hello World')
   .add(start);
 \`\`\`
 
@@ -128,7 +128,7 @@ const start = trigger({
 import { workflow, node, trigger } from '@n8n/workflow-sdk';
 
 const start = trigger({...});
-return workflow('test', 'Test').add(start);
+export default workflow('test', 'Test').add(start);
 \`\`\``;
 
 		const code = extractWorkflowCode(response);
@@ -158,7 +158,7 @@ describe('stripImportStatements', () => {
 		const code = `${SDK_IMPORT_STATEMENT}
 
 const start = trigger({...});
-return workflow('test', 'Test').add(start);`;
+export default workflow('test', 'Test').add(start);`;
 
 		const result = stripImportStatements(code);
 		expect(result).not.toContain('import');
@@ -209,7 +209,7 @@ const start = trigger({...});`;
 
 	it('should handle code with no imports', () => {
 		const code = `const start = trigger({...});
-return workflow('test', 'Test').add(start);`;
+export default workflow('test', 'Test').add(start);`;
 
 		const result = stripImportStatements(code);
 		expect(result).toBe(code);

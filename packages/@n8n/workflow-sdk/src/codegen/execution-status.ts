@@ -41,7 +41,7 @@ export function buildNodeExecutionStatus(
 
 /**
  * Format workflow-level execution status as JSDoc content.
- * Returns content for JSDoc above return workflow() statement.
+ * Returns content for JSDoc above export default workflow() statement.
  */
 export function formatExecutionStatusJSDoc(data?: ExecutionResultData): string {
 	if (!data) return '';

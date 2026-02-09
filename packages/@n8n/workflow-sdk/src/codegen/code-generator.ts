@@ -1313,10 +1313,10 @@ export function generateCode(
 	}
 
 	if (workflowCalls.length > 0) {
-		lines.push('return wf');
+		lines.push('export default wf');
 		lines.push(...workflowCalls);
 	} else {
-		lines.push('return wf');
+		lines.push('export default wf');
 	}
 
 	return lines.join('\n');

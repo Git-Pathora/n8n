@@ -34,7 +34,7 @@ describe('codegen index', () => {
 
 			expect(code).toContain("const wf = workflow('test-workflow-id', 'Test Workflow')");
 			expect(code).toContain('.add(');
-			expect(code).toContain('return wf');
+			expect(code).toContain('export default wf');
 			expect(code).not.toContain('.toJSON();');
 		});
 
@@ -136,7 +136,7 @@ describe('codegen index', () => {
 
 			// Empty string for undefined ID (preserves original for roundtrip)
 			expect(code).toContain("const wf = workflow('', 'Empty')");
-			expect(code).toContain('return wf');
+			expect(code).toContain('export default wf');
 			expect(code).not.toContain('.toJSON();');
 		});
 

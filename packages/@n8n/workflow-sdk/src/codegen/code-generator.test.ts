@@ -32,8 +32,8 @@ describe('code-generator', () => {
 
 				// Should start with const wf = workflow(...)
 				expect(code).toMatch(/^const wf = workflow\(/);
-				// Should end with return wf
-				expect(code.trim()).toMatch(/return wf$/);
+				// Should end with export default wf
+				expect(code.trim()).toMatch(/export default wf$/);
 			});
 
 			it('does not end with .toJSON()', () => {
@@ -71,7 +71,7 @@ describe('code-generator', () => {
 				expect(code).toContain("'Single Trigger'");
 				expect(code).toContain('trigger({');
 				expect(code).toContain("type: 'n8n-nodes-base.manualTrigger'");
-				expect(code).toContain('return wf');
+				expect(code).toContain('export default wf');
 			});
 
 			it('always includes config property even when empty', () => {
@@ -570,7 +570,7 @@ describe('code-generator', () => {
 
 				expect(code).toContain("const wf = workflow('");
 				expect(code).toContain("'Empty'");
-				expect(code).toContain('return wf');
+				expect(code).toContain('export default wf');
 			});
 		});
 
@@ -592,7 +592,7 @@ describe('code-generator', () => {
 				expect(code).toContain("const wf = workflow('settings-test', 'Settings Test',");
 				expect(code).toContain("timezone: 'America/New_York'");
 				expect(code).toContain("executionOrder: 'v1'");
-				expect(code).toContain('return wf');
+				expect(code).toContain('export default wf');
 			});
 
 			it('omits settings when empty', () => {
@@ -621,7 +621,7 @@ describe('code-generator', () => {
 				const code = generateFromWorkflow(json);
 
 				expect(code).toContain("const wf = workflow('undefined-settings', 'Undefined Settings')");
-				expect(code).toContain('return wf');
+				expect(code).toContain('export default wf');
 			});
 		});
 
@@ -2750,7 +2750,7 @@ describe('code-generator', () => {
 				expect(code).toMatch(/assignments:\s*\{[\s\S]*?\}\s*,\s*\n/);
 			});
 
-			it('adds workflow-level execution status JSDoc above return workflow()', () => {
+			it('adds workflow-level execution status JSDoc above export default workflow()', () => {
 				const json: WorkflowJSON = {
 					name: 'Test',
 					nodes: [
@@ -2773,9 +2773,9 @@ describe('code-generator', () => {
 
 				const code = generateCode(tree, json, graph, { workflowStatusJSDoc });
 
-				// JSDoc should appear before return wf
+				// JSDoc should appear before export default wf
 				expect(code).toMatch(
-					/\/\*\*[\s\S]*@lastExecuted "Trigger"[\s\S]*@workflowExecutionStatus success[\s\S]*\*\/\s*return wf/,
+					/\/\*\*[\s\S]*@lastExecuted "Trigger"[\s\S]*@workflowExecutionStatus success[\s\S]*\*\/\s*export default wf/,
 				);
 			});
 		});

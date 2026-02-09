@@ -699,7 +699,7 @@ const finalizeNode = node({
 	config: { name: 'Finalize' },
 });
 
-return workflow('test-id', 'Test')
+export default workflow('test-id', 'Test')
 	.add(trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: {} })
 		.to(splitInBatches(sibNode)
 			.onDone(finalizeNode)
@@ -904,7 +904,7 @@ const splitVideos = splitInBatches({
 });
 
 // Compose workflow with loop
-return workflow('eval-1769451317134-scv1mk1th', 'YouTube Shorts Auto-Publisher')
+export default workflow('eval-1769451317134-scv1mk1th', 'YouTube Shorts Auto-Publisher')
   .add(scheduleTrigger
     .to(createBatchItems)
     .to(splitVideos

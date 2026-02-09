@@ -823,7 +823,7 @@ describe('parseWorkflowCode', () => {
 			// This code has unescaped single quotes inside single-quoted strings
 			// The parser should automatically escape them
 			const codeWithUnescapedQuotes = `
-return workflow('test-id', 'Test Workflow')
+export default workflow('test-id', 'Test Workflow')
   .add(trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: {} })
   .to(node({ type: 'n8n-nodes-base.set', version: 3.4, config: {
     parameters: {
@@ -859,7 +859,7 @@ return workflow('test-id', 'Test Workflow')
 
 		it('should handle multiple node references in the same string', () => {
 			const code = `
-return workflow('test-id', 'Test Workflow')
+export default workflow('test-id', 'Test Workflow')
   .add(trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: {} })
   .to(node({ type: 'n8n-nodes-base.set', version: 3.4, config: {
     parameters: {
@@ -878,7 +878,7 @@ return workflow('test-id', 'Test Workflow')
 		it('should not double-escape already escaped quotes', () => {
 			// Code with already-escaped quotes should not be double-escaped
 			const codeWithEscapedQuotes = `
-return workflow('test-id', 'Test Workflow')
+export default workflow('test-id', 'Test Workflow')
   .add(trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: {} })
   .to(node({ type: 'n8n-nodes-base.set', version: 3.4, config: {
     parameters: {
@@ -897,7 +897,7 @@ return workflow('test-id', 'Test Workflow')
 		it('should preserve double-quoted strings unchanged', () => {
 			// Node references in double-quoted strings don't need escaping
 			const code = `
-return workflow('test-id', 'Test Workflow')
+export default workflow('test-id', 'Test Workflow')
   .add(trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: {} })
   .to(node({ type: 'n8n-nodes-base.set', version: 3.4, config: {
     parameters: {
@@ -915,7 +915,7 @@ return workflow('test-id', 'Test Workflow')
 
 		it('should handle node names with spaces and special characters', () => {
 			const code = `
-return workflow('test-id', 'Test Workflow')
+export default workflow('test-id', 'Test Workflow')
   .add(trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: {} })
   .to(node({ type: 'n8n-nodes-base.set', version: 3.4, config: {
     parameters: {
@@ -935,7 +935,7 @@ return workflow('test-id', 'Test Workflow')
 			// LLMs sometimes generate $(\\'NodeName\\') with double-escaped backslashes
 			// In a template literal, \\\\ produces \\, so the actual string chars are $( + \ + \ + '
 			const code = `
-return workflow('test-id', 'Test Workflow')
+export default workflow('test-id', 'Test Workflow')
   .add(trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: {} })
   .to(node({ type: 'n8n-nodes-base.set', version: 3.4, config: {
     parameters: {
@@ -953,7 +953,7 @@ return workflow('test-id', 'Test Workflow')
 
 		it('should fix multiple double-escaped $() references in the same string', () => {
 			const code = `
-return workflow('test-id', 'Test Workflow')
+export default workflow('test-id', 'Test Workflow')
   .add(trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: {} })
   .to(node({ type: 'n8n-nodes-base.set', version: 3.4, config: {
     parameters: {
@@ -973,7 +973,7 @@ return workflow('test-id', 'Test Workflow')
 	describe('parses placeholder() in workflow code', () => {
 		it('should parse code with placeholder() in parameters', () => {
 			const code = `
-return workflow('test-id', 'Test Workflow')
+export default workflow('test-id', 'Test Workflow')
   .add(trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: {} })
   .to(node({ type: 'n8n-nodes-base.slack', version: 2.2, config: {
     name: 'Send Slack Message',
@@ -1043,7 +1043,7 @@ return workflow('test-id', 'Test Workflow')
 	describe('parses newCredential() in workflow code', () => {
 		it('should parse code with newCredential() in credentials', () => {
 			const code = `
-return workflow('test-id', 'Test Workflow')
+export default workflow('test-id', 'Test Workflow')
   .add(trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: {} })
   .to(node({ type: 'n8n-nodes-base.slack', version: 2.2, config: {
     name: 'Send Slack Message',
@@ -1063,7 +1063,7 @@ return workflow('test-id', 'Test Workflow')
 
 		it('should parse code with multiple newCredential() calls', () => {
 			const code = `
-return workflow('test-id', 'Test Workflow')
+export default workflow('test-id', 'Test Workflow')
   .add(trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: {} })
   .to(node({ type: 'n8n-nodes-base.httpRequest', version: 4.2, config: {
     name: 'HTTP Request',
@@ -1082,7 +1082,7 @@ return workflow('test-id', 'Test Workflow')
 
 		it('should parse code with newCredential() mixed with regular credentials', () => {
 			const code = `
-return workflow('test-id', 'Test Workflow')
+export default workflow('test-id', 'Test Workflow')
   .add(trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: {} })
   .to(node({ type: 'n8n-nodes-base.httpRequest', version: 4.2, config: {
     name: 'HTTP Request',
@@ -1103,7 +1103,7 @@ return workflow('test-id', 'Test Workflow')
 
 		it('should parse AI agent with newCredential() on subnode', () => {
 			const code = `
-return workflow('test-id', 'AI Agent')
+export default workflow('test-id', 'AI Agent')
   .add(trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: {} })
   .to(node({
     type: '@n8n/n8n-nodes-langchain.agent',
@@ -1227,7 +1227,7 @@ const tagAsFeature = node({
   }
 });
 
-return workflow('AlNAxHXOpfimqHPOGVuNg', 'My workflow 23')
+export default workflow('AlNAxHXOpfimqHPOGVuNg', 'My workflow 23')
   .add(
     trigger({
       type: 'n8n-nodes-base.manualTrigger',
@@ -1514,7 +1514,7 @@ const editingSticky = sticky(
 );
 
 // Build the workflow
-return workflow('test-multi-sticky', 'Multi-Agent Research Workflow')
+export default workflow('test-multi-sticky', 'Multi-Agent Research Workflow')
   .add(startTrigger.to(setTopic).to(researchAgent).to(factCheckAgent).to(writingAgent).to(editingAgent))
   .add(researchSticky)
   .add(factCheckSticky)
@@ -1561,7 +1561,7 @@ const sticky1 = sticky('## Section 1\\n\\nFirst section', { color: 1, position: 
 const sticky2 = sticky('## Section 2\\n\\nSecond section', { color: 2, position: [300, 100] });
 const sticky3 = sticky('## Section 3\\n\\nThird section', { color: 3, position: [550, 100] });
 
-return workflow('test-simple-multi-sticky', 'Simple Multi-Sticky Workflow')
+export default workflow('test-simple-multi-sticky', 'Simple Multi-Sticky Workflow')
   .add(startTrigger)
   .add(sticky1)
   .add(sticky2)
@@ -1773,7 +1773,7 @@ return workflow('test-simple-multi-sticky', 'Simple Multi-Sticky Workflow')
 		it('should parse Code node with properly escaped template literals', () => {
 			// When template literals are properly escaped with \$, they should work
 			const code = `
-return workflow('test-id', 'Code Workflow')
+export default workflow('test-id', 'Code Workflow')
   .add(trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: {} })
   .to(node({
     type: 'n8n-nodes-base.code',
@@ -1803,7 +1803,7 @@ return { json: { message } };\`
 			//   jsCode: `...errors.push(\`Currency '${invoiceData.currency}' is not valid.\`);...`
 			// The ${invoiceData.currency} should be escaped to \${invoiceData.currency}
 			const code = `
-return workflow('test-id', 'Validation Workflow')
+export default workflow('test-id', 'Validation Workflow')
   .add(trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: {} })
   .to(node({
     type: 'n8n-nodes-base.code',
@@ -1833,7 +1833,7 @@ return { json: { errors } };\`
 		it('should escape multiple unescaped template expressions in nested template literals', () => {
 			// More complex case with multiple user-defined variables in template expressions
 			const code = `
-return workflow('test-id', 'Complex Code')
+export default workflow('test-id', 'Complex Code')
   .add(trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: {} })
   .to(node({
     type: 'n8n-nodes-base.code',
@@ -1940,7 +1940,7 @@ return { json: { result } };\`
   }
 });
 
-return workflow('test-id', 'Test Workflow')
+export default workflow('test-id', 'Test Workflow')
   .add(myTrigger);`;
 
 			// Simulate what happens when code goes through JSON
@@ -1960,7 +1960,7 @@ return workflow('test-id', 'Test Workflow')
 			// the \\n becomes literal backslash-n characters in the string
 			// This commonly happens when code is embedded in JSON that gets stringified again
 			const codeWithLiteralBackslashN =
-				"const myTrigger = trigger({\\n  type: 'n8n-nodes-base.manualTrigger',\\n  version: 1,\\n  config: {\\n    name: 'Start',\\n    position: [240, 400]\\n  }\\n});\\n\\nreturn workflow('test-id', 'Test Workflow')\\n  .add(myTrigger);";
+				"const myTrigger = trigger({\\n  type: 'n8n-nodes-base.manualTrigger',\\n  version: 1,\\n  config: {\\n    name: 'Start',\\n    position: [240, 400]\\n  }\\n});\\n\\nexport default workflow('test-id', 'Test Workflow')\\n  .add(myTrigger);";
 
 			// The parser should handle this by converting \\n to actual newlines
 			expect(() => parseWorkflowCode(codeWithLiteralBackslashN)).not.toThrow();
@@ -1972,7 +1972,7 @@ return workflow('test-id', 'Test Workflow')
 		it('should parse code with escaped quotes in strings', () => {
 			// Double-escaped quotes like \\" should be handled
 			const codeWithEscapedQuotes =
-				"const setNode = node({\\n  type: 'n8n-nodes-base.set',\\n  version: 3.4,\\n  config: {\\n    name: 'Set Data',\\n    parameters: {\\n      mode: 'manual',\\n      assignments: {\\n        assignments: [{\\n          id: 'msg',\\n          name: 'message',\\n          value: '={{ $json.error || \\\"Default message\\\" }}',\\n          type: 'string'\\n        }]\\n      }\\n    },\\n    position: [240, 400]\\n  }\\n});\\n\\nreturn workflow('test-id', 'Test')\\n  .add(setNode);";
+				"const setNode = node({\\n  type: 'n8n-nodes-base.set',\\n  version: 3.4,\\n  config: {\\n    name: 'Set Data',\\n    parameters: {\\n      mode: 'manual',\\n      assignments: {\\n        assignments: [{\\n          id: 'msg',\\n          name: 'message',\\n          value: '={{ $json.error || \\\"Default message\\\" }}',\\n          type: 'string'\\n        }]\\n      }\\n    },\\n    position: [240, 400]\\n  }\\n});\\n\\nexport default workflow('test-id', 'Test')\\n  .add(setNode);";
 
 			expect(() => parseWorkflowCode(codeWithEscapedQuotes)).not.toThrow();
 			const parsedJson = parseWorkflowCode(codeWithEscapedQuotes);

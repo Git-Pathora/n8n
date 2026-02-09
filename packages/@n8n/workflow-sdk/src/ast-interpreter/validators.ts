@@ -157,7 +157,7 @@ const ALLOWED_NODE_TYPES = new Set([
 
 	// Statements
 	'ExpressionStatement',
-	'ReturnStatement',
+	'ExportDefaultDeclaration',
 
 	// Expressions
 	'CallExpression',
@@ -201,6 +201,8 @@ const FORBIDDEN_NODE_TYPES: Record<string, string> = {
 	NewExpression: 'new expressions are not allowed. Use SDK factory functions instead.',
 	ImportDeclaration: 'Import declarations are not allowed in SDK code',
 	ImportExpression: 'Dynamic imports are not allowed in SDK code',
+	ExportNamedDeclaration: 'Named exports are not allowed. Use export default only.',
+	ExportAllDeclaration: 'Re-exports are not allowed in SDK code',
 	AwaitExpression: 'Await expressions are not allowed in SDK code',
 	YieldExpression: 'Yield expressions are not allowed in SDK code',
 };

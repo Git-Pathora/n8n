@@ -10,7 +10,7 @@
  *
  * const code = `
  *   const wf = workflow('id', 'name');
- *   return wf.add(trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: {} }));
+ *   export default wf.add(trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: {} }));
  * `;
  *
  * const result = interpretSDKCode(code, {

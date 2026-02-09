@@ -59,8 +59,8 @@ class SDKInterpreter {
 				case 'ExpressionStatement':
 					result = this.evaluate(stmt.expression);
 					break;
-				case 'ReturnStatement':
-					return this.evaluate(stmt.argument ?? null);
+				case 'ExportDefaultDeclaration':
+					return this.evaluate(stmt.declaration as ESTree.Expression);
 				default:
 					throw new UnsupportedNodeError(stmt.type, stmt.loc ?? undefined, this.sourceCode);
 			}

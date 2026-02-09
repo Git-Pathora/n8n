@@ -31,7 +31,7 @@ describe('ifElse() factory function', () => {
 describe('parseWorkflowCode with ifElse', () => {
 	it('parseWorkflowCode recognizes ifElse()', () => {
 		const code = `
-return workflow('test', 'Test')
+export default workflow('test', 'Test')
   .add(trigger({ type: 'n8n-nodes-base.manualTrigger', version: 1, config: {} })
     .to(ifElse({ version: 2.2, config: { name: 'Check' } }).onTrue(node({ type: 'n8n-nodes-base.noOp', version: 1, config: {} })).onFalse(null)));
 `;

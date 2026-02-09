@@ -50,6 +50,14 @@ export {
 // Introspection evaluator
 export { createIntrospectionEvaluator, type IntrospectionEvent } from './evaluators/introspection';
 
+// Introspection lifecycle + collector
+export {
+	createIntrospectionCollector,
+	createIntrospectionAnalysisLifecycle,
+	type IntrospectionCollector,
+	type IntrospectionAnalysisOptions,
+} from './lifecycles/introspection-analysis';
+
 // Output
 export {
 	createArtifactSaver,

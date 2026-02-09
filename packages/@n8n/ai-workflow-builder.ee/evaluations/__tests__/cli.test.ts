@@ -65,10 +65,15 @@ jest.mock('../harness/evaluation-helpers', () => ({
 	consumeGenerator: (...args: unknown[]): unknown => mockConsumeGenerator(...args),
 	getChatPayload: (...args: unknown[]): unknown => mockGetChatPayload(...args),
 	createWorkflowGenerator: () =>
-		jest.fn().mockResolvedValue({
-			workflow: { name: 'Test', nodes: [], connections: {} },
-			introspectionEvents: [],
-		}),
+		jest.fn().mockResolvedValue({ name: 'Test', nodes: [], connections: {} }),
+}));
+
+jest.mock('../lifecycles/introspection-analysis', () => ({
+	createIntrospectionCollector: () => ({
+		addEvents: jest.fn(),
+		drain: jest.fn().mockReturnValue([]),
+	}),
+	createIntrospectionAnalysisLifecycle: () => ({}),
 }));
 
 jest.mock('../index', () => ({

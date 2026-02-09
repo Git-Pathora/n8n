@@ -3,10 +3,12 @@ import { getLangchainCallbacks } from 'langsmith/langchain';
 import { v4 as uuid } from 'uuid';
 
 import type { IntrospectionEvent } from '@/tools/introspect.tool';
+import type { SimpleWorkflow } from '@/types/workflow';
 import type { BuilderFeatureFlags, ChatPayload } from '@/workflow-builder-agent';
 
-import type { LlmCallLimiter, WorkflowGenerationResult } from './harness-types';
+import type { LlmCallLimiter } from './harness-types';
 import { generateRunId, isWorkflowStateValues } from '../langsmith/types';
+import type { IntrospectionCollector } from '../lifecycles/introspection-analysis';
 import { EVAL_TYPES, EVAL_USERS, DEFAULTS } from '../support/constants';
 import { createAgent, type CreateAgentOptions } from '../support/environment';
 
@@ -88,28 +90,28 @@ export function getChatPayload(options: GetChatPayloadOptions): ChatPayload {
 /**
  * Options for createWorkflowGenerator - same as agent creation options
  */
-export type WorkflowGeneratorOptions = Omit<CreateAgentOptions, 'experimentName'>;
+export type WorkflowGeneratorOptions = Omit<CreateAgentOptions, 'experimentName'> & {
+	/** Optional collector for introspection events */
+	introspectionCollector?: IntrospectionCollector;
+};
 
 /**
  * Workflow generator function type.
- * Returns both the workflow and any introspection events collected during generation.
+ * Returns the generated workflow.
  */
-export type WorkflowGenerator = (
-	prompt: string,
-	callbacks?: Callbacks,
-) => Promise<WorkflowGenerationResult>;
+export type WorkflowGenerator = (prompt: string, callbacks?: Callbacks) => Promise<SimpleWorkflow>;
 
 /**
- * Creates a workflow generator that captures introspection events from state.
- * Events are extracted from the agent state after each run, avoiding global state.
+ * Creates a workflow generator that returns a SimpleWorkflow.
+ * When an IntrospectionCollector is provided, introspection events are collected as a side-effect.
  *
- * @param options - Agent configuration options (parsedNodeTypes, llms, featureFlags)
- * @returns Generator function that returns workflow and introspection events
+ * @param options - Agent configuration options (parsedNodeTypes, llms, featureFlags, introspectionCollector)
+ * @returns Generator function that returns a SimpleWorkflow
  */
 export function createWorkflowGenerator(options: WorkflowGeneratorOptions): WorkflowGenerator {
-	const { featureFlags } = options;
+	const { featureFlags, introspectionCollector } = options;
 
-	return async (prompt: string, callbacks?: Callbacks): Promise<WorkflowGenerationResult> => {
+	return async (prompt: string, callbacks?: Callbacks): Promise<SimpleWorkflow> => {
 		const runId = generateRunId();
 
 		const agent = createAgent(options);
@@ -134,12 +136,12 @@ export function createWorkflowGenerator(options: WorkflowGeneratorOptions): Work
 			throw new Error('Invalid workflow state: workflow or messages missing');
 		}
 
-		// Extract introspection events from state
-		const introspectionEvents = (state.values.introspectionEvents as IntrospectionEvent[]) ?? [];
+		// Collect introspection events as a side-effect if collector is provided
+		if (introspectionCollector) {
+			const events = (state.values.introspectionEvents ?? []) as IntrospectionEvent[];
+			introspectionCollector.addEvents(events);
+		}
 
-		return {
-			workflow: state.values.workflowJSON,
-			introspectionEvents,
-		};
+		return state.values.workflowJSON;
 	};
 }

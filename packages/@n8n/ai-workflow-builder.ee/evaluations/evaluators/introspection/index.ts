@@ -2,20 +2,22 @@ import type { IntrospectionEvent } from '@/tools/introspect.tool';
 import type { SimpleWorkflow } from '@/types/workflow';
 
 import type { EvaluationContext, Evaluator, Feedback } from '../../harness/harness-types';
+import type { IntrospectionCollector } from '../../lifecycles/introspection-analysis';
 
 // Re-export the type for convenience
 export type { IntrospectionEvent };
 
 /**
- * Evaluator that collects introspection events from the evaluation context.
- * Events are passed via context.introspectionEvents after workflow generation.
+ * Evaluator that collects introspection events via an IntrospectionCollector.
+ * Events are drained from the collector on each evaluate() call.
  */
-export function createIntrospectionEvaluator(): Evaluator<EvaluationContext> {
+export function createIntrospectionEvaluator(
+	collector: IntrospectionCollector,
+): Evaluator<EvaluationContext> {
 	return {
 		name: 'introspection',
-		async evaluate(_workflow: SimpleWorkflow, ctx: EvaluationContext): Promise<Feedback[]> {
-			// Get events from context (populated by the runner from generation result)
-			const events = ctx.introspectionEvents ?? [];
+		async evaluate(_workflow: SimpleWorkflow, _ctx: EvaluationContext): Promise<Feedback[]> {
+			const events = collector.drain();
 
 			if (events.length === 0) {
 				return [

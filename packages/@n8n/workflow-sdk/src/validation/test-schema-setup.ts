@@ -10,8 +10,8 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 
-import { generateNodeDefinitions } from '../generate-types/generate-node-defs-cli';
 import { setSchemaBaseDirs, getSchemaBaseDirs } from './schema-validator';
+import { generateNodeDefinitions } from '../generate-types/generate-node-defs-cli';
 
 const SCHEMA_TEST_DIR = path.join(os.tmpdir(), 'n8n-schema-tests');
 

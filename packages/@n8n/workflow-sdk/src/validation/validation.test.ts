@@ -1,9 +1,9 @@
 import { validateWorkflow, ValidationError } from '.';
+import { setupTestSchemas, teardownTestSchemas } from './test-schema-setup';
 import type { NodeInstance } from '../types/base';
 import { workflow } from '../workflow-builder';
 import { node, trigger, sticky } from '../workflow-builder/node-builders/node-builder';
 import { languageModel, tool } from '../workflow-builder/node-builders/subnode-builders';
-import { setupTestSchemas, teardownTestSchemas } from './test-schema-setup';
 
 describe('Validation', () => {
 	describe('validateWorkflow()', () => {

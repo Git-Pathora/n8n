@@ -198,7 +198,7 @@ describe('OpenAI Integration with Langchain Agent', () => {
 			chunks.push(chunk);
 		}
 
-		expect(chunks).toHaveLength(7);
+		expect(chunks).toHaveLength(10);
 
 		const getChunkData = (chunk: unknown) => {
 			const chunkArray = chunk as unknown[];
@@ -237,24 +237,36 @@ describe('OpenAI Integration with Langchain Agent', () => {
 
 		const { message: message4 } = getChunkData(chunks[3]);
 		const content4 = message4.content as Array<{ type: string; text: string }>;
-		expect(content4[0].text).toBe("It's always");
+		expect(content4[0].text).toBe("It's");
 
 		const { message: message5 } = getChunkData(chunks[4]);
 		const content5 = message5.content as Array<{ type: string; text: string }>;
-		expect(content5[0].text).toBe(' sunny in');
+		expect(content5[0].text).toBe(' always');
 
 		const { message: message6 } = getChunkData(chunks[5]);
 		const content6 = message6.content as Array<{ type: string; text: string }>;
-		expect(content6[0].text).toBe(' Tokyo!');
+		expect(content6[0].text).toBe(' sunny');
 
 		const { message: message7 } = getChunkData(chunks[6]);
-		expect(message7.usage_metadata).toEqual({
+		const content7 = message7.content as Array<{ type: string; text: string }>;
+		expect(content7[0].text).toBe(' in');
+
+		const { message: message8 } = getChunkData(chunks[7]);
+		const content8 = message8.content as Array<{ type: string; text: string }>;
+		expect(content8[0].text).toBe(' Tokyo');
+
+		const { message: message9 } = getChunkData(chunks[8]);
+		const content9 = message9.content as Array<{ type: string; text: string }>;
+		expect(content9[0].text).toBe('!');
+
+		const { message: message10 } = getChunkData(chunks[9]);
+		expect(message10.usage_metadata).toEqual({
 			input_tokens: 76,
 			output_tokens: 8,
 			total_tokens: 84,
 		});
-		const responseMetadata7 = message7.response_metadata as Record<string, unknown>;
-		expect(responseMetadata7.finish_reason).toBe('stop');
+		const responseMetadata10 = message10.response_metadata as Record<string, unknown>;
+		expect(responseMetadata10.finish_reason).toBe('stop');
 
 		for (const chunk of chunks) {
 			const { metadata } = getChunkData(chunk);

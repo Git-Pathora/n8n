@@ -18,6 +18,7 @@ import {
 	validateIdentifier,
 	isAllowedSDKFunction,
 	isAllowedMethod,
+	getSafeJSONMethod,
 } from './validators';
 
 /**
@@ -181,8 +182,6 @@ class SDKInterpreter {
 				);
 			}
 
-			thisArg = this.evaluate(memberExpr.object);
-
 			// Get method name
 			let methodName: string;
 			if (memberExpr.property.type === 'Identifier') {
@@ -199,6 +198,18 @@ class SDKInterpreter {
 					this.sourceCode,
 				);
 			}
+
+			// Handle safe global methods (e.g. JSON.stringify, JSON.parse)
+			// Must check before evaluating the object, since the global itself is blocked
+			if (memberExpr.object.type === 'Identifier') {
+				const safeMethod = getSafeJSONMethod(memberExpr.object.name, methodName);
+				if (safeMethod) {
+					const args = node.arguments.map((arg) => this.evaluate(arg));
+					return safeMethod(...args);
+				}
+			}
+
+			thisArg = this.evaluate(memberExpr.object);
 
 			// Validate method name against allowlist
 			if (!isAllowedMethod(methodName)) {

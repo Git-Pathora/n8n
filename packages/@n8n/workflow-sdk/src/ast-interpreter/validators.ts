@@ -314,3 +314,25 @@ export function isAllowedSDKFunction(name: string): boolean {
 export function isAllowedMethod(name: string): boolean {
 	return ALLOWED_METHODS.has(name);
 }
+
+/**
+ * Safe subset of JSON methods available in SDK code.
+ * Only stringify and parse are permitted.
+ */
+const SAFE_JSON_METHODS: Record<string, (...args: unknown[]) => unknown> = {
+	stringify: (...args: unknown[]) =>
+		JSON.stringify(args[0], args[1] as undefined, args[2] as undefined),
+	parse: (...args: unknown[]) => JSON.parse(args[0] as string) as unknown,
+};
+
+/**
+ * Check if a member expression is a safe JSON method call (JSON.stringify / JSON.parse).
+ * Returns the safe function if so, undefined otherwise.
+ */
+export function getSafeJSONMethod(
+	objectName: string,
+	methodName: string,
+): ((...args: unknown[]) => unknown) | undefined {
+	if (objectName !== 'JSON') return undefined;
+	return SAFE_JSON_METHODS[methodName];
+}

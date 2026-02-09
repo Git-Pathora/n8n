@@ -623,7 +623,7 @@ describe('AST Interpreter', () => {
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
 		});
 
-		it('should reject JSON access', () => {
+		it('should reject raw JSON access', () => {
 			const code = 'return JSON;';
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
 		});
@@ -655,6 +655,42 @@ describe('AST Interpreter', () => {
 
 		it('should reject WebAssembly access', () => {
 			const code = 'return WebAssembly;';
+			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
+		});
+	});
+
+	describe('JSON.stringify and JSON.parse', () => {
+		let sdkFunctions: SDKFunctions;
+
+		beforeEach(() => {
+			sdkFunctions = createMockSDKFunctions();
+		});
+
+		it('should allow JSON.stringify with an object', () => {
+			const code = 'return JSON.stringify({ a: 1, b: "hello" });';
+			const result = interpretSDKCode(code, sdkFunctions);
+			expect(result).toBe('{"a":1,"b":"hello"}');
+		});
+
+		it('should allow JSON.parse with a string', () => {
+			const code = 'return JSON.parse("{\\"x\\": 42}");';
+			const result = interpretSDKCode(code, sdkFunctions);
+			expect(result).toEqual({ x: 42 });
+		});
+
+		it('should allow JSON.stringify with indent argument', () => {
+			const code = 'return JSON.stringify({ a: 1 }, null, 2);';
+			const result = interpretSDKCode(code, sdkFunctions);
+			expect(result).toBe('{\n  "a": 1\n}');
+		});
+
+		it('should reject unlisted JSON methods', () => {
+			const code = 'return JSON.rawJSON("123");';
+			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
+		});
+
+		it('should still reject raw JSON identifier access', () => {
+			const code = 'return JSON;';
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
 		});
 	});

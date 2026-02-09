@@ -136,7 +136,10 @@ Fix with \`executeOnce: true\` (simplest) or parallel branches + Merge (when com
 const sourceB = node({{ ..., config: {{ ..., executeOnce: true }} }});
 startTrigger.to(sourceA.to(sourceB.to(processResults)));
 
-// FIX 2 - parallel branches + Merge (combine by position): pairs items by index
+// FIX 2 - parallel branches + Merge (combine by position)
+// Pairs items by index, merging fields from both inputs into one item.
+// @example input0: [{{ a: 1 }}, {{ a: 2 }}] input1: [{{ b: 10, c: 'x' }}, {{ b: 20 }}]
+//   output: [{{ a: 1, b: 10, c: 'x' }}, {{ a: 2, b: 20, c: undefined }}]
 const combineResults = merge({{
   version: 3.2,
   config: {{ name: 'Combine Results', parameters: {{ mode: 'combine', combineBy: 'combineByPosition' }} }}
@@ -146,7 +149,10 @@ return workflow('id', 'name')
   .add(startTrigger.to(sourceB.to(combineResults.input(1))))
   .add(combineResults.to(processResults));
 
-// FIX 3 - parallel branches + Merge (append): concatenates all items into one list
+// FIX 3 - parallel branches + Merge (append)
+// Concatenates all items from all inputs into one list sequentially.
+// @example input0: [{{ a: 1 }}, {{ a: 2 }}] input1: [{{ b: 10 }}]
+//   output: [{{ a: 1 }}, {{ a: 2 }}, {{ b: 10 }}]
 const allResults = merge({{
   version: 3.2,
   config: {{ name: 'All Results', parameters: {{ mode: 'append' }} }}

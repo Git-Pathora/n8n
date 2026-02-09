@@ -1,6 +1,8 @@
 import type { INodeTypes, IConnections as N8nIConnections, IDisplayOptions } from 'n8n-workflow';
 import { mapConnectionsByDestination } from 'n8n-workflow';
 
+import { matchesDisplayOptions } from './display-options';
+import type { DisplayOptions, DisplayOptionsContext } from './display-options';
 import { resolveMainInputCount } from './input-resolver';
 import { validateNodeConfig } from './schema-validator';
 import { isStickyNoteType, isHttpRequestType } from '../constants/node-types';
@@ -31,6 +33,7 @@ export type ValidationErrorCode =
 	| 'INVALID_INPUT_INDEX'
 	| 'SUBNODE_NOT_CONNECTED'
 	| 'SUBNODE_PARAMETER_MISMATCH'
+	| 'UNSUPPORTED_SUBNODE_INPUT'
 	| 'MAX_NODES_EXCEEDED'
 	| 'INVALID_EXPRESSION_PATH'
 	| 'PARTIAL_EXPRESSION_PATH'
@@ -486,6 +489,8 @@ export function validateWorkflow(
 		checkNodeInputIndices(json, options.nodeTypesProvider, warnings);
 		// Validate subnode parameters match parent's displayOptions requirements
 		validateSubnodeParameters(json, options.nodeTypesProvider, warnings);
+		// Validate parent nodes actually support their connected AI input types
+		validateParentSupportsInputs(json, options.nodeTypesProvider, warnings);
 	}
 
 	return {
@@ -622,6 +627,109 @@ function validateSubnodeParameters(
 							),
 						);
 					}
+				}
+			}
+		}
+	}
+}
+
+/**
+ * Build a human-readable summary of which displayOptions conditions are not met.
+ */
+function buildConditionSummary(
+	displayOptions: IDisplayOptions,
+	parentParams: Record<string, unknown>,
+): string {
+	if (!displayOptions.show) return '';
+
+	const parts: string[] = [];
+	for (const [paramName, expectedValues] of Object.entries(displayOptions.show)) {
+		if (!expectedValues) continue;
+		const actual = parentParams[paramName];
+		const expectedStr = (expectedValues as unknown[]).map((v) => `'${String(v)}'`).join(' or ');
+		parts.push(
+			`${paramName} should be ${expectedStr} (currently '${String(actual ?? 'undefined')}')`,
+		);
+	}
+
+	return parts.length > 0 ? `Required: ${parts.join(', ')}.` : '';
+}
+
+/**
+ * Validate that parent nodes actually support their connected AI input types
+ * based on the parent's own parameters and builderHint.inputs displayOptions.
+ *
+ * For example, if a vector store has mode='retrieve' but a documentLoader is connected,
+ * this produces a warning because ai_document requires mode='insert'.
+ */
+function validateParentSupportsInputs(
+	json: WorkflowJSON,
+	nodeTypesProvider: INodeTypes,
+	warnings: ValidationWarning[],
+): void {
+	const nodesByName = new Map<string, NodeJSON>();
+	for (const node of json.nodes) {
+		if (node.name) {
+			nodesByName.set(node.name, node);
+		}
+	}
+
+	const connectionsByDest = mapConnectionsByDestination(
+		json.connections as unknown as N8nIConnections,
+	);
+
+	for (const parentNode of json.nodes) {
+		if (!parentNode.name) continue;
+
+		const version =
+			typeof parentNode.typeVersion === 'string'
+				? parseFloat(parentNode.typeVersion)
+				: (parentNode.typeVersion ?? 1);
+
+		const parentNodeType = nodeTypesProvider.getByNameAndVersion(parentNode.type, version);
+		const builderHintInputs = parentNodeType?.description?.builderHint?.inputs;
+		if (!builderHintInputs) continue;
+
+		const parentContext: DisplayOptionsContext = {
+			parameters: (parentNode.parameters ?? {}) as Record<string, unknown>,
+			nodeVersion: version,
+			rootParameters: (parentNode.parameters ?? {}) as Record<string, unknown>,
+		};
+
+		for (const [connectionType, inputConfig] of Object.entries(builderHintInputs)) {
+			if (!connectionType.startsWith('ai_')) continue;
+			if (!inputConfig?.displayOptions) continue;
+
+			const parentSupportsInput = matchesDisplayOptions(
+				parentContext,
+				inputConfig.displayOptions as DisplayOptions,
+			);
+
+			if (parentSupportsInput) continue;
+
+			const incomingConnections = connectionsByDest[parentNode.name]?.[connectionType];
+			if (!incomingConnections) continue;
+
+			for (const connList of incomingConnections) {
+				if (!connList) continue;
+				for (const conn of connList) {
+					const subnodeName = conn.node;
+					const subnodeField = AI_CONNECTION_TO_SUBNODE_FIELD[connectionType] || connectionType;
+					const conditionDetails = buildConditionSummary(
+						inputConfig.displayOptions as IDisplayOptions,
+						(parentNode.parameters ?? {}) as Record<string, unknown>,
+					);
+
+					warnings.push(
+						new ValidationWarning(
+							'UNSUPPORTED_SUBNODE_INPUT',
+							`'${subnodeName}' is connected to '${parentNode.name}' as ${subnodeField}, but '${parentNode.name}' does not support ${subnodeField} in its current configuration. ${conditionDetails}`,
+							parentNode.name,
+							undefined,
+							undefined,
+							'major',
+						),
+					);
 				}
 			}
 		}

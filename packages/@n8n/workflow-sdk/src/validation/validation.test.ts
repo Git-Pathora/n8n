@@ -1885,6 +1885,341 @@ describe('Validation', () => {
 		});
 	});
 
+	describe('UNSUPPORTED_SUBNODE_INPUT validation', () => {
+		// Mock that returns builderHint.inputs with displayOptions on the PARENT node
+		// These displayOptions describe when the parent accepts a given AI input type
+		const mockNodeTypesProviderForParentValidation = {
+			getByNameAndVersion: (type: string, _version?: number) => {
+				if (type === '@n8n/n8n-nodes-langchain.vectorStorePinecone') {
+					return {
+						description: {
+							inputs: ['main'],
+							builderHint: {
+								inputs: {
+									ai_embedding: { required: true },
+									ai_document: {
+										required: true,
+										displayOptions: {
+											show: { mode: ['insert'] },
+										},
+									},
+								},
+							},
+						},
+					};
+				}
+				if (type === '@n8n/n8n-nodes-langchain.agent') {
+					return {
+						description: {
+							inputs: ['main'],
+							builderHint: {
+								inputs: {
+									ai_languageModel: { required: true },
+									ai_memory: { required: false },
+									ai_tool: { required: false },
+									ai_outputParser: {
+										required: false,
+										displayOptions: {
+											show: { hasOutputParser: [true] },
+										},
+									},
+								},
+							},
+						},
+					};
+				}
+				return { description: { inputs: ['main'] } };
+			},
+			getByName: (type: string) =>
+				mockNodeTypesProviderForParentValidation.getByNameAndVersion(type),
+			getKnownTypes: () => ({}),
+		};
+
+		it('should warn when vector store in retrieve mode has documentLoader connected', () => {
+			const workflowJson = {
+				id: 'test',
+				name: 'Test',
+				nodes: [
+					{
+						id: 'trigger-1',
+						name: 'Manual Trigger',
+						type: 'n8n-nodes-base.manualTrigger',
+						typeVersion: 1,
+						position: [0, 0] as [number, number],
+						parameters: {},
+					},
+					{
+						id: 'vs-1',
+						name: 'Pinecone Store',
+						type: '@n8n/n8n-nodes-langchain.vectorStorePinecone',
+						typeVersion: 1.3,
+						position: [200, 0] as [number, number],
+						parameters: { mode: 'retrieve' }, // retrieve mode - doesn't support ai_document
+					},
+					{
+						id: 'doc-1',
+						name: 'Document Loader',
+						type: '@n8n/n8n-nodes-langchain.documentDefaultDataLoader',
+						typeVersion: 1.1,
+						position: [200, 100] as [number, number],
+						parameters: {},
+					},
+					{
+						id: 'emb-1',
+						name: 'Embeddings',
+						type: '@n8n/n8n-nodes-langchain.embeddingsOpenAi',
+						typeVersion: 1.2,
+						position: [200, 200] as [number, number],
+						parameters: {},
+					},
+				],
+				connections: {
+					'Manual Trigger': {
+						main: [[{ node: 'Pinecone Store', type: 'main', index: 0 }]],
+					},
+					'Document Loader': {
+						ai_document: [[{ node: 'Pinecone Store', type: 'ai_document', index: 0 }]],
+					},
+					Embeddings: {
+						ai_embedding: [[{ node: 'Pinecone Store', type: 'ai_embedding', index: 0 }]],
+					},
+				},
+			};
+
+			const result = validateWorkflow(workflowJson, {
+				nodeTypesProvider: mockNodeTypesProviderForParentValidation as never,
+			});
+
+			const warnings = result.warnings.filter((w) => w.code === 'UNSUPPORTED_SUBNODE_INPUT');
+			expect(warnings).toHaveLength(1);
+			expect(warnings[0].nodeName).toBe('Pinecone Store');
+			expect(warnings[0].message).toContain('Document Loader');
+			expect(warnings[0].message).toContain('documentLoader');
+			expect(warnings[0].message).toContain('mode');
+		});
+
+		it('should not warn when vector store in insert mode has documentLoader connected', () => {
+			const workflowJson = {
+				id: 'test',
+				name: 'Test',
+				nodes: [
+					{
+						id: 'trigger-1',
+						name: 'Manual Trigger',
+						type: 'n8n-nodes-base.manualTrigger',
+						typeVersion: 1,
+						position: [0, 0] as [number, number],
+						parameters: {},
+					},
+					{
+						id: 'vs-1',
+						name: 'Pinecone Store',
+						type: '@n8n/n8n-nodes-langchain.vectorStorePinecone',
+						typeVersion: 1.3,
+						position: [200, 0] as [number, number],
+						parameters: { mode: 'insert' }, // insert mode - supports ai_document
+					},
+					{
+						id: 'doc-1',
+						name: 'Document Loader',
+						type: '@n8n/n8n-nodes-langchain.documentDefaultDataLoader',
+						typeVersion: 1.1,
+						position: [200, 100] as [number, number],
+						parameters: {},
+					},
+				],
+				connections: {
+					'Manual Trigger': {
+						main: [[{ node: 'Pinecone Store', type: 'main', index: 0 }]],
+					},
+					'Document Loader': {
+						ai_document: [[{ node: 'Pinecone Store', type: 'ai_document', index: 0 }]],
+					},
+				},
+			};
+
+			const result = validateWorkflow(workflowJson, {
+				nodeTypesProvider: mockNodeTypesProviderForParentValidation as never,
+			});
+
+			const warnings = result.warnings.filter((w) => w.code === 'UNSUPPORTED_SUBNODE_INPUT');
+			expect(warnings).toHaveLength(0);
+		});
+
+		it('should warn when agent has outputParser connected but hasOutputParser is false', () => {
+			const workflowJson = {
+				id: 'test',
+				name: 'Test',
+				nodes: [
+					{
+						id: 'trigger-1',
+						name: 'Manual Trigger',
+						type: 'n8n-nodes-base.manualTrigger',
+						typeVersion: 1,
+						position: [0, 0] as [number, number],
+						parameters: {},
+					},
+					{
+						id: 'agent-1',
+						name: 'AI Agent',
+						type: '@n8n/n8n-nodes-langchain.agent',
+						typeVersion: 3.1,
+						position: [200, 0] as [number, number],
+						parameters: { hasOutputParser: false },
+					},
+					{
+						id: 'parser-1',
+						name: 'Output Parser',
+						type: '@n8n/n8n-nodes-langchain.outputParserStructured',
+						typeVersion: 1,
+						position: [200, 100] as [number, number],
+						parameters: {},
+					},
+				],
+				connections: {
+					'Manual Trigger': {
+						main: [[{ node: 'AI Agent', type: 'main', index: 0 }]],
+					},
+					'Output Parser': {
+						ai_outputParser: [[{ node: 'AI Agent', type: 'ai_outputParser', index: 0 }]],
+					},
+				},
+			};
+
+			const result = validateWorkflow(workflowJson, {
+				nodeTypesProvider: mockNodeTypesProviderForParentValidation as never,
+			});
+
+			const warnings = result.warnings.filter((w) => w.code === 'UNSUPPORTED_SUBNODE_INPUT');
+			expect(warnings).toHaveLength(1);
+			expect(warnings[0].nodeName).toBe('AI Agent');
+			expect(warnings[0].message).toContain('Output Parser');
+			expect(warnings[0].message).toContain('hasOutputParser');
+		});
+
+		it('should not warn when agent has outputParser connected and hasOutputParser is true', () => {
+			const workflowJson = {
+				id: 'test',
+				name: 'Test',
+				nodes: [
+					{
+						id: 'trigger-1',
+						name: 'Manual Trigger',
+						type: 'n8n-nodes-base.manualTrigger',
+						typeVersion: 1,
+						position: [0, 0] as [number, number],
+						parameters: {},
+					},
+					{
+						id: 'agent-1',
+						name: 'AI Agent',
+						type: '@n8n/n8n-nodes-langchain.agent',
+						typeVersion: 3.1,
+						position: [200, 0] as [number, number],
+						parameters: { hasOutputParser: true },
+					},
+					{
+						id: 'parser-1',
+						name: 'Output Parser',
+						type: '@n8n/n8n-nodes-langchain.outputParserStructured',
+						typeVersion: 1,
+						position: [200, 100] as [number, number],
+						parameters: {},
+					},
+				],
+				connections: {
+					'Manual Trigger': {
+						main: [[{ node: 'AI Agent', type: 'main', index: 0 }]],
+					},
+					'Output Parser': {
+						ai_outputParser: [[{ node: 'AI Agent', type: 'ai_outputParser', index: 0 }]],
+					},
+				},
+			};
+
+			const result = validateWorkflow(workflowJson, {
+				nodeTypesProvider: mockNodeTypesProviderForParentValidation as never,
+			});
+
+			const warnings = result.warnings.filter((w) => w.code === 'UNSUPPORTED_SUBNODE_INPUT');
+			expect(warnings).toHaveLength(0);
+		});
+
+		it('should not warn for input types without displayOptions', () => {
+			const workflowJson = {
+				id: 'test',
+				name: 'Test',
+				nodes: [
+					{
+						id: 'agent-1',
+						name: 'AI Agent',
+						type: '@n8n/n8n-nodes-langchain.agent',
+						typeVersion: 3.1,
+						position: [200, 0] as [number, number],
+						parameters: {},
+					},
+					{
+						id: 'model-1',
+						name: 'OpenAI Model',
+						type: '@n8n/n8n-nodes-langchain.lmChatOpenAi',
+						typeVersion: 1.2,
+						position: [200, 100] as [number, number],
+						parameters: {},
+					},
+				],
+				connections: {
+					'OpenAI Model': {
+						ai_languageModel: [[{ node: 'AI Agent', type: 'ai_languageModel', index: 0 }]],
+					},
+				},
+			};
+
+			const result = validateWorkflow(workflowJson, {
+				nodeTypesProvider: mockNodeTypesProviderForParentValidation as never,
+			});
+
+			const warnings = result.warnings.filter((w) => w.code === 'UNSUPPORTED_SUBNODE_INPUT');
+			expect(warnings).toHaveLength(0);
+		});
+
+		it('should not warn when parent parameter is an expression', () => {
+			const workflowJson = {
+				id: 'test',
+				name: 'Test',
+				nodes: [
+					{
+						id: 'vs-1',
+						name: 'Pinecone Store',
+						type: '@n8n/n8n-nodes-langchain.vectorStorePinecone',
+						typeVersion: 1.3,
+						position: [200, 0] as [number, number],
+						parameters: { mode: '={{ $json.mode }}' }, // expression - can't evaluate statically
+					},
+					{
+						id: 'doc-1',
+						name: 'Document Loader',
+						type: '@n8n/n8n-nodes-langchain.documentDefaultDataLoader',
+						typeVersion: 1.1,
+						position: [200, 100] as [number, number],
+						parameters: {},
+					},
+				],
+				connections: {
+					'Document Loader': {
+						ai_document: [[{ node: 'Pinecone Store', type: 'ai_document', index: 0 }]],
+					},
+				},
+			};
+
+			const result = validateWorkflow(workflowJson, {
+				nodeTypesProvider: mockNodeTypesProviderForParentValidation as never,
+			});
+
+			const warnings = result.warnings.filter((w) => w.code === 'UNSUPPORTED_SUBNODE_INPUT');
+			expect(warnings).toHaveLength(0);
+		});
+	});
+
 	describe('Invalid subnode error message enhancement', () => {
 		beforeAll(setupTestSchemas, 120_000);
 		afterAll(teardownTestSchemas);

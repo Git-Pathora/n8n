@@ -33,6 +33,10 @@ export const suggestedNodesData: Record<string, CategoryData> = {
 				name: '@n8n/n8n-nodes-langchain.memoryBufferWindow',
 				note: 'Maintains short-term conversation history. Must be connected as a subnode to every Agent that participates in a conversation. When multiple agents share a conversation, use the same session key across all of them',
 			},
+			{
+				name: '@n8n/n8n-nodes-langchain.retrieverVectorStore',
+				note: 'Connects any Vector Store (Pinecone, Qdrant, Supabase, In-Memory, etc.) to an AI Agent for RAG. Use this as a subnode between the vector store and the agent to retrieve relevant documents when answering questions',
+			},
 			{ name: 'n8n-nodes-base.slack' },
 			{ name: 'n8n-nodes-base.telegram' },
 			{ name: 'n8n-nodes-base.whatsApp' },

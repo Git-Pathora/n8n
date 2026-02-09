@@ -101,7 +101,6 @@ import { useNpsSurveyStore } from '@/app/stores/npsSurvey.store';
 import { useTelemetry } from '@/app/composables/useTelemetry';
 import { useProjectsStore } from '@/features/collaboration/projects/projects.store';
 import { useNodeHelpers } from '@/app/composables/useNodeHelpers';
-import { useExecutionDebugging } from '@/features/execution/executions/composables/useExecutionDebugging';
 import { buildExecutionResponseFromSchema } from '@/features/execution/executions/executions.utils';
 import type { ExecutionPreviewNodeSchema } from '@/features/execution/executions/executions.types';
 import { useUsersStore } from '@/features/settings/users/users.store';

@@ -44,6 +44,6 @@ export interface AgentCapabilitiesResponse {
 export interface AgentTaskDispatchResponse {
 	status: 'dispatched' | 'completed' | 'error';
 	summary?: string;
-	steps?: Array<{ action: string; workflowName?: string; result?: string }>;
+	steps?: Array<{ action: string; workflowName?: string; toAgent?: string; result?: string }>;
 	message?: string;
 }

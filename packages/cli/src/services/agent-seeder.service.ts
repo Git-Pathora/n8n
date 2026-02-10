@@ -159,6 +159,44 @@ return [{ json: { flakyCount: flakyTests.length, tests: flakyTests, scannedAt: n
 	},
 ];
 
+const MESSENGER_DEMO_WORKFLOWS: DemoWorkflow[] = [
+	{
+		name: 'Send Team Alert',
+		nodes: [
+			{
+				id: uuid(),
+				name: 'Manual Trigger',
+				type: 'n8n-nodes-base.manualTrigger',
+				typeVersion: 1,
+				position: [0, 0],
+				parameters: {},
+			},
+			{
+				id: uuid(),
+				name: 'Send Alert',
+				type: 'n8n-nodes-base.code',
+				typeVersion: 2,
+				position: [220, 0],
+				parameters: {
+					jsCode: `// Simulated team alert
+const alert = {
+  channel: '#engineering',
+  message: $input.first().json.message ?? 'Alert from agent system',
+  sentAt: new Date().toISOString(),
+  status: 'delivered',
+};
+return [{ json: alert }];`,
+				},
+			},
+		],
+		connections: {
+			'Manual Trigger': {
+				main: [[{ node: 'Send Alert', type: 'main', index: 0 }]],
+			},
+		},
+	},
+];
+
 @Service()
 export class AgentSeederService {
 	constructor(
@@ -192,6 +230,7 @@ export class AgentSeederService {
 		}
 
 		await this.seedQaWorkflows();
+		await this.seedMessengerWorkflows();
 	}
 
 	private async seedQaWorkflows() {
@@ -240,5 +279,55 @@ export class AgentSeederService {
 		}
 
 		this.logger.info(`Seeded ${toCreate.length} demo workflows for QA Agent`);
+	}
+
+	private async seedMessengerWorkflows() {
+		const messengerUser = await this.userRepository.findOne({
+			where: { email: 'agent-messenger@internal.n8n.local' },
+		});
+
+		if (!messengerUser) {
+			this.logger.warn('Messenger Agent user not found, skipping workflow seed');
+			return;
+		}
+
+		const messengerProject = await this.projectRepository.getPersonalProjectForUser(
+			messengerUser.id,
+		);
+		if (!messengerProject) {
+			this.logger.warn('Messenger Agent project not found, skipping workflow seed');
+			return;
+		}
+
+		const existingWorkflows = await this.workflowRepository.find({
+			where: MESSENGER_DEMO_WORKFLOWS.map((w) => ({ name: w.name })),
+			select: ['name'],
+		});
+		const existingNames = new Set(existingWorkflows.map((w) => w.name));
+		const toCreate = MESSENGER_DEMO_WORKFLOWS.filter((w) => !existingNames.has(w.name));
+
+		if (toCreate.length === 0) {
+			this.logger.debug('Messenger Agent demo workflows already exist, skipping');
+			return;
+		}
+
+		this.logger.info(`Seeding ${toCreate.length} Messenger Agent demo workflows...`);
+
+		for (const demo of toCreate) {
+			const workflow = this.workflowRepository.create({
+				name: demo.name,
+				nodes: demo.nodes,
+				connections: demo.connections,
+				active: false,
+				versionId: uuid(),
+				settings: { executionOrder: 'v1' },
+			});
+
+			const saved = await this.workflowRepository.save(workflow);
+			await this.sharedWorkflowRepository.makeOwner([saved.id], messengerProject.id);
+			this.logger.info(`Created demo workflow: ${demo.name} (${saved.id})`);
+		}
+
+		this.logger.info(`Seeded ${toCreate.length} demo workflows for Messenger Agent`);
 	}
 }

@@ -32,8 +32,16 @@ import { WorkflowSharingService } from '@/workflows/workflow-sharing.service';
 const LLM_API_KEY = process.env.N8N_AGENT_LLM_API_KEY ?? '';
 const LLM_BASE_URL = process.env.N8N_AGENT_LLM_BASE_URL ?? 'https://api.anthropic.com';
 const LLM_MODEL = process.env.N8N_AGENT_LLM_MODEL ?? 'claude-sonnet-4-5-20250929';
-const MAX_ITERATIONS = 10;
+const MAX_ITERATIONS = 15;
+const MAX_DELEGATION_DEPTH = 2;
 const EXECUTION_TIMEOUT_MS = 120_000;
+
+const AGENT_ROLES: Record<string, string> = {
+	'agent-docs-curator@internal.n8n.local': 'Knowledge Base',
+	'agent-issue-triager@internal.n8n.local': 'Bug Analysis',
+	'agent-qa@internal.n8n.local': 'Test Strategy',
+	'agent-messenger@internal.n8n.local': 'Comms & Alerts',
+};
 
 const SUPPORTED_TRIGGERS: Record<string, string> = {
 	[MANUAL_TRIGGER_NODE_TYPE]: 'Manual Trigger',
@@ -51,6 +59,7 @@ interface LlmMessage {
 interface TaskStep {
 	action: string;
 	workflowName?: string;
+	toAgent?: string;
 	result?: string;
 }
 
@@ -123,7 +132,14 @@ export class AgentsController {
 	@Post('/:agentId/task')
 	async dispatchTask(req: AuthenticatedRequest, _res: Response, @Param('agentId') agentId: string) {
 		const { prompt } = req.body as { prompt: string };
+		return this.executeAgentTask(agentId, prompt, 0);
+	}
 
+	private async executeAgentTask(
+		agentId: string,
+		prompt: string,
+		depth: number,
+	): Promise<{ status: string; summary?: string; steps: TaskStep[]; message?: string }> {
 		const agentUser = await this.userRepository.findOne({
 			where: { id: agentId },
 			relations: ['role'],
@@ -135,9 +151,10 @@ export class AgentsController {
 
 		if (!LLM_API_KEY) {
 			return {
-				status: 'error' as const,
+				status: 'error',
 				message:
 					'N8N_AGENT_LLM_API_KEY not configured. Set the environment variable to enable agent tasks.',
+				steps: [],
 			};
 		}
 
@@ -157,10 +174,25 @@ export class AgentsController {
 			active: w.active,
 		}));
 
+		// Fetch other agents for delegation (only if depth allows)
+		const otherAgents: Array<{ firstName: string; role: string }> = [];
+		if (depth < MAX_DELEGATION_DEPTH) {
+			const allAgents = await this.userRepository.find({ where: { type: 'agent' } });
+			for (const a of allAgents) {
+				if (a.id !== agentId) {
+					const agentDef = AGENT_ROLES[a.email];
+					otherAgents.push({
+						firstName: a.firstName,
+						role: agentDef ?? '',
+					});
+				}
+			}
+		}
+
 		const agentName = `${agentUser.firstName} ${agentUser.lastName}`.trim();
 		const steps: TaskStep[] = [];
 
-		const systemPrompt = buildSystemPrompt(agentName, workflowList);
+		const systemPrompt = buildSystemPrompt(agentName, workflowList, otherAgents, depth);
 		const messages: LlmMessage[] = [
 			{ role: 'system', content: systemPrompt },
 			{ role: 'user', content: prompt },
@@ -179,18 +211,20 @@ export class AgentsController {
 			let parsed: {
 				action: string;
 				workflowId?: string;
+				toAgent?: string;
+				message?: string;
 				reasoning?: string;
 				summary?: string;
 			};
 			try {
 				parsed = JSON.parse(cleaned);
 			} catch {
-				return { status: 'completed' as const, summary: llmResponse, steps };
+				return { status: 'completed', summary: llmResponse, steps };
 			}
 
 			if (parsed.action === 'complete') {
 				return {
-					status: 'completed' as const,
+					status: 'completed',
 					summary: parsed.summary ?? 'Task completed',
 					steps,
 				};
@@ -203,7 +237,7 @@ export class AgentsController {
 				steps.push({ action: 'execute_workflow', workflowName });
 
 				try {
-					const result = await this.runWorkflow(agentUser, parsed.workflowId);
+					const result = await this.runWorkflow(agentUser, parsed.workflowId, prompt);
 					const observation = `Workflow "${workflowName}" executed. Result: ${jsonStringify(result).slice(0, 2000)}`;
 					steps[steps.length - 1].result = result.success ? 'success' : 'failed';
 					messages.push({ role: 'user', content: `Observation: ${observation}` });
@@ -215,20 +249,58 @@ export class AgentsController {
 						content: `Observation: Workflow execution failed: ${errorMsg}`,
 					});
 				}
+			} else if (
+				parsed.action === 'send_message' &&
+				parsed.toAgent &&
+				parsed.message &&
+				depth < MAX_DELEGATION_DEPTH
+			) {
+				const targetAgent = await this.userRepository.findOne({
+					where: { firstName: parsed.toAgent, type: 'agent' },
+				});
+
+				steps.push({ action: 'send_message', toAgent: parsed.toAgent });
+
+				if (!targetAgent) {
+					steps[steps.length - 1].result = 'error';
+					messages.push({
+						role: 'user',
+						content: `Observation: Agent "${parsed.toAgent}" not found. Available agents: ${otherAgents.map((a) => a.firstName).join(', ')}`,
+					});
+				} else {
+					try {
+						const result = await this.executeAgentTask(targetAgent.id, parsed.message, depth + 1);
+						const observation = `Agent "${parsed.toAgent}" responded: ${result.summary ?? 'No summary'}`;
+						steps[steps.length - 1].result = result.status === 'completed' ? 'success' : 'failed';
+						messages.push({ role: 'user', content: `Observation: ${observation}` });
+					} catch (error) {
+						const errorMsg = error instanceof Error ? error.message : String(error);
+						steps[steps.length - 1].result = 'error';
+						messages.push({
+							role: 'user',
+							content: `Observation: Agent delegation failed: ${errorMsg}`,
+						});
+					}
+				}
 			} else {
+				const validActions =
+					depth < MAX_DELEGATION_DEPTH
+						? '"execute_workflow", "send_message", or "complete"'
+						: '"execute_workflow" or "complete"';
 				messages.push({
 					role: 'user',
-					content: 'Observation: Unknown action. Use "execute_workflow" or "complete".',
+					content: `Observation: Unknown action. Use ${validActions}.`,
 				});
 			}
 		}
 
-		return { status: 'completed' as const, summary: 'Reached maximum iterations', steps };
+		return { status: 'completed', summary: 'Reached maximum iterations', steps };
 	}
 
 	private async runWorkflow(
 		user: User,
 		workflowId: string,
+		agentPrompt?: string,
 	): Promise<{ success: boolean; executionId: string; data?: unknown }> {
 		const workflow = await this.workflowFinderService.findWorkflowForUser(
 			workflowId,
@@ -251,7 +323,7 @@ export class AgentsController {
 			);
 		}
 
-		const pinData = buildPinData(triggerNode);
+		const pinData = buildPinData(triggerNode, agentPrompt);
 
 		const runData: IWorkflowExecutionDataProcess = {
 			executionMode: getExecutionMode(triggerNode),
@@ -315,11 +387,19 @@ function getExecutionMode(node: INode): WorkflowExecuteMode {
 	}
 }
 
-function buildPinData(node: INode): IPinData {
+function buildPinData(node: INode, agentPrompt?: string): IPinData {
 	switch (node.type) {
 		case MANUAL_TRIGGER_NODE_TYPE:
 			return {
-				[node.name]: [{ json: { triggeredByAgent: true, timestamp: new Date().toISOString() } }],
+				[node.name]: [
+					{
+						json: {
+							triggeredByAgent: true,
+							timestamp: new Date().toISOString(),
+							...(agentPrompt ? { message: agentPrompt } : {}),
+						},
+					},
+				],
 			};
 		case WEBHOOK_NODE_TYPE:
 			return {
@@ -367,20 +447,41 @@ function buildPinData(node: INode): IPinData {
 function buildSystemPrompt(
 	agentName: string,
 	workflows: Array<{ id: string; name: string; active: boolean }>,
+	otherAgents: Array<{ firstName: string; role: string }>,
+	depth: number,
 ): string {
 	const workflowList = workflows
 		.map((w) => `- ${w.name} (id: ${w.id}, active: ${w.active})`)
 		.join('\n');
 
+	let agentSection = '';
+	if (depth < MAX_DELEGATION_DEPTH && otherAgents.length > 0) {
+		const agentList = otherAgents.map((a) => `- ${a.firstName} (${a.role})`).join('\n');
+		agentSection = `
+
+You can also delegate tasks to other agents:
+${agentList}
+
+To send a message to another agent:
+{"action": "send_message", "toAgent": "<firstName>", "message": "<what you need them to do>"}`;
+	}
+
+	const validActions =
+		depth < MAX_DELEGATION_DEPTH
+			? '"execute_workflow", "send_message", or "complete"'
+			: '"execute_workflow" or "complete"';
+
 	return `You are ${agentName}, an autonomous AI agent in an n8n workflow automation system.
 
 You have access to these workflows:
 ${workflowList || '(none)'}
+${agentSection}
 
 RULES:
 - Respond with exactly ONE JSON object per message. No markdown, no explanation, no code fences.
 - After each action, you will receive an Observation with the result. Wait for it before deciding your next action.
 - Do NOT batch multiple actions. One action per response, then wait.
+- Valid actions: ${validActions}
 
 To execute a workflow:
 {"action": "execute_workflow", "workflowId": "<id>", "reasoning": "<why>"}

@@ -125,6 +125,7 @@ async function onRunTask() {
 							<span v-if="step.workflowName" :class="$style.stepWorkflow">
 								{{ step.workflowName }}
 							</span>
+							<span v-if="step.toAgent" :class="$style.stepAgent"> &rarr; {{ step.toAgent }} </span>
 							<span v-if="step.result" :class="$style.stepResult">{{ step.result }}</span>
 						</div>
 					</div>
@@ -376,6 +377,10 @@ async function onRunTask() {
 
 .stepWorkflow {
 	color: var(--color--primary);
+}
+
+.stepAgent {
+	color: var(--color--secondary);
 }
 
 .stepResult {

@@ -5,24 +5,13 @@
  * Can be run directly or used as a reference for custom setups.
  */
 
+import type { INodeTypeDescription } from 'n8n-workflow';
 import pLimit from 'p-limit';
 
-import { createWorkflowGenerator } from '../harness/evaluation-helpers';
-import { createLogger } from '../harness/logger';
-import {
-	runEvaluation,
-	createConsoleLifecycle,
-	mergeLifecycles,
-	createLLMJudgeEvaluator,
-	createProgrammaticEvaluator,
-	createPairwiseEvaluator,
-	createSimilarityEvaluator,
-	createIntrospectionEvaluator,
-	type RunConfig,
-	type TestCase,
-	type Evaluator,
-	type EvaluationContext,
-} from '../index';
+import type { CoordinationLogEntry } from '@/types/coordination';
+import type { SimpleWorkflow } from '@/types/workflow';
+import type { BuilderFeatureFlags } from '@/workflow-builder-agent';
+
 import {
 	argsToStageModels,
 	getDefaultDatasetName,
@@ -37,10 +26,140 @@ import {
 } from './csv-prompt-loader';
 import { sendWebhookNotification } from './webhook';
 import {
+	consumeGenerator,
+	extractSubgraphMetrics,
+	getChatPayload,
+} from '../harness/evaluation-helpers';
+import { createLogger } from '../harness/logger';
+import type { GenerationCollectors } from '../harness/runner';
+import { TokenUsageTrackingHandler } from '../harness/token-tracking-handler';
+import {
+	runEvaluation,
+	createConsoleLifecycle,
+	mergeLifecycles,
+	createLLMJudgeEvaluator,
+	createProgrammaticEvaluator,
+	createPairwiseEvaluator,
+	createSimilarityEvaluator,
+	createIntrospectionEvaluator,
+	type RunConfig,
+	type TestCase,
+	type Evaluator,
+	type EvaluationContext,
+} from '../index';
+import { generateRunId, isWorkflowStateValues } from '../langsmith/types';
+import {
 	createIntrospectionCollector,
 	createIntrospectionAnalysisLifecycle,
 } from '../lifecycles/introspection-analysis';
-import { setupTestEnvironment, type ResolvedStageLLMs } from '../support/environment';
+import type { IntrospectionCollector } from '../lifecycles/introspection-analysis';
+import { EVAL_TYPES, EVAL_USERS } from '../support/constants';
+import { setupTestEnvironment, createAgent, type ResolvedStageLLMs } from '../support/environment';
+
+/**
+ * Type guard to check if state values contain a coordination log.
+ */
+function hasCoordinationLog(
+	values: unknown,
+): values is { coordinationLog: CoordinationLogEntry[] } {
+	if (!values || typeof values !== 'object') return false;
+	const obj = values as Record<string, unknown>;
+	return Array.isArray(obj.coordinationLog);
+}
+
+/**
+ * Report subgraph metrics from coordination log and workflow.
+ */
+function reportSubgraphMetrics(
+	collectors: GenerationCollectors | undefined,
+	stateValues: unknown,
+	workflow: SimpleWorkflow,
+): void {
+	if (!collectors?.subgraphMetrics) return;
+
+	const coordinationLog = hasCoordinationLog(stateValues) ? stateValues.coordinationLog : undefined;
+	const nodeCount = workflow.nodes?.length;
+	const metrics = extractSubgraphMetrics(coordinationLog, nodeCount);
+
+	if (
+		metrics.discoveryDurationMs !== undefined ||
+		metrics.builderDurationMs !== undefined ||
+		metrics.responderDurationMs !== undefined ||
+		metrics.nodeCount !== undefined
+	) {
+		collectors.subgraphMetrics(metrics);
+	}
+}
+
+/**
+ * Create a workflow generator function.
+ * LangSmith tracing is handled via traceable() in the runner.
+ * Callbacks are passed explicitly from the runner to ensure correct trace context
+ * under high concurrency (avoids AsyncLocalStorage race conditions).
+ */
+function createWorkflowGenerator(options: {
+	parsedNodeTypes: INodeTypeDescription[];
+	llms: ResolvedStageLLMs;
+	featureFlags?: BuilderFeatureFlags;
+	introspectionCollector?: IntrospectionCollector;
+}): (prompt: string, collectors?: GenerationCollectors) => Promise<SimpleWorkflow> {
+	const { parsedNodeTypes, llms, featureFlags, introspectionCollector } = options;
+
+	return async (prompt: string, collectors?: GenerationCollectors): Promise<SimpleWorkflow> => {
+		const runId = generateRunId();
+
+		const agent = createAgent({
+			parsedNodeTypes,
+			llms,
+			featureFlags,
+		});
+
+		// Create token tracking handler to capture usage from all LLM calls
+		// (supervisor, discovery, builder, responder agents)
+		const tokenTracker = collectors?.tokenUsage ? new TokenUsageTrackingHandler() : undefined;
+
+		await consumeGenerator(
+			agent.chat(
+				getChatPayload({
+					evalType: EVAL_TYPES.LANGSMITH,
+					message: prompt,
+					workflowId: runId,
+					featureFlags,
+				}),
+				EVAL_USERS.LANGSMITH,
+				undefined, // abortSignal
+				tokenTracker ? [tokenTracker] : undefined, // externalCallbacks
+			),
+		);
+
+		const state = await agent.getState(runId, EVAL_USERS.LANGSMITH);
+
+		if (!state.values || !isWorkflowStateValues(state.values)) {
+			throw new Error('Invalid workflow state: workflow or messages missing');
+		}
+
+		const workflow = state.values.workflowJSON;
+
+		// Report accumulated token usage from all agents
+		if (collectors?.tokenUsage && tokenTracker) {
+			const usage = tokenTracker.getUsage();
+			if (usage.inputTokens > 0 || usage.outputTokens > 0) {
+				collectors.tokenUsage(usage);
+			}
+		}
+
+		// Extract and report subgraph metrics from coordination log
+		reportSubgraphMetrics(collectors, state.values, workflow);
+
+		// Collect introspection events as a side-effect if collector is provided
+		if (introspectionCollector) {
+			const events = state.values.introspectionEvents ?? [];
+			introspectionCollector.addEvents(events);
+		}
+
+		return workflow;
+	};
+}
 
 /**
  * Create evaluators based on suite type.
@@ -192,6 +311,8 @@ export async function runV2Evaluation(): Promise<void> {
 		lifecycle: mergedLifecycle,
 		logger,
 		outputDir: args.outputDir,
+		outputCsv: args.outputCsv,
+		suite: args.suite,
 		timeoutMs: args.timeoutMs,
 		context: { llmCallLimiter },
 	};

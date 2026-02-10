@@ -102,6 +102,41 @@ jest.mock('../introspect.tool', () => ({
 	},
 }));
 
+jest.mock('../get-execution-schema.tool', () => ({
+	GET_EXECUTION_SCHEMA_TOOL: {
+		toolName: 'get_execution_schema',
+		displayTitle: 'Getting execution schema',
+	},
+}));
+
+jest.mock('../get-execution-logs.tool', () => ({
+	GET_EXECUTION_LOGS_TOOL: {
+		toolName: 'get_execution_logs',
+		displayTitle: 'Getting execution logs',
+	},
+}));
+
+jest.mock('../get-expression-data-mapping.tool', () => ({
+	GET_EXPRESSION_DATA_MAPPING_TOOL: {
+		toolName: 'get_expression_data_mapping',
+		displayTitle: 'Getting expression data mapping',
+	},
+}));
+
+jest.mock('../get-workflow-overview.tool', () => ({
+	GET_WORKFLOW_OVERVIEW_TOOL: {
+		toolName: 'get_workflow_overview',
+		displayTitle: 'Getting workflow overview',
+	},
+}));
+
+jest.mock('../get-node-context.tool', () => ({
+	GET_NODE_CONTEXT_TOOL: {
+		toolName: 'get_node_context',
+		displayTitle: 'Getting node context',
+	},
+}));
+
 describe('builder-tools', () => {
 	let parsedNodeTypes: INodeTypeDescription[];
 
@@ -113,8 +148,10 @@ describe('builder-tools', () => {
 	describe('getBuilderToolsForDisplay', () => {
 		// Base tools (always included): get_documentation, node_search, node_details, add_node,
 		// connect_nodes, remove_connection, remove_node, rename_node, update_node_parameters,
-		// get_node_parameter, validate_structure, validate_configuration
-		const BASE_TOOL_COUNT = 12;
+		// get_node_parameter, validate_structure, validate_configuration,
+		// get_execution_schema, get_execution_logs, get_expression_data_mapping,
+		// get_workflow_overview, get_node_context
+		const BASE_TOOL_COUNT = 17;
 
 		it('should return base tools when no feature flags are provided', () => {
 			const tools = getBuilderToolsForDisplay({

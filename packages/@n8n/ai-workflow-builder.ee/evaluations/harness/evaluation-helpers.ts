@@ -2,14 +2,9 @@ import type { Callbacks } from '@langchain/core/callbacks/manager';
 import { getLangchainCallbacks } from 'langsmith/langchain';
 import { v4 as uuid } from 'uuid';
 
-import type { SimpleWorkflow } from '@/types/workflow';
-import type { BuilderFeatureFlags, ChatPayload } from '@/workflow-builder-agent';
-
 import type { LlmCallLimiter } from './harness-types';
-import { generateRunId, isWorkflowStateValues } from '../langsmith/types';
-import type { IntrospectionCollector } from '../lifecycles/introspection-analysis';
-import { EVAL_TYPES, EVAL_USERS, DEFAULTS } from '../support/constants';
-import { createAgent, type CreateAgentOptions } from '../support/environment';
+import type { BuilderFeatureFlags, ChatPayload } from '../../src/workflow-builder-agent';
+import { DEFAULTS } from '../support/constants';
 
 /**
  * Get LangChain callbacks that bridge the current traceable context.
@@ -87,60 +82,83 @@ export function getChatPayload(options: GetChatPayloadOptions): ChatPayload {
 }
 
 /**
- * Options for createWorkflowGenerator - same as agent creation options
+ * Coordination log entry for subgraph timing extraction.
+ * Matches the CoordinationLogEntry type from src/types/coordination.ts
  */
-export type WorkflowGeneratorOptions = Omit<CreateAgentOptions, 'experimentName'> & {
-	/** Optional collector for introspection events */
-	introspectionCollector?: IntrospectionCollector;
-};
+interface CoordinationLogEntry {
+	phase: 'discovery' | 'builder' | 'state_management' | 'responder' | 'planner';
+	status: 'completed' | 'in_progress' | 'error';
+	timestamp: number;
+}
 
 /**
- * Workflow generator function type.
- * Returns the generated workflow.
+ * Subgraph metrics extracted from coordination log.
  */
-export type WorkflowGenerator = (prompt: string, callbacks?: Callbacks) => Promise<SimpleWorkflow>;
+export interface ExtractedSubgraphMetrics {
+	discoveryDurationMs?: number;
+	builderDurationMs?: number;
+	responderDurationMs?: number;
+	nodeCount?: number;
+}
 
 /**
- * Creates a workflow generator that returns a SimpleWorkflow.
- * When an IntrospectionCollector is provided, introspection events are collected as a side-effect.
- *
- * @param options - Agent configuration options (parsedNodeTypes, llms, featureFlags, introspectionCollector)
- * @returns Generator function that returns a SimpleWorkflow
+ * Calculate duration for a specific phase from coordination log entries.
+ * Looks for the first 'in_progress' and terminal ('completed' or 'error') status for the phase.
  */
-export function createWorkflowGenerator(options: WorkflowGeneratorOptions): WorkflowGenerator {
-	const { featureFlags, introspectionCollector } = options;
+function calculatePhaseDuration(
+	coordinationLog: CoordinationLogEntry[],
+	phase: 'discovery' | 'builder' | 'responder',
+): number | undefined {
+	const phaseEntries = coordinationLog.filter((entry) => entry.phase === phase);
+	if (phaseEntries.length === 0) return undefined;
 
-	return async (prompt: string, callbacks?: Callbacks): Promise<SimpleWorkflow> => {
-		const runId = generateRunId();
+	const inProgress = phaseEntries.find((e) => e.status === 'in_progress');
+	// Accept either 'completed' or 'error' as the terminal status
+	const terminal = phaseEntries.find((e) => e.status === 'completed' || e.status === 'error');
 
-		const agent = createAgent(options);
+	if (inProgress && terminal) {
+		return terminal.timestamp - inProgress.timestamp;
+	}
 
-		await consumeGenerator(
-			agent.chat(
-				getChatPayload({
-					evalType: EVAL_TYPES.LANGSMITH,
-					message: prompt,
-					workflowId: runId,
-					featureFlags,
-				}),
-				EVAL_USERS.LANGSMITH,
-				undefined, // abortSignal
-				callbacks,
-			),
-		);
+	// If no in_progress entry, try to calculate from first to last entry
+	if (phaseEntries.length >= 2) {
+		const sorted = [...phaseEntries].sort((a, b) => a.timestamp - b.timestamp);
+		return sorted[sorted.length - 1].timestamp - sorted[0].timestamp;
+	}
 
-		const state = await agent.getState(runId, EVAL_USERS.LANGSMITH);
+	return undefined;
+}
 
-		if (!state.values || !isWorkflowStateValues(state.values)) {
-			throw new Error('Invalid workflow state: workflow or messages missing');
+/**
+ * Extract subgraph metrics from coordination log and workflow.
+ */
+export function extractSubgraphMetrics(
+	coordinationLog: CoordinationLogEntry[] | undefined,
+	nodeCount: number | undefined,
+): ExtractedSubgraphMetrics {
+	const metrics: ExtractedSubgraphMetrics = {};
+
+	// Include node count
+	if (nodeCount !== undefined) {
+		metrics.nodeCount = nodeCount;
+	}
+
+	// Extract timing from coordination log
+	if (coordinationLog && coordinationLog.length > 0) {
+		const discoveryDuration = calculatePhaseDuration(coordinationLog, 'discovery');
+		const builderDuration = calculatePhaseDuration(coordinationLog, 'builder');
+		const responderDuration = calculatePhaseDuration(coordinationLog, 'responder');
+
+		if (discoveryDuration !== undefined) {
+			metrics.discoveryDurationMs = discoveryDuration;
 		}
-
-		// Collect introspection events as a side-effect if collector is provided
-		if (introspectionCollector) {
-			const events = state.values.introspectionEvents ?? [];
-			introspectionCollector.addEvents(events);
+		if (builderDuration !== undefined) {
+			metrics.builderDurationMs = builderDuration;
 		}
+		if (responderDuration !== undefined) {
+			metrics.responderDurationMs = responderDuration;
+		}
+	}
 
-		return state.values.workflowJSON;
-	};
+	return metrics;
 }

@@ -3,8 +3,8 @@ import type { BaseMessage } from '@langchain/core/messages';
 import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import type { RunnableConfig } from '@langchain/core/runnables';
 import type { Logger } from '@n8n/backend-common';
-import type { ReactAgent } from 'langchain';
-import { createAgent } from 'langchain';
+import { createAgent, createMiddleware } from 'langchain';
+import { z } from 'zod';
 
 import {
 	buildResponderPrompt,
@@ -13,29 +13,23 @@ import {
 	buildGeneralErrorGuidance,
 	buildDataTableCreationGuidance,
 } from '@/prompts';
+import type { CoordinationLogEntry } from '@/types/coordination';
+import type { DiscoveryContext } from '@/types/discovery-types';
+import type { SimpleWorkflow } from '@/types/workflow';
+import { buildSimplifiedExecutionContext, buildWorkflowOverview } from '@/utils/context-builders';
+import {
+	getErrorEntry,
+	getBuilderOutput,
+	hasRecursionErrorsCleared,
+} from '@/utils/coordination-log';
+import { extractDataTableInfo } from '@/utils/data-table-helpers';
+import type { ChatPayload } from '@/workflow-builder-agent';
 
 import {
 	createIntrospectTool,
 	extractIntrospectionEventsFromMessages,
 	type IntrospectionEvent,
 } from '../tools/introspect.tool';
-import type { CoordinationLogEntry } from '../types/coordination';
-import type { DiscoveryContext } from '../types/discovery-types';
-import { isAIMessage } from '../types/langchain';
-import type { SimpleWorkflow } from '../types/workflow';
-import {
-	getErrorEntry,
-	getBuilderOutput,
-	hasRecursionErrorsCleared,
-} from '../utils/coordination-log';
-import { extractDataTableInfo } from '../utils/data-table-helpers';
-
-export interface ResponderAgentConfig {
-	llm: BaseChatModel;
-	/** Enable introspection tool for diagnostic data collection. */
-	enableIntrospection?: boolean;
-	logger?: Logger;
-}
 
 /**
  * Context required for the responder to generate a response
@@ -51,48 +45,34 @@ export interface ResponderContext {
 	workflowJSON: SimpleWorkflow;
 	/** Summary of previous conversation (from compaction) */
 	previousSummary?: string;
+	/** Workflow context with execution data */
+	workflowContext?: ChatPayload['workflowContext'];
 }
 
 /**
- * Result from ResponderAgent.invoke
+ * Result from invokeResponderAgent
  */
 export interface ResponderResult {
-	response: AIMessage;
+	response: BaseMessage;
 	introspectionEvents: IntrospectionEvent[];
 }
 
 /**
- * Expected result type from agent.invoke
+ * Schema for context passed via runtime.context
  */
-interface AgentInvokeResult {
-	messages: BaseMessage[];
-}
+const responderContextSchema = z.object({
+	coordinationLog: z.array(z.any()),
+	discoveryContext: z.any().optional().nullable(),
+	workflowJSON: z.any(),
+	previousSummary: z.string().optional(),
+	workflowContext: z.any().optional(),
+});
 
 /**
- * Type guard for agent invoke result
+ * Build internal context message from coordination log and state.
+ * This is called by the middleware to inject context into the message stream.
  */
-function isValidAgentResult(value: unknown): value is AgentInvokeResult {
-	if (typeof value !== 'object' || value === null) {
-		return false;
-	}
-	const obj = value as Record<string, unknown>;
-	return Array.isArray(obj.messages);
-}
-
-/**
- * Context for building the internal context message
- */
-interface BuildContextInput {
-	coordinationLog: CoordinationLogEntry[];
-	discoveryContext: DiscoveryContext | null | undefined;
-	workflowJSON: SimpleWorkflow;
-	previousSummary?: string;
-}
-
-/**
- * Build internal context message from coordination log and state
- */
-function buildContextMessage(context: BuildContextInput): HumanMessage | null {
+function buildContextContent(context: ResponderContext): string | null {
 	const contextParts: string[] = [];
 
 	// Previous conversation summary (from compaction)
@@ -150,7 +130,8 @@ function buildContextMessage(context: BuildContextInput): HumanMessage | null {
 	if (builderOutput) {
 		contextParts.push(`**Builder:** ${builderOutput}`);
 	} else if (context.workflowJSON.nodes.length) {
-		contextParts.push(`**Workflow:** ${context.workflowJSON.nodes.length} nodes created`);
+		// Provide workflow overview with Mermaid diagram and parameters
+		contextParts.push(`**Workflow:**\n${buildWorkflowOverview(context.workflowJSON)}`);
 	}
 
 	// Data Table creation guidance
@@ -161,85 +142,149 @@ function buildContextMessage(context: BuildContextInput): HumanMessage | null {
 		contextParts.push(dataTableGuidance);
 	}
 
+	// Execution status (simplified error info for user explanations)
+	if (context.workflowContext) {
+		const executionStatus = buildSimplifiedExecutionContext(
+			context.workflowContext,
+			context.workflowJSON.nodes,
+		);
+		contextParts.push(`**Execution Status:**\n${executionStatus}`);
+	}
+
 	if (contextParts.length === 0) {
 		return null;
 	}
 
-	return new HumanMessage({
-		content: `[Internal Context - Use this to craft your response]\n${contextParts.join('\n\n')}`,
+	return `[Internal Context - Use this to craft your response]\n${contextParts.join('\n\n')}`;
+}
+
+/**
+ * Middleware that injects coordination context into the model request.
+ * This replaces the manual context building in the old class-based implementation.
+ */
+const contextInjectionMiddleware = createMiddleware({
+	name: 'ResponderContextInjection',
+	contextSchema: responderContextSchema,
+	wrapModelCall: async (request, handler) => {
+		const context = request.runtime.context as z.infer<typeof responderContextSchema> | undefined;
+		if (!context) {
+			return await handler(request);
+		}
+
+		// Build the full ResponderContext for the helper function
+		// Use explicit casts since the Zod schema uses z.any() for complex types
+		const responderContext: ResponderContext = {
+			messages: request.messages,
+			coordinationLog: (context.coordinationLog ?? []) as CoordinationLogEntry[],
+			discoveryContext: context.discoveryContext as DiscoveryContext | null | undefined,
+			workflowJSON: (context.workflowJSON ?? { nodes: [], connections: {} }) as SimpleWorkflow,
+			previousSummary: context.previousSummary,
+			workflowContext: context.workflowContext as ChatPayload['workflowContext'] | undefined,
+		};
+
+		const contextContent = buildContextContent(responderContext);
+		if (!contextContent) {
+			return await handler(request);
+		}
+
+		// Inject context as an additional human message
+		const contextMessage = new HumanMessage({ content: contextContent });
+
+		return await handler({
+			...request,
+			messages: [...request.messages, contextMessage],
+		});
+	},
+});
+
+export interface ResponderAgentConfig {
+	llm: BaseChatModel;
+	/** Enable introspection tool for diagnostic data collection. */
+	enableIntrospection?: boolean;
+	logger?: Logger;
+}
+
+/**
+ * Create Responder agent using LangChain v1 createAgent.
+ *
+ * The Responder synthesizes final user-facing responses from workflow building context.
+ * It handles conversational queries and explanations.
+ */
+export function createResponderAgent(config: ResponderAgentConfig) {
+	const tools = config.enableIntrospection
+		? [createIntrospectTool(config.logger).tool]
+		: [];
+
+	const systemPromptText = buildResponderPrompt({
+		enableIntrospection: config.enableIntrospection,
+	});
+
+	// Use SystemMessage with cache_control for Anthropic prompt caching
+	const systemPrompt = new SystemMessage({
+		content: [
+			{
+				type: 'text',
+				text: systemPromptText,
+				cache_control: { type: 'ephemeral' },
+			},
+		],
+	});
+
+	return createAgent({
+		model: config.llm,
+		tools,
+		systemPrompt,
+		middleware: [contextInjectionMiddleware],
+		contextSchema: responderContextSchema,
 	});
 }
 
 /**
- * Responder Agent
- *
- * Synthesizes final user-facing responses from workflow building context.
- * Handles conversational queries and explanations.
+ * Type for the compiled agent returned by createResponderAgent
  */
-export class ResponderAgent {
-	private readonly agent: ReactAgent;
+export type ResponderAgentType = ReturnType<typeof createResponderAgent>;
 
-	private readonly enableIntrospection: boolean;
+/**
+ * Invoke the responder agent with the given context.
+ * This is a convenience wrapper that handles context passing.
+ *
+ * @returns The response message and any introspection events collected
+ */
+export async function invokeResponderAgent(
+	agent: ResponderAgentType,
+	context: ResponderContext,
+	config?: RunnableConfig,
+	options?: { enableIntrospection?: boolean },
+): Promise<ResponderResult> {
+	const result = await agent.invoke(
+		{ messages: context.messages },
+		{
+			...config,
+			context: {
+				coordinationLog: context.coordinationLog,
+				discoveryContext: context.discoveryContext,
+				workflowJSON: context.workflowJSON,
+				previousSummary: context.previousSummary,
+				workflowContext: context.workflowContext,
+			},
+		},
+	);
 
-	constructor(config: ResponderAgentConfig) {
-		this.enableIntrospection = config.enableIntrospection === true;
+	// Extract the last message from the result
+	// The agent returns { messages: BaseMessage[], ... } after processing
+	const messages = result.messages;
 
-		const tools = this.enableIntrospection ? [createIntrospectTool(config.logger).tool] : [];
+	// Extract introspection events from tool calls in agent messages
+	const introspectionEvents = options?.enableIntrospection
+		? extractIntrospectionEventsFromMessages(messages)
+		: [];
 
-		this.agent = createAgent({
-			model: config.llm,
-			tools,
-			systemPrompt: new SystemMessage({
-				content: [
-					{
-						type: 'text',
-						text: buildResponderPrompt({ enableIntrospection: config.enableIntrospection }),
-						cache_control: { type: 'ephemeral' },
-					},
-				],
-			}),
-		});
-	}
+	const response =
+		messages.length === 0
+			? new AIMessage({
+					content: 'I encountered an issue generating a response. Please try again.',
+				})
+			: messages[messages.length - 1];
 
-	/**
-	 * Invoke the responder agent with the given context
-	 * @param context - Responder context with messages and workflow state
-	 * @param config - Optional RunnableConfig for tracing callbacks
-	 * @returns Response message and any introspection events collected
-	 */
-	async invoke(context: ResponderContext, config?: RunnableConfig): Promise<ResponderResult> {
-		// Build context message and add to input messages
-		const contextMessage = buildContextMessage({
-			coordinationLog: context.coordinationLog,
-			discoveryContext: context.discoveryContext ?? null,
-			workflowJSON: context.workflowJSON,
-			previousSummary: context.previousSummary,
-		});
-
-		const inputMessages = contextMessage ? [...context.messages, contextMessage] : context.messages;
-
-		const result = await this.agent.invoke({ messages: inputMessages }, config);
-
-		if (!isValidAgentResult(result)) {
-			return {
-				response: new AIMessage({ content: 'I encountered an issue generating a response.' }),
-				introspectionEvents: [],
-			};
-		}
-
-		const lastMessage = result.messages.at(-1);
-
-		// Extract introspection events from all AIMessages in the conversation
-		const introspectionEvents = this.enableIntrospection
-			? extractIntrospectionEventsFromMessages(result.messages)
-			: [];
-
-		return {
-			response:
-				lastMessage && isAIMessage(lastMessage)
-					? lastMessage
-					: new AIMessage({ content: 'I encountered an issue generating a response.' }),
-			introspectionEvents,
-		};
-	}
+	return { response, introspectionEvents };
 }

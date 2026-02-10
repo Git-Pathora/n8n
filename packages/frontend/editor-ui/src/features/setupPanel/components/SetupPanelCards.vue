@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { useWorkflowSetupState } from '@/features/setupPanel/composables/useWorkflowSetupState';
 import NodeSetupCard from './NodeSetupCard.vue';
+import DemoWorkflowCard from './DemoWorkflowCard.vue';
 import { N8nIcon, N8nText } from '@n8n/design-system';
 import { useI18n } from '@n8n/i18n';
 
 const i18n = useI18n();
-const { nodeSetupStates, isAllComplete, setCredential, unsetCredential } = useWorkflowSetupState();
+const { nodeSetupStates, isAllComplete, setCredential, unsetCredential, isReadyToDemo } =
+	useWorkflowSetupState();
+
+const wasReadyToDemo = isReadyToDemo.value;
 
 const onCredentialSelected = (
 	nodeName: string,
@@ -46,6 +50,7 @@ const onTestNode = (_nodeName: string) => {
 			</div>
 		</div>
 		<div v-else :class="$style['card-list']" data-test-id="setup-cards-list">
+			<DemoWorkflowCard />
 			<NodeSetupCard
 				v-for="state in nodeSetupStates"
 				:key="state.node.id"

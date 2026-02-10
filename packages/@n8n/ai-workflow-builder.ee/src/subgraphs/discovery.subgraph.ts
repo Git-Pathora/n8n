@@ -243,7 +243,8 @@ export class DiscoverySubgraph extends BaseSubgraph<
 		}
 
 		// Conditionally add documentation and workflow examples tools if feature flag is enabled
-		const tools = includeExamples ? [
+		const tools = includeExamples
+			? [
 					...baseTools,
 					createGetDocumentationTool().tool,
 					createGetWorkflowExamplesTool(config.logger).tool,

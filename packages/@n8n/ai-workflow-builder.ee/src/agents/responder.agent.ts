@@ -221,9 +221,7 @@ export interface ResponderAgentConfig {
  * It handles conversational queries and explanations.
  */
 export function createResponderAgent(config: ResponderAgentConfig) {
-	const tools = config.enableIntrospection
-		? [createIntrospectTool(config.logger).tool]
-		: [];
+	const tools = config.enableIntrospection ? [createIntrospectTool(config.logger).tool] : [];
 
 	const systemPromptText = buildResponderPrompt({
 		enableIntrospection: config.enableIntrospection,

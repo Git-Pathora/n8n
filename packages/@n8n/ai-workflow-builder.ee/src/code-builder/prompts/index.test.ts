@@ -160,7 +160,7 @@ export default workflow('', 'Test').add(start);`;
 			expect(content).toContain('Use metric units for temperature');
 		});
 
-		it('includes plan_mode_instructions in system prompt when planOutput is provided', async () => {
+		it('replaces step 1 with plan-specific version when planOutput is provided', async () => {
 			const prompt = buildCodeBuilderPrompt(undefined, undefined, {
 				planOutput: mockPlan,
 			});
@@ -171,11 +171,33 @@ export default workflow('', 'Test').add(start);`;
 				? systemMessage.content.map((b) => ('text' in b ? b.text : '')).join('')
 				: String(systemMessage?.content ?? '');
 
-			expect(content).toContain('<plan_mode_instructions>');
-			expect(content).toContain('</plan_mode_instructions>');
+			// Should NOT contain the default step 1 (requirements analysis)
+			expect(content).not.toContain('<step_1_analyze_user_request>');
+			// Should contain a plan-specific step 1
+			expect(content).toContain('<step_1_read_approved_plan>');
+			expect(content).toContain('</step_1_read_approved_plan>');
 		});
 
-		it('does not include plan sections when planOutput is not provided', async () => {
+		it('excludes step 2a (get_suggested_nodes) when planOutput is provided', async () => {
+			const prompt = buildCodeBuilderPrompt(undefined, undefined, {
+				planOutput: mockPlan,
+			});
+
+			const messages = await prompt.formatMessages({ userMessage: 'Build weather workflow' });
+			const systemMessage = messages.find((m) => m._getType() === 'system');
+			const content = Array.isArray(systemMessage?.content)
+				? systemMessage.content.map((b) => ('text' in b ? b.text : '')).join('')
+				: String(systemMessage?.content ?? '');
+
+			// Should NOT contain step 2a at all
+			expect(content).not.toContain('<step_2a_get_suggested_nodes>');
+			expect(content).not.toContain('get_suggested_nodes');
+			// Should still contain step 2b (search_nodes)
+			expect(content).toContain('<step_2b_search_for_nodes>');
+			expect(content).toContain('search_nodes');
+		});
+
+		it('includes default steps 1 and 2a when planOutput is not provided', async () => {
 			const prompt = buildCodeBuilderPrompt();
 
 			const messages = await prompt.formatMessages({ userMessage: 'test' });
@@ -188,7 +210,11 @@ export default workflow('', 'Test').add(start);`;
 				: String(systemMessage?.content ?? '');
 
 			expect(humanContent).not.toContain('<approved_plan>');
-			expect(systemContent).not.toContain('<plan_mode_instructions>');
+			// Should contain the default steps
+			expect(systemContent).toContain('<step_1_analyze_user_request>');
+			expect(systemContent).toContain('<step_2a_get_suggested_nodes>');
+			// Should NOT contain plan-specific step
+			expect(systemContent).not.toContain('<step_1_read_approved_plan>');
 		});
 	});
 });

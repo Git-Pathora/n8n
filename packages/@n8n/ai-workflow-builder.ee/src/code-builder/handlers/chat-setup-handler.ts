@@ -133,8 +133,8 @@ export class ChatSetupHandler {
 			planOutput: payload.planOutput,
 		});
 
-		// Bind tools to LLM
-		const llmWithTools = this.bindToolsToLlm(textEditorEnabled);
+		// Bind tools to LLM (exclude get_suggested_nodes when plan provides node suggestions)
+		const llmWithTools = this.bindToolsToLlm(textEditorEnabled, !!payload.planOutput);
 
 		// Format initial messages
 		const messages = await this.formatInitialMessages(prompt, payload.message);
@@ -199,16 +199,25 @@ export class ChatSetupHandler {
 	 *
 	 * @returns LLM with tools bound, typed for use with AgentIterationHandler
 	 */
-	private bindToolsToLlm(textEditorEnabled: boolean): LlmWithTools {
+	private bindToolsToLlm(textEditorEnabled: boolean, hasPlanOutput: boolean): LlmWithTools {
 		if (!this.llm.bindTools) {
 			throw new Error('LLM does not support bindTools - cannot use tools for node discovery');
 		}
 
-		const toolsToUse = textEditorEnabled
-			? [...this.tools, TEXT_EDITOR_TOOL, VALIDATE_TOOL, BATCH_STR_REPLACE_TOOL]
-			: this.tools;
+		// When an approved plan is provided, exclude get_suggested_nodes
+		// because the plan already contains curated node suggestions per step
+		let tools: Array<
+			| StructuredToolInterface
+			| typeof TEXT_EDITOR_TOOL
+			| typeof VALIDATE_TOOL
+			| typeof BATCH_STR_REPLACE_TOOL
+		> = hasPlanOutput ? this.tools.filter((t) => t.name !== 'get_suggested_nodes') : this.tools;
 
-		return this.llm.bindTools(toolsToUse) as LlmWithTools;
+		if (textEditorEnabled) {
+			tools = [...tools, TEXT_EDITOR_TOOL, VALIDATE_TOOL, BATCH_STR_REPLACE_TOOL];
+		}
+
+		return this.llm.bindTools(tools) as LlmWithTools;
 	}
 
 	/**

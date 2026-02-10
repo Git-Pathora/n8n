@@ -533,12 +533,15 @@ export default workflow('ai-sentiment', 'AI Sentiment Analyzer')
 \`\`\`
 </ai_agent_with_structured_output>`;
 
-/**
- * Mandatory workflow for tool usage
- */
-const MANDATORY_WORKFLOW = `**You MUST follow these steps in order. Do NOT produce visible output until the final step — only tool calls. Use the \`think\` tool in-between steps (after first step) when you need to reason about results.**
+// ── Mandatory workflow steps ──────────────────────────────────────────────────
+// Steps are split into constants so the prompt can swap in plan-specific
+// versions of Steps 1, 2a, 2b, 2c, and 3 when an approved plan is provided.
 
-<step_1_analyze_user_request>
+const MANDATORY_WORKFLOW_INTRO = `**You MUST follow these steps in order. Do NOT produce visible output until the final step — only tool calls. Use the \`think\` tool in-between steps (after first step) when you need to reason about results.**`;
+
+// ── Step 1 variants ──────────────────────────────────────────────────────────
+
+const STEP_1_ANALYZE_USER_REQUEST = `<step_1_analyze_user_request>
 
 Analyze the user request internally. Do NOT produce visible output in this step — reason internally (NOT Think tool), then proceed to tool calls. Be concise.
 
@@ -567,11 +570,23 @@ Analyze the user request internally. Do NOT produce visible output in this step 
    - Loops (batch processing)
    - Data transformation needs
 
-</step_1_analyze_user_request>
+</step_1_analyze_user_request>`;
 
-<step_2_search_for_nodes>
+const STEP_1_READ_APPROVED_PLAN = `<step_1_read_approved_plan>
 
-<step_2a_get_suggested_nodes>
+Read the approved plan provided in <approved_plan>. Do NOT re-analyze the user request — the plan is the authoritative specification.
+
+1. **Collect node types**: Extract all node type names from each step's suggestedNodes.
+2. **Note the trigger**: Identify the trigger type described in the plan.
+3. **Note additional specs**: Review any additionalSpecs for constraints.
+
+Proceed directly to Step 2.
+
+</step_1_read_approved_plan>`;
+
+// ── Step 2 variants ──────────────────────────────────────────────────────────
+
+const STEP_2A_GET_SUGGESTED_NODES = `<step_2a_get_suggested_nodes>
 
 Do NOT produce visible output — only the tool call. Call \`get_suggested_nodes\` with the workflow technique categories identified in Step 1:
 
@@ -581,9 +596,9 @@ get_suggested_nodes({{ categories: ["chatbot", "notification"] }})
 
 This returns curated node recommendations with pattern hints and configuration guidance.
 
-</step_2a_get_suggested_nodes>
+</step_2a_get_suggested_nodes>`;
 
-<step_2b_search_for_nodes>
+const STEP_2B_SEARCH_DEFAULT = `<step_2b_search_for_nodes>
 
 Do NOT produce visible output — only the tool call. Be EXTREMELY concise. Call \`search_nodes\` to find specific nodes for services identified in Step 1 and ALL node types you plan to use:
 
@@ -598,9 +613,24 @@ Search for:
 - AI-related terms if needed
 - **Nodes from suggested results you plan to use**
 
-</step_2b_search_for_nodes>
+</step_2b_search_for_nodes>`;
 
-<step_2c_review_search_results>
+const STEP_2B_SEARCH_PLAN = `<step_2b_search_for_nodes>
+
+Do NOT produce visible output — only the tool call. Be EXTREMELY concise. Call \`search_nodes\` with node types from the plan's suggestedNodes to get discriminators, versions, and related nodes:
+
+\`\`\`
+search_nodes({{ queries: ["httpRequest", "slack", "schedule trigger", "set", ...] }})
+\`\`\`
+
+Search for:
+- All node types listed in the plan's suggestedNodes
+- The trigger type mentioned in the plan
+- **Utility nodes you'll need** (set/edit fields, filter, if, code, merge, switch, etc.)
+
+</step_2b_search_for_nodes>`;
+
+const STEP_2C_REVIEW_DEFAULT = `<step_2c_review_search_results>
 
 Use the \`think\` tool to review all results. Do NOT produce visible output in this step. Be EXTREMELY concise.
 
@@ -615,11 +645,27 @@ For each service/concept searched, list the matching node(s) found:
 
 If you have everything you need to build a workflow, continue to step 3, planning the workflow design.
 
-</step_2c_review_search_results>
+</step_2c_review_search_results>`;
 
-</step_2_search_for_nodes>
+const STEP_2C_REVIEW_PLAN = `<step_2c_review_search_results>
 
-<step_3_plan_workflow_design>
+Use the \`think\` tool to review all results. Do NOT produce visible output in this step. Be EXTREMELY concise.
+
+For each node searched, list the matching node(s) found:
+- Note which nodes have [TRIGGER] tags for trigger nodes
+- Note discriminator requirements (resource/operation or mode) for each node
+- Note [RELATED] nodes that might be useful
+- Note @relatedNodes with relationHints for complementary nodes
+- **Pay special attention to @builderHint and @example annotations** — write these out as they are guides specifically meant to help you choose the right node configurations
+- It's OK for this section to be quite long if many nodes were found
+
+If you have everything you need to build a workflow, continue to step 3, planning the workflow design.
+
+</step_2c_review_search_results>`;
+
+// ── Step 3 variants ──────────────────────────────────────────────────────────
+
+const STEP_3_DESIGN_DEFAULT = `<step_3_plan_workflow_design>
 
 Use the \`think\` tool to make design decisions based on the reviewed results. Do NOT produce visible output in this step.
 
@@ -643,9 +689,35 @@ Use the \`think\` tool to make design decisions based on the reviewed results. D
 It's OK for this section to be quite long as you work through the design.
 **Pay attention to @builderHint annotations in the type definitions** - these provide critical guidance on how to correctly configure node parameters.
 
-</step_3_plan_workflow_design>
+</step_3_plan_workflow_design>`;
 
-<step_4_get_node_type_definitions>
+const STEP_3_DESIGN_PLAN = `<step_3_plan_workflow_design>
+
+Use the \`think\` tool to make design decisions based on the search results and the approved plan's steps. Do NOT produce visible output in this step.
+
+1. **Select Nodes**: Based on search results and the plan's steps, choose specific nodes:
+   - Use dedicated integration nodes when available (from search)
+   - Only use HTTP Request if no dedicated node was found
+   - Note discriminators needed for each node
+   - Follow the plan's step sequence as the workflow structure
+
+2. **Map Node Connections**:
+   - Is this linear, branching, parallel, or looped? Or merge to combine parallel branches?
+   - **Trace item counts**: For each connection A → B, if A returns N items, should B run N times or just once? If B doesn't need A's items (e.g., it fetches from an independent source), either set \`executeOnce: true\` on B or use parallel branches + Merge to combine results.
+   - Which nodes connect to which?
+	 - Draw out the flow in text form (e.g., "Trigger → Node A → Node B → Node C" or "Trigger → Node A → [Node B (true), Node C (false)]")
+   - **Handling convergence after branches**: When a node receives data from multiple paths (after Switch, IF, Merge): use optional chaining \`expr('{{{{ $json.data?.approved ?? $json.status }}}}')\`, reference a node that ALWAYS runs \`expr("{{{{ $('Webhook').item.json.field }}}}")\`, or normalize data before convergence with Set nodes
+
+3. **Prepare get_node_types Call**: Write the exact call including discriminators
+
+It's OK for this section to be quite long as you work through the design.
+**Pay attention to @builderHint annotations in the type definitions** - these provide critical guidance on how to correctly configure node parameters.
+
+</step_3_plan_workflow_design>`;
+
+// ── Steps 4–7 (shared) ──────────────────────────────────────────────────────
+
+const STEPS_4_THROUGH_7 = `<step_4_get_node_type_definitions>
 
 Do NOT produce visible output — only the tool call.
 
@@ -706,6 +778,28 @@ When validation passes, stop calling tools.
 </step_7_finalize>`;
 
 /**
+ * Build the mandatory workflow steps, swapping in plan-specific versions
+ * of Steps 1, 2a, 2b, 2c, and 3 when an approved plan is provided.
+ */
+function buildMandatoryWorkflow(hasPlanOutput: boolean): string {
+	const step1 = hasPlanOutput ? STEP_1_READ_APPROVED_PLAN : STEP_1_ANALYZE_USER_REQUEST;
+	const step2a = hasPlanOutput ? '' : STEP_2A_GET_SUGGESTED_NODES;
+	const step2b = hasPlanOutput ? STEP_2B_SEARCH_PLAN : STEP_2B_SEARCH_DEFAULT;
+	const step2c = hasPlanOutput ? STEP_2C_REVIEW_PLAN : STEP_2C_REVIEW_DEFAULT;
+	const step3 = hasPlanOutput ? STEP_3_DESIGN_PLAN : STEP_3_DESIGN_DEFAULT;
+
+	const step2Parts = [step2a, step2b, step2c].filter(Boolean).join('\n');
+
+	return [
+		MANDATORY_WORKFLOW_INTRO,
+		step1,
+		`<step_2_search_for_nodes>\n${step2Parts}\n</step_2_search_for_nodes>`,
+		step3,
+		STEPS_4_THROUGH_7,
+	].join('\n\n');
+}
+
+/**
  * History context for multi-turn conversations
  */
 export interface HistoryContext {
@@ -749,6 +843,9 @@ export function buildCodeBuilderPrompt(
 	historyContext?: HistoryContext,
 	options?: BuildCodeBuilderPromptOptions,
 ): ChatPromptTemplate {
+	const hasPlanOutput = !!options?.planOutput;
+	const mandatoryWorkflow = buildMandatoryWorkflow(hasPlanOutput);
+
 	const promptSections = [
 		`<role>\n${ROLE}\n</role>`,
 		`<response_style>\n${RESPONSE_STYLE}\n</response_style>`,
@@ -756,14 +853,8 @@ export function buildCodeBuilderPrompt(
 		`<workflow_patterns>\n${WORKFLOW_PATTERNS}\n</workflow_patterns>`,
 		`<expression_reference>\n${EXPRESSION_REFERENCE}\n</expression_reference>`,
 		`<additional_functions>\n${ADDITIONAL_FUNCTIONS}\n</additional_functions>`,
-		`<mandatory_workflow_process>\n${MANDATORY_WORKFLOW}\n</mandatory_workflow_process>`,
+		`<mandatory_workflow_process>\n${mandatoryWorkflow}\n</mandatory_workflow_process>`,
 	];
-
-	if (options?.planOutput) {
-		promptSections.push(
-			"<plan_mode_instructions>\nAn approved workflow plan is provided in the user message under <approved_plan>. Use this plan as the authoritative specification for what to build. Your Step 1 analysis should follow this plan. The plan's trigger, steps, and suggested nodes guide your search and node selection.\n</plan_mode_instructions>",
-		);
-	}
 
 	const systemMessage = promptSections.join('\n\n');
 

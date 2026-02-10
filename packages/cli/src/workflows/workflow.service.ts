@@ -125,6 +125,7 @@ export class WorkflowService {
 			projectRoles?: string[];
 			workflowRoles?: string[];
 			isPersonalProject?: boolean;
+			personalProjectOwnerId?: string;
 			onlySharedWithMe?: boolean;
 		} = {};
 
@@ -133,6 +134,7 @@ export class WorkflowService {
 				return { workflows: [], count: 0 };
 			}
 			sharingOptions.isPersonalProject = true;
+			sharingOptions.personalProjectOwnerId = personalProjectOwnerId;
 		} else if (onlySharedWithMe) {
 			sharingOptions.onlySharedWithMe = true;
 		} else {

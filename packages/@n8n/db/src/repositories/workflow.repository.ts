@@ -389,6 +389,7 @@ export class WorkflowRepository extends Repository<WorkflowEntity> {
 			projectRoles?: string[];
 			workflowRoles?: string[];
 			isPersonalProject?: boolean;
+			personalProjectOwnerId?: string;
 			onlySharedWithMe?: boolean;
 		},
 		options: ListQuery.Options = {},
@@ -435,6 +436,7 @@ export class WorkflowRepository extends Repository<WorkflowEntity> {
 			projectRoles?: string[];
 			workflowRoles?: string[];
 			isPersonalProject?: boolean;
+			personalProjectOwnerId?: string;
 			onlySharedWithMe?: boolean;
 		},
 		options: ListQuery.Options = {},
@@ -462,6 +464,7 @@ export class WorkflowRepository extends Repository<WorkflowEntity> {
 			projectRoles?: string[];
 			workflowRoles?: string[];
 			isPersonalProject?: boolean;
+			personalProjectOwnerId?: string;
 			onlySharedWithMe?: boolean;
 		},
 		options: ListQuery.Options = {},
@@ -475,9 +478,8 @@ export class WorkflowRepository extends Repository<WorkflowEntity> {
 		);
 
 		const response = await baseQuery
-			.select(`COUNT(DISTINCT ${baseQuery.escape('RESULT')}.${baseQuery.escape('id')})`, 'count')
-			.from('RESULT_QUERY', 'RESULT')
 			.select('COUNT(*)', 'count')
+			.from('RESULT_QUERY', 'RESULT')
 			.getRawOne<{ count: number | string }>();
 
 		return Number(response?.count) || 0;
@@ -490,6 +492,7 @@ export class WorkflowRepository extends Repository<WorkflowEntity> {
 			projectRoles?: string[];
 			workflowRoles?: string[];
 			isPersonalProject?: boolean;
+			personalProjectOwnerId?: string;
 			onlySharedWithMe?: boolean;
 		},
 		options: ListQuery.Options = {},
@@ -659,6 +662,7 @@ export class WorkflowRepository extends Repository<WorkflowEntity> {
 			projectRoles?: string[];
 			workflowRoles?: string[];
 			isPersonalProject?: boolean;
+			personalProjectOwnerId?: string;
 			onlySharedWithMe?: boolean;
 		},
 		options: ListQuery.Options = {},
@@ -683,6 +687,7 @@ export class WorkflowRepository extends Repository<WorkflowEntity> {
 			projectRoles?: string[];
 			workflowRoles?: string[];
 			isPersonalProject?: boolean;
+			personalProjectOwnerId?: string;
 			onlySharedWithMe?: boolean;
 		},
 		options: ListQuery.Options = {},
@@ -738,13 +743,20 @@ export class WorkflowRepository extends Repository<WorkflowEntity> {
 			projectRoles?: string[];
 			workflowRoles?: string[];
 			isPersonalProject?: boolean;
+			personalProjectOwnerId?: string;
 			onlySharedWithMe?: boolean;
 			projectId?: string;
 		},
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 	): SelectQueryBuilder<any> {
-		const { projectRoles, workflowRoles, isPersonalProject, onlySharedWithMe, projectId } =
-			sharingOptions;
+		const {
+			projectRoles,
+			workflowRoles,
+			isPersonalProject,
+			personalProjectOwnerId,
+			onlySharedWithMe,
+			projectId,
+		} = sharingOptions;
 
 		const subquery = this.manager
 			.createQueryBuilder()
@@ -754,12 +766,13 @@ export class WorkflowRepository extends Repository<WorkflowEntity> {
 		// Handle different sharing scenarios
 		// Check explicit filters first (isPersonalProject, onlySharedWithMe) before falling back to user's global permissions
 		if (isPersonalProject) {
-			// Personal project - get owned workflows in the specified personal project
+			// Personal project - get owned workflows using the project owner's ID (not the requesting user's)
+			const ownerUserId = personalProjectOwnerId ?? user.id;
 			subquery
 				.innerJoin(Project, 'p', 'sw.projectId = p.id')
 				.innerJoin(ProjectRelation, 'pr', 'pr.projectId = p.id')
 				.where('sw.role = :ownerRole', { ownerRole: 'workflow:owner' })
-				.andWhere('pr.userId = :subqueryUserId', { subqueryUserId: user.id })
+				.andWhere('pr.userId = :subqueryUserId', { subqueryUserId: ownerUserId })
 				.andWhere('pr.role = :projectOwnerRole', { projectOwnerRole: PROJECT_OWNER_ROLE_SLUG });
 
 			// Filter by the specific project ID when specified

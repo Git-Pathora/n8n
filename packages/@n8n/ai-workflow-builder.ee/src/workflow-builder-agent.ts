@@ -34,7 +34,7 @@ const WORKFLOW_TOO_COMPLEX_ERROR =
 
 /**
  * Type for the state snapshot with properly typed values.
- * Note: Uses WorkflowState.State for backward compatibility with telemetry fields.
+ * Note: Uses WorkflowState.State for backward compatibility.
  * The actual graph uses ParentGraphState which includes additional fields like introspectionEvents.
  */
 export type TypedStateSnapshot = Omit<StateSnapshot, 'values'> & {

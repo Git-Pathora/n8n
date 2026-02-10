@@ -177,7 +177,7 @@ export class BuilderSubgraph extends BaseSubgraph<
 		// Use separate LLM for parameter updater if provided
 		const parameterUpdaterLLM = config.llmParameterUpdater ?? config.llm;
 
-		// Create base tools - explicitly typed to allow adding different tool types
+		// Create all tools (structure + configuration)
 		const baseTools: BuilderTool[] = [
 			// Structure tools
 			createAddNodeTool(config.parsedNodeTypes),
@@ -202,17 +202,18 @@ export class BuilderSubgraph extends BaseSubgraph<
 			// Workflow context tools
 			createGetWorkflowOverviewTool(config.logger),
 			createGetNodeContextTool(config.logger),
-			// Conditionally add resource locator tool if callback is provided
-			...(config.resourceLocatorCallback
-				? [
-						createGetResourceLocatorOptionsTool(
-							config.parsedNodeTypes,
-							config.resourceLocatorCallback,
-							config.logger,
-						),
-					]
-				: []),
 		];
+
+		// Conditionally add resource locator tool if callback is provided
+		if (config.resourceLocatorCallback) {
+			baseTools.push(
+				createGetResourceLocatorOptionsTool(
+					config.parsedNodeTypes,
+					config.resourceLocatorCallback,
+					config.logger,
+				),
+			);
+		}
 
 		// Conditionally add introspect tool if feature flag is enabled
 		if (enableIntrospection) {

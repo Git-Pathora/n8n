@@ -111,6 +111,26 @@ describe('Expression System', () => {
 			const result = expr("{{ $('Config').item.json.apiUrl }}");
 			expect(result).toBe("={{ $('Config').item.json.apiUrl }}");
 		});
+
+		it('should throw clear error when called with a PlaceholderValue', () => {
+			const placeholderObj = { __placeholder: true, hint: 'Your API URL' };
+			expect(() => expr(placeholderObj as unknown as string)).toThrow(
+				"expr(placeholder('Your API URL')) is invalid. Use placeholder() directly as the value, not inside expr().",
+			);
+		});
+
+		it('should throw clear error when called with a NewCredentialValue', () => {
+			const credObj = { __newCredential: true, name: 'Slack Bot' };
+			expect(() => expr(credObj as unknown as string)).toThrow(
+				"expr(newCredential('Slack Bot')) is invalid. Use newCredential() directly in the credentials config, not inside expr().",
+			);
+		});
+
+		it('should throw generic error for other non-string arguments', () => {
+			expect(() => expr(123 as unknown as string)).toThrow(
+				'expr() requires a string argument, but received number.',
+			);
+		});
 	});
 
 	describe('createFromAIExpression() key sanitization', () => {

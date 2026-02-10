@@ -48,7 +48,7 @@ const EXPRESSION_REFERENCE = `Available variables inside \`expr('{{{{ ... }}}}')
  */
 const ADDITIONAL_FUNCTIONS = `Additional SDK functions:
 
-- \`placeholder('hint')\` — marks a parameter value for user input. Must be the entire value, cannot be concatenated.
+- \`placeholder('hint')\` — marks a parameter value for user input. Use directly as the parameter value — never wrap in \`expr()\`, objects, or arrays.
   Example: \`parameters: {{ url: placeholder('Your API URL (e.g. https://api.example.com/v1)') }}\`
 
 - \`sticky('content', nodes?, config?)\` — creates a sticky note on the canvas.
@@ -678,6 +678,7 @@ Rules:
 - Expressions: use \`expr()\` for any \`{{{{ }}}}\` syntax  — always use single or double quotes, NOT backtick template literals
   - e.g. \`expr('Hello {{{{ $json.name }}}}')\` or \`expr("{{{{ $('Node').item.json.field }}}}")\`
 	- For multiline expressions, use string concatenation: \`expr('Line 1\\n' + 'Line 2 {{{{ $json.value }}}}')\`
+- Placeholders: use \`placeholder('hint')\` directly as the parameter value, not inside \`expr()\`, objects, or arrays, etc.
 - Every node MUST have an \`output\` property with sample data — following nodes depend on it for expressions
 - String quoting: When a string value contains an apostrophe, use double quotes for that string.
   Example: \`output: [{{ text: "I've arrived" }}]\`

@@ -7,6 +7,7 @@ import {
 	UnsupportedNodeError,
 	UnknownIdentifierError,
 } from './errors';
+import { expr } from '../expression';
 import type { SDKFunctions } from './interpreter';
 import { interpretSDKCode } from './interpreter';
 import { parseSDKCode } from './parser';
@@ -55,7 +56,14 @@ const createMockSDKFunctions = (): SDKFunctions => ({
 		content,
 		options,
 	})),
-	placeholder: jest.fn((value: string) => `__PLACEHOLDER__${value}__`),
+	placeholder: jest.fn((value: string) => ({
+		__placeholder: true as const,
+		hint: value,
+		toString: () => `<__PLACEHOLDER_VALUE__${value}__>`,
+		toJSON() {
+			return this.toString();
+		},
+	})),
 	newCredential: jest.fn((name: string) => ({ __newCredential: true, name })),
 	ifElse: jest.fn(),
 	switchCase: jest.fn(),
@@ -732,6 +740,20 @@ describe('AST Interpreter', () => {
 		it('should still reject other string methods', () => {
 			const code = 'export default "hello".toUpperCase();';
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
+		});
+	});
+
+	describe('expr(placeholder(...)) error', () => {
+		it('should throw clear error when expr receives a PlaceholderValue', () => {
+			const funcs: SDKFunctions = {
+				...createMockSDKFunctions(),
+				expr,
+			};
+			const code = `const val = expr(placeholder('Your ID'));
+export default val;`;
+			expect(() => interpretSDKCode(code, funcs)).toThrow(
+				"expr(placeholder('Your ID')) is invalid",
+			);
 		});
 	});
 });

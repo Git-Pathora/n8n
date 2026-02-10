@@ -178,7 +178,46 @@ export function serializeExpression<T>(fn: Expression<T>): string {
  * expr('={{ $json.x }}')             // '={{ $json.x }}' (strips redundant =)
  * ```
  */
+function isPlaceholderLike(value: unknown): value is { __placeholder: true; hint: string } {
+	return (
+		typeof value === 'object' &&
+		value !== null &&
+		'__placeholder' in value &&
+		(value as Record<string, unknown>).__placeholder === true &&
+		'hint' in value &&
+		typeof (value as Record<string, unknown>).hint === 'string'
+	);
+}
+
+function isNewCredentialLike(value: unknown): value is { __newCredential: true; name: string } {
+	return (
+		typeof value === 'object' &&
+		value !== null &&
+		'__newCredential' in value &&
+		(value as Record<string, unknown>).__newCredential === true &&
+		'name' in value &&
+		typeof (value as Record<string, unknown>).name === 'string'
+	);
+}
+
 export function expr(expression: string): string {
+	if (typeof expression !== 'string') {
+		// At runtime, the AST interpreter may pass non-string values (e.g. PlaceholderImpl objects).
+		// TypeScript narrows to `never` here since the param is typed as `string`,
+		// so we re-bind as `unknown` to perform runtime type checks.
+		const value: unknown = expression;
+		if (isPlaceholderLike(value)) {
+			throw new Error(
+				`expr(placeholder('${value.hint}')) is invalid. Use placeholder() directly as the value, not inside expr().`,
+			);
+		}
+		if (isNewCredentialLike(value)) {
+			throw new Error(
+				`expr(newCredential('${value.name}')) is invalid. Use newCredential() directly in the credentials config, not inside expr().`,
+			);
+		}
+		throw new Error(`expr() requires a string argument, but received ${typeof value}.`);
+	}
 	// Strip any leading '=' to prevent double-equals patterns from LLM output
 	const normalized = expression.startsWith('=') ? expression.slice(1) : expression;
 	return '=' + normalized;

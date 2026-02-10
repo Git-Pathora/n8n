@@ -88,11 +88,11 @@ Example "Webhook → Set → IF → Slack / Email":
   Round 4: configure(Slack, Email)
   Round 5: connect(IF→Slack, IF→Email), validate_structure, validate_configuration
 
-Validation: Use validate_structure and validate_configuration once at the end. Once both pass, output your summary and stop—the workflow is complete.
+Validation: Use validate_structure and validate_configuration once at the end. Once both pass, output your summary and stop — the workflow is complete.
 
 Plan all nodes before starting to avoid backtracking.`;
 
-const VALIDATION_WITH_INTROSPECTION = `Validation: Call validate_structure and validate_configuration once at the end. After validation passes, call introspect to report any issues. Once both validation and introspection are complete, output your summary and stop—the workflow is complete.
+const VALIDATION_WITH_INTROSPECTION = `Validation: Call validate_structure and validate_configuration once at the end. After validation passes, call introspect to report any issues. Once both validation and introspection are complete, output your summary and stop — the workflow is complete.
 
 NEVER respond to the user without calling validate_structure, validate_configuration, AND introspect first.`;
 
@@ -110,28 +110,16 @@ function buildExecutionSequence(includeExamples: boolean, enableIntrospection: b
 	if (includeExamples) {
 		// Flat format: add introspect to batch flow, example, and validation
 		return base
-			.replace(
-				'3. Final: configure(last) → connect(last) → validate_structure, validate_configuration',
-				'3. Final: configure(last) → connect(last) → validate_structure, validate_configuration → introspect',
-			)
-			.replace(
-				'  Round 5: connect(IF→Slack, IF→Email), validate_structure, validate_configuration',
-				'  Round 5: connect(IF→Slack, IF→Email), validate_structure, validate_configuration\n  Round 6: introspect (REQUIRED)',
-			)
-			.replace(
-				'Validation: Use validate_structure and validate_configuration once at the end. Once both pass, output your summary and stop—the workflow is complete.',
-				VALIDATION_WITH_INTROSPECTION,
-			);
+			.replace(/^3\. Final: .*$/m, '$& → introspect')
+			.replace(/^\s+Round 5: .*$/m, '$&\n  Round 6: introspect (REQUIRED)')
+			.replace(/^Validation: .*$/m, VALIDATION_WITH_INTROSPECTION);
 	}
 
 	// XML format: add introspect to example and replace validation section
 	return base
+		.replace(/^\s+Turn 7: .*$/m, '$&\n  Turn 8: introspect (REQUIRED)')
 		.replace(
-			'  Turn 7: connect_nodes(batch 3) + validate_structure + validate_configuration',
-			'  Turn 7: connect_nodes(batch 3) + validate_structure + validate_configuration\n  Turn 8: introspect (REQUIRED)',
-		)
-		.replace(
-			'<validation>\nCall validate_structure and validate_configuration at the end. When validation fails, fix the issues and re-validate. Never call validation in parallel with update operations—validation must see the current state.\n</validation>',
+			/<validation>\n[\s\S]*?<\/validation>/,
 			`<validation>\n${VALIDATION_WITH_INTROSPECTION}\n</validation>`,
 		);
 }
@@ -436,24 +424,24 @@ const EXPRESSION_SYNTAX = `n8n field values have two modes:
    Example: "Hello World" → outputs literal "Hello World"
 
 2. EXPRESSION (= prefix): Evaluated JavaScript expression
-   Example: ={{ $json.name }} → outputs the value of the name field
-   Example: ={{ $json.count > 10 ? 'many' : 'few' }} → conditional logic
-	 Example: =Hello my name is {{ $json.name }} → valid partial expression
+   Example: ={{{{ $json.name }}}} → outputs the value of the name field
+   Example: ={{{{ $json.count > 10 ? 'many' : 'few' }}}} → conditional logic
+	 Example: =Hello my name is {{{{ $json.name }}}} → valid partial expression
 
 Rules:
 - Text fields with dynamic content MUST start with =
 - The = tells n8n to evaluate what follows as an expression
-- Without =, {{ $json.field }} is literal text, not a data reference
+- Without =, {{{{ $json.field }}}} is literal text, not a data reference
 
 Common patterns:
 - Static value: "support@company.com"
-- Dynamic value: ={{ $json.email }}
-- String concatenation: =Hello {{ $json.name }}
-- Conditional: ={{ $json.status === 'active' ? 'Yes' : 'No' }}`;
+- Dynamic value: ={{{{ $json.email }}}}
+- String concatenation: =Hello {{{{ $json.name }}}}
+- Conditional: ={{{{ $json.status === 'active' ? 'Yes' : 'No' }}}}`;
 
 const TOOL_NODES = `Tool nodes (types ending in "Tool") use $fromAI for dynamic values that the parent AI Agent determines at runtime:
 - $fromAI('key', 'description', 'type', defaultValue)
-- Example: "Set sendTo to ={{ $fromAI('recipient', 'Email address', 'string') }}"
+- Example: "Set sendTo to ={{{{ $fromAI('recipient', 'Email address', 'string') }}}}"
 
 $fromAI is designed specifically for tool nodes where the parent AI Agent provides values. For regular nodes, use static values or expressions referencing previous node outputs.
 
@@ -527,8 +515,8 @@ const COMMON_SETTINGS = `Important node settings:
 - AI classification nodes: Use low temperature (0-0.2) for consistent results
 
 Binary data expressions:
-- From previous node: ={{ $binary.property_name }}
-- From specific node: ={{ $('NodeName').item.binary.attachment_0 }}
+- From previous node: ={{{{ $binary.property_name }}}}
+- From specific node: ={{{{ $('NodeName').item.binary.attachment_0 }}}}
 
 Code node return format: Must return array with json property - return items; or return [{{{{ json: {{...}} }}}}]`;
 
@@ -618,7 +606,7 @@ Error output data structure: When a node errors with continueErrorOutput, the er
 - $json.error.name - Error type name (e.g., "NodeApiError")
 - Original input data is NOT preserved in error output
 
-To log errors, reference: ={{ $json.error.message }}
+To log errors, reference: ={{{{ $json.error.message }}}}
 To preserve input context, store input data in a Set node BEFORE the error-prone node.`;
 
 // === CONTEXT AND INVESTIGATION ===

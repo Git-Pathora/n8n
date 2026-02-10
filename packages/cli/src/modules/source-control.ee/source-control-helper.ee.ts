@@ -74,27 +74,23 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
  * Handles strings, numbers, booleans, arrays, and plain objects.
  */
 function mergeSingleValue(sanitizedRemoteValue: unknown, localValue: unknown): unknown {
-	// Handle strings
 	if (typeof sanitizedRemoteValue === 'string') {
 		if (stringContainsExpression(sanitizedRemoteValue)) {
-			// Expression - always use remote
 			return sanitizedRemoteValue;
 		} else if (localValue !== undefined && localValue !== null) {
 			// Local value is preserved if it exists (secret handling)
 			return localValue;
 		}
-		// No local value for this secret field - don't set it
+
 		return undefined;
 	}
 
-	// Handle numbers and booleans - always use remote
 	if (typeof sanitizedRemoteValue === 'number' || typeof sanitizedRemoteValue === 'boolean') {
 		return sanitizedRemoteValue;
 	}
 
-	// Handle arrays
 	if (Array.isArray(sanitizedRemoteValue)) {
-		// Only merge by index if lengths match - otherwise array structure has changed
+		// Only merge by index if lengths match, otherwise array structure has changed
 		// and we can't reliably match items (could be additions/removals/reordering)
 		if (Array.isArray(localValue) && localValue.length === sanitizedRemoteValue.length) {
 			return sanitizedRemoteValue.map((sanitizedItem, index) => {
@@ -103,11 +99,9 @@ function mergeSingleValue(sanitizedRemoteValue: unknown, localValue: unknown): u
 			});
 		}
 
-		// Different length or no local array - use remote as-is (secrets must be re-entered)
 		return sanitizedRemoteValue;
 	}
 
-	// Handle plain objects - merge recursively
 	if (isPlainObject(sanitizedRemoteValue)) {
 		if (isPlainObject(localValue)) {
 			return mergeRemoteCrendetialDataIntoLocalCredentialData({
@@ -139,7 +133,6 @@ export function mergeRemoteCrendetialDataIntoLocalCredentialData({
 	// This prevents importing invalid data that should have not been synched in the first place
 	const sanitizedRemote = sanitizeCredentialData(remote);
 
-	// Iterate through sanitized remote keys - for properties in remote, remote is the source of truth
 	for (const [key, sanitizedRemoteValue] of Object.entries(sanitizedRemote)) {
 		const localValue = local[key];
 		const mergedValue = mergeSingleValue(sanitizedRemoteValue, localValue);

@@ -533,6 +533,7 @@ export function useWorkflowSaving({
 					if (autosaveStore.autoSaveState === AutoSaveState.InProgress) {
 						autosaveStore.setAutoSaveState(AutoSaveState.Idle);
 					}
+					autosaveStore.setPendingAutoSave(null);
 					// If changes were made during save, reschedule autosave
 					if (uiStore.stateIsDirty && !autosaveStore.isRetrying) {
 						autosaveStore.setAutoSaveState(AutoSaveState.Scheduled);

@@ -28,6 +28,7 @@ import { getResourcePermissions } from '@n8n/permissions';
 import { createEventBus } from '@n8n/utils/event-bus';
 import {
 	computed,
+	inject,
 	onBeforeUnmount,
 	onMounted,
 	ref,
@@ -42,10 +43,7 @@ import { useSettingsStore } from '@/app/stores/settings.store';
 import { useUIStore } from '@/app/stores/ui.store';
 import { useWorkflowsStore } from '@/app/stores/workflows.store';
 import { useWorkflowsListStore } from '@/app/stores/workflowsList.store';
-import {
-	useWorkflowDocumentStore,
-	createWorkflowDocumentId,
-} from '@/app/stores/workflowDocument.store';
+import { WorkflowDocumentStoreKey } from '@/app/constants/injectionKeys';
 
 const WORKFLOW_NAME_BP_TO_WIDTH: { [key: string]: number } = {
 	XS: 150,
@@ -89,6 +87,7 @@ const toast = useToast();
 const documentTitle = useDocumentTitle();
 const workflowSaving = useWorkflowSaving({ router });
 const workflowState = injectWorkflowState();
+const workflowDocumentStore = inject(WorkflowDocumentStoreKey, null);
 
 const isTagsEditEnabled = ref(false);
 const appliedTagIds = ref<string[]>([]);
@@ -174,9 +173,9 @@ function onTagsBlur() {
 
 	collaborationStore.requestWriteAccess();
 
-	const workflowDocumentId = createWorkflowDocumentId(props.id);
-	const workflowDocumentStore = useWorkflowDocumentStore(workflowDocumentId);
-	workflowDocumentStore.setTags(tags);
+	if (workflowDocumentStore?.value) {
+		workflowDocumentStore.value.setTags(tags);
+	}
 	workflowState.setWorkflowTagIds(tags);
 	uiStore.markStateDirty();
 

@@ -31,7 +31,7 @@ import {
 	getChatPayload,
 } from '../harness/evaluation-helpers';
 import { createLogger } from '../harness/logger';
-import type { GenerationCollectors } from '../harness/runner';
+import type { GenerationCollectors, SubgraphMetricsCollector } from '../harness/runner';
 import { TokenUsageTrackingHandler } from '../harness/token-tracking-handler';
 import {
 	runEvaluation,
@@ -41,18 +41,13 @@ import {
 	createProgrammaticEvaluator,
 	createPairwiseEvaluator,
 	createSimilarityEvaluator,
-	createIntrospectionEvaluator,
 	type RunConfig,
 	type TestCase,
 	type Evaluator,
 	type EvaluationContext,
 } from '../index';
 import { generateRunId, isWorkflowStateValues } from '../langsmith/types';
-import {
-	createIntrospectionCollector,
-	createIntrospectionAnalysisLifecycle,
-} from '../lifecycles/introspection-analysis';
-import type { IntrospectionCollector } from '../lifecycles/introspection-analysis';
+import { createIntrospectionAnalysisLifecycle } from '../lifecycles/introspection-analysis';
 import { EVAL_TYPES, EVAL_USERS } from '../support/constants';
 import { setupTestEnvironment, createAgent, type ResolvedStageLLMs } from '../support/environment';
 
@@ -71,12 +66,10 @@ function hasCoordinationLog(
  * Report subgraph metrics from coordination log and workflow.
  */
 function reportSubgraphMetrics(
-	collectors: GenerationCollectors | undefined,
+	collector: SubgraphMetricsCollector,
 	stateValues: unknown,
 	workflow: SimpleWorkflow,
 ): void {
-	if (!collectors?.subgraphMetrics) return;
-
 	const coordinationLog = hasCoordinationLog(stateValues) ? stateValues.coordinationLog : undefined;
 	const nodeCount = workflow.nodes?.length;
 	const metrics = extractSubgraphMetrics(coordinationLog, nodeCount);
@@ -87,7 +80,7 @@ function reportSubgraphMetrics(
 		metrics.responderDurationMs !== undefined ||
 		metrics.nodeCount !== undefined
 	) {
-		collectors.subgraphMetrics(metrics);
+		collector(metrics);
 	}
 }
 
@@ -101,9 +94,8 @@ function createWorkflowGenerator(options: {
 	parsedNodeTypes: INodeTypeDescription[];
 	llms: ResolvedStageLLMs;
 	featureFlags?: BuilderFeatureFlags;
-	introspectionCollector?: IntrospectionCollector;
 }): (prompt: string, collectors?: GenerationCollectors) => Promise<SimpleWorkflow> {
-	const { parsedNodeTypes, llms, featureFlags, introspectionCollector } = options;
+	const { parsedNodeTypes, llms, featureFlags } = options;
 
 	return async (prompt: string, collectors?: GenerationCollectors): Promise<SimpleWorkflow> => {
 		const runId = generateRunId();
@@ -149,13 +141,12 @@ function createWorkflowGenerator(options: {
 		}
 
 		// Extract and report subgraph metrics from coordination log
-		reportSubgraphMetrics(collectors, state.values, workflow);
-
-		// Collect introspection events as a side-effect if collector is provided
-		if (introspectionCollector) {
-			const events = state.values.introspectionEvents ?? [];
-			introspectionCollector.addEvents(events);
+		if (collectors?.subgraphMetrics) {
+			reportSubgraphMetrics(collectors.subgraphMetrics, state.values, workflow);
 		}
+
+		// Report introspection events
+		collectors?.introspectionEvents?.(state.values.introspectionEvents ?? []);
 
 		return workflow;
 	};
@@ -169,18 +160,11 @@ function createEvaluators(params: {
 	judgeLlm: ResolvedStageLLMs['judge'];
 	parsedNodeTypes: Parameters<typeof createProgrammaticEvaluator>[0];
 	numJudges: number;
-	introspectionCollector?: ReturnType<typeof createIntrospectionCollector>;
 }): Array<Evaluator<EvaluationContext>> {
-	const { suite, judgeLlm, parsedNodeTypes, numJudges, introspectionCollector } = params;
+	const { suite, judgeLlm, parsedNodeTypes, numJudges } = params;
 	const evaluators: Array<Evaluator<EvaluationContext>> = [];
 
 	switch (suite) {
-		case 'introspection':
-			if (!introspectionCollector) {
-				throw new Error('Introspection suite requires an IntrospectionCollector');
-			}
-			evaluators.push(createIntrospectionEvaluator(introspectionCollector));
-			break;
 		case 'llm-judge':
 			evaluators.push(createLLMJudgeEvaluator(judgeLlm, parsedNodeTypes));
 			evaluators.push(createProgrammaticEvaluator(parsedNodeTypes));
@@ -271,32 +255,27 @@ export async function runV2Evaluation(): Promise<void> {
 		throw new Error('LangSmith client not initialized - check LANGSMITH_API_KEY');
 	}
 
-	// Create introspection collector if needed
-	const collector = args.suite === 'introspection' ? createIntrospectionCollector() : undefined;
-
 	// Create evaluators based on suite type
 	const evaluators = createEvaluators({
 		suite: args.suite,
 		judgeLlm: env.llms.judge,
 		parsedNodeTypes: env.parsedNodeTypes,
 		numJudges: args.numJudges,
-		introspectionCollector: collector,
 	});
 
-	// Create workflow generator (collector captures introspection events as side-effect)
+	// Create workflow generator
 	const generateWorkflow = createWorkflowGenerator({
 		parsedNodeTypes: env.parsedNodeTypes,
 		llms: env.llms,
 		featureFlags: args.featureFlags,
-		introspectionCollector: collector,
 	});
 
 	const llmCallLimiter = pLimit(args.concurrency);
 
-	// Merge console lifecycle with introspection analysis lifecycle
+	// Merge console lifecycle with optional introspection analysis lifecycle
 	const mergedLifecycle = mergeLifecycles(
 		createConsoleLifecycle({ verbose: args.verbose, logger }),
-		collector
+		args.suite === 'introspection'
 			? createIntrospectionAnalysisLifecycle({
 					judgeLlm: env.llms.judge,
 					outputDir: args.outputDir,
@@ -315,6 +294,7 @@ export async function runV2Evaluation(): Promise<void> {
 		suite: args.suite,
 		timeoutMs: args.timeoutMs,
 		context: { llmCallLimiter },
+		passThreshold: args.suite === 'introspection' ? 0 : undefined,
 	};
 
 	const config: RunConfig =

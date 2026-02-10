@@ -3,6 +3,7 @@ import type pLimit from 'p-limit';
 
 import type { EvalLogger } from './logger.js';
 import type { GenerationCollectors } from './runner.js';
+import type { IntrospectionEvent } from '../../src/tools/introspect.tool.js';
 import type { SimpleWorkflow } from '../../src/types/workflow.js';
 
 export type LlmCallLimiter = ReturnType<typeof pLimit>;
@@ -97,7 +98,12 @@ export interface TestCase {
 }
 
 /** Evaluation suite types supported by the harness */
-export type EvaluationSuite = 'llm-judge' | 'pairwise' | 'programmatic' | 'similarity' | 'introspection';
+export type EvaluationSuite =
+	| 'llm-judge'
+	| 'pairwise'
+	| 'programmatic'
+	| 'similarity'
+	| 'introspection';
 
 /**
  * Configuration for an evaluation run.
@@ -208,6 +214,8 @@ export interface ExampleResult {
 	generationOutputTokens?: number;
 	/** Subgraph timing and workflow metrics */
 	subgraphMetrics?: SubgraphMetrics;
+	/** Introspection events reported by the agent during workflow generation */
+	introspectionEvents?: IntrospectionEvent[];
 	workflow?: SimpleWorkflow;
 	error?: string;
 }

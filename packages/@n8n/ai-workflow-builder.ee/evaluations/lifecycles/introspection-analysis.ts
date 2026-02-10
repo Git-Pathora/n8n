@@ -2,30 +2,9 @@ import type { BaseChatModel } from '@langchain/core/language_models/chat_models'
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 
-import type { IntrospectionEvent } from '../../src/tools/introspect.tool';
 import type { EvaluationLifecycle, ExampleResult } from '../harness/harness-types';
 import type { EvalLogger } from '../harness/logger';
 import { summarizeIntrospectionResults } from '../summarizers/introspection-summarizer';
-
-export interface IntrospectionCollector {
-	addEvents(events: IntrospectionEvent[]): void;
-	/** Drain all collected events, resetting the internal buffer. */
-	drain(): IntrospectionEvent[];
-}
-
-export function createIntrospectionCollector(): IntrospectionCollector {
-	let collected: IntrospectionEvent[] = [];
-	return {
-		addEvents(events) {
-			collected.push(...events);
-		},
-		drain() {
-			const events = collected;
-			collected = [];
-			return events;
-		},
-	};
-}
 
 export interface IntrospectionAnalysisOptions {
 	judgeLlm: BaseChatModel;
@@ -36,11 +15,22 @@ export interface IntrospectionAnalysisOptions {
 export function createIntrospectionAnalysisLifecycle(
 	options: IntrospectionAnalysisOptions,
 ): Partial<EvaluationLifecycle> {
+	const { logger } = options;
 	const collectedResults: ExampleResult[] = [];
 
 	return {
 		onExampleComplete(_index, result) {
 			collectedResults.push(result);
+
+			const events = result.introspectionEvents ?? [];
+			if (events.length > 0) {
+				logger.info(`  ${events.length} introspection event(s):`);
+				for (const event of events) {
+					logger.info(`    [${event.category}] ${event.issue}`);
+				}
+			} else {
+				logger.info('  No introspection events');
+			}
 		},
 
 		async onEnd() {

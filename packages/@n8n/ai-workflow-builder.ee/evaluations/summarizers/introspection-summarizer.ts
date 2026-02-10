@@ -1,7 +1,5 @@
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 
-import type { IntrospectionEvent } from '@/tools/introspect.tool';
-
 import type { ExampleResult } from '../harness/harness-types';
 
 export interface IntrospectionSummary {
@@ -35,20 +33,7 @@ export async function summarizeIntrospectionResults(
 	results: ExampleResult[],
 	llm: BaseChatModel,
 ): Promise<IntrospectionSummary> {
-	// Extract all introspection events from feedback
-	const allEvents = results.flatMap((r) =>
-		r.feedback
-			.filter((f) => f.evaluator === 'introspection' && f.kind === 'detail' && f.details)
-			.map((f) => {
-				const details = f.details as { category?: string; timestamp?: string; source?: string };
-				return {
-					timestamp: details.timestamp ?? '',
-					category: details.category ?? 'unknown',
-					issue: f.comment ?? '',
-					source: details.source,
-				} satisfies IntrospectionEvent;
-			}),
-	);
+	const allEvents = results.flatMap((r) => r.introspectionEvents ?? []);
 
 	if (allEvents.length === 0) {
 		return {

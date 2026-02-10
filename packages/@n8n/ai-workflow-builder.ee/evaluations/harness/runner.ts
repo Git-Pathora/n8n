@@ -29,6 +29,7 @@ import {
 	selectScoringItems,
 	calculateFiniteAverage,
 } from './score-calculator';
+import type { IntrospectionEvent } from '../../src/tools/introspect.tool.js';
 import type { SimpleWorkflow } from '../../src/types/workflow.js';
 import { extractMessageContent } from '../langsmith/types';
 
@@ -52,11 +53,18 @@ export type SubgraphMetricsCollector = (metrics: {
 }) => void;
 
 /**
+ * Callback to collect introspection events from generation.
+ * Called after each workflow generation with the events array.
+ */
+export type IntrospectionEventsCollector = (events: IntrospectionEvent[]) => void;
+
+/**
  * Combined collectors for workflow generation metrics.
  */
 export interface GenerationCollectors {
 	tokenUsage?: TokenUsageCollector;
 	subgraphMetrics?: SubgraphMetricsCollector;
+	introspectionEvents?: IntrospectionEventsCollector;
 }
 
 /**
@@ -472,6 +480,7 @@ async function runLocalExample(args: {
 		let builderDurationMs: number | undefined;
 		let responderDurationMs: number | undefined;
 		let nodeCount: number | undefined;
+		let collectedIntrospectionEvents: IntrospectionEvent[] | undefined;
 
 		const collectors: GenerationCollectors = {
 			tokenUsage: (usage) => {
@@ -483,6 +492,9 @@ async function runLocalExample(args: {
 				builderDurationMs = metrics.builderDurationMs;
 				responderDurationMs = metrics.responderDurationMs;
 				nodeCount = metrics.nodeCount;
+			},
+			introspectionEvents: (events) => {
+				collectedIntrospectionEvents = events;
 			},
 		};
 
@@ -534,6 +546,7 @@ async function runLocalExample(args: {
 				nodeCount !== undefined
 					? { discoveryDurationMs, builderDurationMs, responderDurationMs, nodeCount }
 					: undefined,
+			introspectionEvents: collectedIntrospectionEvents,
 			workflow,
 		};
 
@@ -1084,6 +1097,7 @@ async function runLangsmith(config: LangsmithRunConfig): Promise<RunSummary> {
 		let builderDurationMs: number | undefined;
 		let responderDurationMs: number | undefined;
 		let nodeCount: number | undefined;
+		let collectedIntrospectionEvents: IntrospectionEvent[] | undefined;
 
 		const collectors: GenerationCollectors = {
 			tokenUsage: (usage) => {
@@ -1095,6 +1109,9 @@ async function runLangsmith(config: LangsmithRunConfig): Promise<RunSummary> {
 				builderDurationMs = metrics.builderDurationMs;
 				responderDurationMs = metrics.responderDurationMs;
 				nodeCount = metrics.nodeCount;
+			},
+			introspectionEvents: (events) => {
+				collectedIntrospectionEvents = events;
 			},
 		};
 
@@ -1162,6 +1179,7 @@ async function runLangsmith(config: LangsmithRunConfig): Promise<RunSummary> {
 					nodeCount !== undefined
 						? { discoveryDurationMs, builderDurationMs, responderDurationMs, nodeCount }
 						: undefined,
+				introspectionEvents: collectedIntrospectionEvents,
 				workflow,
 			};
 

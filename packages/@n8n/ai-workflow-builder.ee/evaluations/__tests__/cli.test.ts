@@ -69,10 +69,6 @@ jest.mock('../harness/evaluation-helpers', () => ({
 }));
 
 jest.mock('../lifecycles/introspection-analysis', () => ({
-	createIntrospectionCollector: () => ({
-		addEvents: jest.fn(),
-		drain: jest.fn().mockReturnValue([]),
-	}),
 	createIntrospectionAnalysisLifecycle: () => ({}),
 }));
 
@@ -93,7 +89,6 @@ jest.mock('../index', () => ({
 		mockCreateProgrammaticEvaluator(...args),
 	createPairwiseEvaluator: (...args: unknown[]): unknown => mockCreatePairwiseEvaluator(...args),
 	createSimilarityEvaluator: () => ({ name: 'similarity', evaluate: jest.fn() }),
-	createIntrospectionEvaluator: () => ({ name: 'introspection', evaluate: jest.fn() }),
 }));
 
 /** Helper to create a minimal valid workflow for tests */

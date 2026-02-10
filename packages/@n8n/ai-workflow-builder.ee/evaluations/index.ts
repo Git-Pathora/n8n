@@ -47,14 +47,9 @@ export {
 	type SimilarityEvaluatorOptions,
 } from './evaluators';
 
-// Introspection evaluator
-export { createIntrospectionEvaluator, type IntrospectionEvent } from './evaluators/introspection';
-
-// Introspection lifecycle + collector
+// Introspection lifecycle
 export {
-	createIntrospectionCollector,
 	createIntrospectionAnalysisLifecycle,
-	type IntrospectionCollector,
 	type IntrospectionAnalysisOptions,
 } from './lifecycles/introspection-analysis';
 

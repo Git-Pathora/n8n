@@ -2203,6 +2203,71 @@ describe('code-generator', () => {
 					expect.arrayContaining([expect.objectContaining({ node: 'Loop Over Items' })]),
 				);
 			});
+
+			it('emits merge downstream as builder-level .to() not nested inside .add()', () => {
+				const json: WorkflowJSON = {
+					id: 'merge-downstream-format',
+					name: 'Test',
+					nodes: [
+						{
+							id: '1',
+							name: 'Trigger',
+							type: 'n8n-nodes-base.manualTrigger',
+							typeVersion: 1,
+							position: [0, 0],
+						},
+						{
+							id: '2',
+							name: 'Branch A',
+							type: 'n8n-nodes-base.noOp',
+							typeVersion: 1,
+							position: [200, -50],
+						},
+						{
+							id: '3',
+							name: 'Branch B',
+							type: 'n8n-nodes-base.noOp',
+							typeVersion: 1,
+							position: [200, 50],
+						},
+						{
+							id: '4',
+							name: 'Combine',
+							type: 'n8n-nodes-base.merge',
+							typeVersion: 3,
+							position: [400, 0],
+							parameters: { numberInputs: 2 },
+						},
+						{
+							id: '5',
+							name: 'Process Result',
+							type: 'n8n-nodes-base.set',
+							typeVersion: 3.4,
+							position: [600, 0],
+						},
+					],
+					connections: {
+						Trigger: {
+							main: [
+								[
+									{ node: 'Branch A', type: 'main', index: 0 },
+									{ node: 'Branch B', type: 'main', index: 0 },
+								],
+							],
+						},
+						'Branch A': { main: [[{ node: 'Combine', type: 'main', index: 0 }]] },
+						'Branch B': { main: [[{ node: 'Combine', type: 'main', index: 1 }]] },
+						Combine: { main: [[{ node: 'Process Result', type: 'main', index: 0 }]] },
+					},
+				};
+
+				const code = generateFromWorkflow(json);
+
+				// Merge downstream should use builder-level: .add(combine)\n  .to(process_Result)
+				// NOT nested: .add(combine.to(process_Result))
+				expect(code).toMatch(/\.add\(combine\)\s*\n\s*\.to\(process_Result\)/);
+				expect(code).not.toContain('.add(combine.to(');
+			});
 		});
 
 		describe('chain intermediate node connections', () => {

@@ -1279,7 +1279,8 @@ export function generateCode(
 		const mergeVarName = getVarName(downstream.mergeNode.name, ctx);
 		if (downstream.downstreamChain) {
 			const chainCode = generateComposite(downstream.downstreamChain, ctx);
-			workflowCalls.push(`  .add(${mergeVarName}.to(${chainCode}))`);
+			workflowCalls.push(`  .add(${mergeVarName})`);
+			workflowCalls.push(`  .to(${chainCode})`);
 		}
 	}
 

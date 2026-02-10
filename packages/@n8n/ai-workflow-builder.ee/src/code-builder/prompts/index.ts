@@ -154,9 +154,12 @@ const combineResults = merge({{
   config: {{ name: 'Combine Results', parameters: {{ mode: 'combine', combineBy: 'combineByPosition' }} }}
 }});
 export default workflow('id', 'name')
-  .add(startTrigger.to(sourceA.to(combineResults.input(0))))
-  .add(startTrigger.to(sourceB.to(combineResults.input(1))))
-  .add(combineResults.to(processResults));
+  .add(startTrigger)
+  .to(sourceA.to(combineResults.input(0)))
+  .add(startTrigger)
+  .to(sourceB.to(combineResults.input(1)))
+  .add(combineResults)
+  .to(processResults);
 
 // FIX 3 - parallel branches + Merge (append)
 // Concatenates all items from all inputs into one list sequentially.
@@ -167,9 +170,12 @@ const allResults = merge({{
   config: {{ name: 'All Results', parameters: {{ mode: 'append' }} }}
 }});
 export default workflow('id', 'name')
-  .add(startTrigger.to(sourceA.to(allResults.input(0))))
-  .add(startTrigger.to(sourceB.to(allResults.input(1))))
-  .add(allResults.to(processResults));
+  .add(startTrigger)
+  .to(sourceA.to(allResults.input(0)))
+  .add(startTrigger)
+  .to(sourceB.to(allResults.input(1)))
+  .add(allResults)
+  .to(processResults);
 \`\`\`
 
 </independent_sources>
@@ -226,9 +232,12 @@ const processResults = node({{ type: 'n8n-nodes-base.set', ... }});
 
 // Connect branches to specific merge inputs using .input(n)
 export default workflow('id', 'name')
-  .add(trigger({{ ... }}).to(branch1.to(combineResults.input(0))))  // Connect to input 0
-  .add(trigger({{ ... }}).to(branch2.to(combineResults.input(1))))  // Connect to input 1
-  .add(combineResults.to(processResults));  // Process merged results
+  .add(trigger({{ ... }}))
+  .to(branch1.to(combineResults.input(0)))  // Connect to input 0
+  .add(trigger({{ ... }}))
+  .to(branch2.to(combineResults.input(1)))  // Connect to input 1
+  .add(combineResults)
+  .to(processResults);  // Process merged results
 \`\`\`
 
 </parallel_execution>
@@ -350,9 +359,11 @@ const sendNotification = node({{
 }});
 
 export default workflow('id', 'name')
-  .add(webhookTrigger.to(processData))
-  .add(scheduleTrigger.to(processData))
-  .add(processData.to(sendNotification));
+  .add(webhookTrigger)
+  .to(processData)
+  .to(sendNotification)
+  .add(scheduleTrigger)
+  .to(processData);
 \`\`\`
 
 </fan_in>

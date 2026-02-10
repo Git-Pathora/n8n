@@ -2,7 +2,7 @@ import { GenericContainer, Wait } from 'testcontainers';
 
 import { createSilentLogConsumer } from '../helpers/utils';
 import { TEST_CONTAINER_IMAGES } from '../test-containers';
-import type { Service, ServiceResult, StartContext } from './types';
+import { EXTERNAL_HOST, type Service, type ServiceResult, type StartContext } from './types';
 
 export interface NgrokMeta {
 	publicUrl: string;
@@ -14,6 +14,9 @@ export type NgrokResult = ServiceResult<NgrokMeta>;
 const API_PORT = 4040;
 
 function getTunnelTarget(ctx: StartContext): string {
+	if (ctx.external) {
+		return `${EXTERNAL_HOST}:5678`;
+	}
 	if (ctx.needsLoadBalancer) {
 		return `${ctx.projectName}-caddy-lb:80`;
 	}

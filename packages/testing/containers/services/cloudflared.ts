@@ -2,7 +2,7 @@ import { GenericContainer, Wait } from 'testcontainers';
 
 import { createSilentLogConsumer } from '../helpers/utils';
 import { TEST_CONTAINER_IMAGES } from '../test-containers';
-import type { Service, ServiceResult, StartContext } from './types';
+import { EXTERNAL_HOST, type Service, type ServiceResult, type StartContext } from './types';
 
 export interface CloudflaredMeta {
 	publicUrl: string;
@@ -14,6 +14,9 @@ export type CloudflaredResult = ServiceResult<CloudflaredMeta>;
 const METRICS_PORT = 2000;
 
 function getTunnelTarget(ctx: StartContext): string {
+	if (ctx.external) {
+		return `${EXTERNAL_HOST}:5678`;
+	}
 	if (ctx.needsLoadBalancer) {
 		return `${ctx.projectName}-caddy-lb:80`;
 	}

@@ -1,6 +1,6 @@
 import getPort from 'get-port';
 import type { StartedNetwork, StartedTestContainer, StoppedTestContainer } from 'testcontainers';
-import { Network } from 'testcontainers';
+import { Network, TestContainers } from 'testcontainers';
 
 import { createElapsedLogger, pollContainerHttpEndpoint } from './helpers/utils';
 import { waitForNetworkQuiet } from './network-stabilization';
@@ -81,6 +81,7 @@ export async function createN8NStack(config: N8NConfig = {}): Promise<N8NStack> 
 		projectName,
 		resourceQuota,
 		services: enabledServices = [],
+		external = false,
 	} = config;
 
 	const log = createElapsedLogger('stack');
@@ -107,6 +108,10 @@ export async function createN8NStack(config: N8NConfig = {}): Promise<N8NStack> 
 
 	const telemetry = createTelemetryRecorder(config);
 
+	if (external) {
+		await TestContainers.exposeHostPorts(5678, 5679);
+	}
+
 	let network: StartedNetwork;
 	try {
 		const networkStart = performance.now();
@@ -127,6 +132,7 @@ export async function createN8NStack(config: N8NConfig = {}): Promise<N8NStack> 
 			isQueueMode,
 			usePostgres,
 			needsLoadBalancer,
+			external,
 			environment,
 			serviceResults,
 			allocatedPorts: {

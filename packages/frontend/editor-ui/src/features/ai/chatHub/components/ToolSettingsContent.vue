@@ -245,10 +245,20 @@ watch(
 			}
 
 			node.value = nodeData;
+
+			if (nodeTypeDescription.value) {
+				// Strip " (N)" suffix that makeUniqueName adds for duplicate detection
+				const nameForCheck = nodeData.name.replace(/ \(\d+\)$/, '');
+				userEditedName.value = !NodeHelpers.isDefaultNodeName(
+					nameForCheck,
+					nodeTypeDescription.value,
+					nodeData.parameters,
+				);
+			}
 		} else {
 			node.value = initialNode;
+			userEditedName.value = false;
 		}
-		userEditedName.value = false;
 	},
 	{ immediate: true },
 );

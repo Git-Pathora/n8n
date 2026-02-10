@@ -3,13 +3,14 @@ import { computed, onMounted, ref } from 'vue';
 import { useI18n } from '@n8n/i18n';
 import { useToast } from '@/app/composables/useToast';
 import { useRootStore } from '@n8n/stores/useRootStore';
+import { useUIStore } from '@/app/stores/ui.store';
 import { createEventBus } from '@n8n/utils/event-bus';
 import { getAllCredentials } from '@/features/credentials/credentials.api';
 import { deleteSecretProviderConnection } from '@n8n/rest-api-client';
 import Modal from '@/app/components/Modal.vue';
-import { N8nButton, N8nInput, N8nInputLabel, N8nText } from '@n8n/design-system';
-import { RouterLink } from 'vue-router';
-import { VIEWS } from '@/app/constants';
+import { N8nButton, N8nInput, N8nLink, N8nInputLabel, N8nText } from '@n8n/design-system';
+import { useRouter } from 'vue-router';
+import { SECRETS_PROVIDER_CONNECTION_MODAL_KEY, VIEWS } from '@/app/constants';
 
 interface Props {
 	modalName: string;
@@ -26,6 +27,7 @@ const props = defineProps<Props>();
 const i18n = useI18n();
 const toast = useToast();
 const rootStore = useRootStore();
+const uiStore = useUIStore();
 const modalBus = createEventBus();
 
 const confirmationText = ref('');
@@ -98,7 +100,8 @@ async function onConfirmDelete() {
 			await props.data.onConfirm();
 		}
 
-		modalBus.emit('close');
+		uiStore.closeModal(props.modalName);
+		uiStore.closeModal(SECRETS_PROVIDER_CONNECTION_MODAL_KEY);
 	} catch (error) {
 		toast.showError(
 			error as Error,
@@ -110,11 +113,7 @@ async function onConfirmDelete() {
 }
 
 function onCancel() {
-	modalBus.emit('close');
-}
-
-function onCredentialsLinkClick() {
-	modalBus.emit('close');
+	uiStore.closeModal(props.modalName);
 }
 </script>
 
@@ -149,13 +148,9 @@ function onCredentialsLinkClick() {
 					<ul>
 						<li>
 							<N8nText size="medium" color="text-base">
-								<RouterLink
-									:to="credentialsPageUrl"
-									data-test-id="credentials-link"
-									@click="onCredentialsLinkClick"
-								>
+								<N8nLink data-test-id="credentials-link" :to="credentialsPageUrl" target="_blank">
 									{{ credentialsLabel }}
-								</RouterLink>
+								</N8nLink>
 								{{ i18n.baseText('settings.secretsProviderConnections.delete.impact.description') }}
 							</N8nText>
 						</li>

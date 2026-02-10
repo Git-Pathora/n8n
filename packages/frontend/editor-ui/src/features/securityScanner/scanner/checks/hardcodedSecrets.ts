@@ -71,8 +71,11 @@ export function checkHardcodedSecrets(nodes: INodeUi[]): SecurityFinding[] {
 						title: `Hardcoded ${provider} key detected`,
 						description:
 							"Move this key to n8n's credential store instead of hardcoding it in the workflow.",
+						remediation:
+							'1. Open the node and remove the hardcoded key from the parameter.\n2. Go to Credentials > Add New Credential and create a credential for this service.\n3. Select the new credential in the node settings.\n4. Delete the old key from the workflow JSON if it was saved.',
 						nodeName: node.name,
 						nodeId: node.id,
+						nodeType: node.type,
 						parameterPath: path,
 						matchedValue: redactValue(value),
 					});
@@ -88,8 +91,11 @@ export function checkHardcodedSecrets(nodes: INodeUi[]): SecurityFinding[] {
 					severity: 'critical',
 					title: 'Possible hardcoded token or secret',
 					description: `The field "${path}" contains a hardcoded value that looks like a secret. Use n8n credentials instead.`,
+					remediation:
+						'1. Open the node and remove the hardcoded value from the parameter.\n2. Create an n8n credential of the appropriate type (or use "Header Auth" for custom headers).\n3. Select the credential in the node\'s Authentication section.\n4. Test the node to verify the credential works.',
 					nodeName: node.name,
 					nodeId: node.id,
+					nodeType: node.type,
 					parameterPath: path,
 					matchedValue: redactValue(value),
 				});

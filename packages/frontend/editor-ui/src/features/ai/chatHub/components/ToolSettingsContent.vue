@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { useNodeHelpers } from '@/app/composables/useNodeHelpers';
+import { setParameterValue } from '@/app/utils/parameterUtils';
 import { useNodeTypesStore } from '@/app/stores/nodeTypes.store';
 import { useCredentialsStore } from '@/features/credentials/credentials.store';
 import { useProjectsStore } from '@/features/collaboration/projects/projects.store';
@@ -181,12 +182,12 @@ function makeUniqueName(baseName: string, existingNames: string[]): string {
 function handleChangeParameter(updateData: IUpdateInformation) {
 	if (!node.value) return;
 
+	const newParameters = deepCopy(node.value.parameters);
+	setParameterValue(newParameters, updateData.name, updateData.value);
+
 	node.value = {
 		...node.value,
-		parameters: {
-			...node.value.parameters,
-			[updateData.name]: updateData.value,
-		},
+		parameters: newParameters,
 	};
 }
 
@@ -194,9 +195,11 @@ function handleChangeSettingsValue(updateData: IUpdateInformation) {
 	if (!node.value) return;
 	if (updateData.name.startsWith('parameters.')) {
 		const paramName = updateData.name.slice('parameters.'.length);
+		const newParameters = deepCopy(node.value.parameters);
+		setParameterValue(newParameters, paramName, updateData.value);
 		node.value = {
 			...node.value,
-			parameters: { ...node.value.parameters, [paramName]: updateData.value },
+			parameters: newParameters,
 		};
 	} else {
 		node.value = { ...node.value, [updateData.name]: updateData.value };

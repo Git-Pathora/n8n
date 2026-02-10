@@ -137,6 +137,29 @@ jest.mock('../get-node-context.tool', () => ({
 	},
 }));
 
+jest.mock('@/code-builder/constants', () => ({
+	CODE_BUILDER_TEXT_EDITOR_TOOL: {
+		toolName: 'str_replace_based_edit_tool',
+		displayTitle: 'Editing workflow',
+	},
+	CODE_BUILDER_VALIDATE_TOOL: {
+		toolName: 'validate_workflow',
+		displayTitle: 'Validating workflow',
+	},
+	CODE_BUILDER_SEARCH_NODES_TOOL: {
+		toolName: 'search_nodes',
+		displayTitle: 'Searching nodes',
+	},
+	CODE_BUILDER_GET_NODE_TYPES_TOOL: {
+		toolName: 'get_node_types',
+		displayTitle: 'Getting node definitions',
+	},
+	CODE_BUILDER_GET_SUGGESTED_NODES_TOOL: {
+		toolName: 'get_suggested_nodes',
+		displayTitle: 'Getting suggested nodes',
+	},
+}));
+
 describe('builder-tools', () => {
 	let parsedNodeTypes: INodeTypeDescription[];
 
@@ -151,7 +174,7 @@ describe('builder-tools', () => {
 		// get_node_parameter, validate_structure, validate_configuration,
 		// get_execution_schema, get_execution_logs, get_expression_data_mapping,
 		// get_workflow_overview, get_node_context
-		const BASE_TOOL_COUNT = 17;
+		const BASE_TOOL_COUNT = 22;
 
 		it('should return base tools when no feature flags are provided', () => {
 			const tools = getBuilderToolsForDisplay({

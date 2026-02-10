@@ -228,6 +228,14 @@ onMounted(() => {
 	background-color: var(--color--background--light-2);
 	border: var(--border);
 	border-radius: var(--radius);
+}
+
+.header {
+	display: flex;
+	gap: var(--spacing--xs);
+	cursor: pointer;
+	user-select: none;
+	padding: var(--spacing--sm) var(--spacing--sm) 0;
 
 	.header-icon {
 		&.chevron {
@@ -245,14 +253,6 @@ onMounted(() => {
 			}
 		}
 	}
-}
-
-.header {
-	display: flex;
-	gap: var(--spacing--xs);
-	cursor: pointer;
-	user-select: none;
-	padding: var(--spacing--sm) var(--spacing--sm) 0;
 
 	.card:not(.collapsed) & {
 		margin-bottom: var(--spacing--sm);

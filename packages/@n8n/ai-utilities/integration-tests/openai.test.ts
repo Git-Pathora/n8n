@@ -10,8 +10,8 @@ import {
 	mockToolCallResponse,
 	weatherTool,
 } from './openai.fixtures';
-import { LangchainAdapter } from '../../adapters/langchain-chat-model';
-import { OpenAIChatModel } from '../../examples/models/openai';
+import { OpenAIChatModel } from '../examples/models/openai';
+import { LangchainAdapter } from '../src/adapters/langchain-chat-model';
 
 describe('OpenAI Integration with Langchain Agent', () => {
 	const baseURL = 'https://api.openai.com/v1';

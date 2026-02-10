@@ -96,7 +96,7 @@ describe('LangchainAdapter', () => {
 			const chatModel = createMockChatModel();
 			const response: GenerateResult = {
 				message: {
-					role: 'ai',
+					role: 'assistant',
 					content: [{ type: 'text', text: 'Hi there' }],
 				},
 			};
@@ -108,7 +108,7 @@ describe('LangchainAdapter', () => {
 			const result = await adapter._generate(messages, options);
 
 			expect(chatModel.generate).toHaveBeenCalledWith(
-				[{ role: 'human', content: [{ type: 'text', text: 'hello' }] }],
+				[{ role: 'user', content: [{ type: 'text', text: 'hello' }] }],
 				options,
 			);
 			expect(result.generations).toHaveLength(1);
@@ -120,7 +120,7 @@ describe('LangchainAdapter', () => {
 			const chatModel = createMockChatModel();
 			const response: GenerateResult = {
 				message: {
-					role: 'ai',
+					role: 'assistant',
 					content: [{ type: 'text', text: 'ok' }],
 				},
 				usage: {
@@ -151,7 +151,7 @@ describe('LangchainAdapter', () => {
 			const chatModel = createMockChatModel();
 			const response: GenerateResult = {
 				message: {
-					role: 'ai',
+					role: 'assistant',
 					content: [
 						{
 							type: 'tool-call',

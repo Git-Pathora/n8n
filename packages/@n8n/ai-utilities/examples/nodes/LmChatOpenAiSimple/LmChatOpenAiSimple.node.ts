@@ -30,7 +30,7 @@ export class LmChatOpenAiSimple implements INodeType {
 			name: 'OpenAI Simple',
 		},
 		codex: {
-			categories: ['AI'],
+			categories: ['assistant'],
 			subcategories: {
 				AI: ['Language Models', 'Root Nodes'],
 				// eslint-disable-next-line @typescript-eslint/naming-convention

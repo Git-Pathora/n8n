@@ -33,7 +33,7 @@ export class LmChatOpenAiCustom implements INodeType {
 			name: 'Custom OpenAI',
 		},
 		codex: {
-			categories: ['AI'],
+			categories: ['assistant'],
 			subcategories: {
 				AI: ['Language Models', 'Root Nodes'],
 				// eslint-disable-next-line @typescript-eslint/naming-convention

@@ -190,7 +190,7 @@ function genericMessagesToResponsesInput(messages: Message[]): {
 			}
 		}
 
-		if (msg.role === 'human') {
+		if (msg.role === 'user') {
 			for (const contentPart of msg.content) {
 				if (contentPart.type === 'text') {
 					inputItems.push({
@@ -202,7 +202,7 @@ function genericMessagesToResponsesInput(messages: Message[]): {
 			continue;
 		}
 
-		if (msg.role === 'ai') {
+		if (msg.role === 'assistant') {
 			for (const contentPart of msg.content) {
 				if (contentPart.type === 'text') {
 					inputItems.push({
@@ -452,7 +452,7 @@ export class OpenAIChatModel extends BaseChatModel<OpenAIChatModelConfig> {
 		content.push({ type: 'text', text });
 
 		const message: Message = {
-			role: 'ai',
+			role: 'assistant',
 			content,
 			id: response.id,
 		};
@@ -520,7 +520,7 @@ export class OpenAIChatModel extends BaseChatModel<OpenAIChatModelConfig> {
 						.filter(Boolean)
 						.join('');
 					if (reasoningText) {
-						yield { type: 'text-delta', delta: reasoningText };
+						yield { type: 'reasoning-delta', delta: reasoningText };
 					}
 				}
 			}
@@ -528,7 +528,7 @@ export class OpenAIChatModel extends BaseChatModel<OpenAIChatModelConfig> {
 			if (type === 'response.reasoning_summary_text.delta') {
 				const delta = event.delta;
 				if (delta) {
-					yield { type: 'text-delta', delta };
+					yield { type: 'reasoning-delta', delta };
 				}
 			}
 

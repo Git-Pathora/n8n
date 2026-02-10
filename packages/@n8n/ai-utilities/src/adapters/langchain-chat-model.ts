@@ -186,7 +186,7 @@ export class LangchainAdapter<
 				});
 			} else if (chunk.type === 'content') {
 				const lcMessage = toLcMessage({
-					role: 'ai',
+					role: 'assistant',
 					content: [chunk.content],
 					id: chunk.id,
 				});

@@ -7,8 +7,9 @@ import dotenv from 'dotenv';
 import { createAgent, HumanMessage, tool } from 'langchain';
 import z from 'zod';
 
+import { LangchainAdapter } from 'src/adapters/langchain-chat-model';
+
 import { OpenAIChatModel } from './models/openai';
-import { LangchainAdapter } from '../adapters/langchain-chat-model';
 
 dotenv.config();
 
@@ -132,10 +133,10 @@ async function main() {
 						Authorization: `Bearer ${apiKey}`,
 					},
 				});
+				if (!response.ok) {
+					throw new Error(`Failed to fetch: ${response.statusText}`);
+				}
 				return {
-					ok: response.ok,
-					status: response.status,
-					statusText: response.statusText,
 					body: await response.json(),
 				};
 			},
@@ -148,10 +149,10 @@ async function main() {
 						Authorization: `Bearer ${apiKey}`,
 					},
 				});
+				if (!response.ok) {
+					throw new Error(`Failed to fetch: ${response.statusText}`);
+				}
 				return {
-					ok: response.ok,
-					status: response.status,
-					statusText: response.statusText,
 					body: response.body as ReadableStream<Uint8Array<ArrayBufferLike>>,
 				};
 			},

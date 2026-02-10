@@ -313,9 +313,7 @@ export function toLcContent(block: N8nMessages.MessageContent): LangchainMessage
 }
 
 export function toLcMessage(message: Message): LangchainMessages.BaseMessage {
-	const lcContent = message.content
-		.map(toLcContent)
-		.filter((c): c is LangchainMessages.ContentBlock => c !== null);
+	const lcContent = message.content.map(toLcContent);
 
 	switch (message.role) {
 		case 'system':

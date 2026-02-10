@@ -520,7 +520,7 @@ export class OpenAIChatModel extends BaseChatModel<OpenAIChatModelConfig> {
 						.filter(Boolean)
 						.join('');
 					if (reasoningText) {
-						yield { type: 'text-delta', delta: reasoningText };
+						yield { type: 'reasoning-delta', delta: reasoningText };
 					}
 				}
 			}
@@ -528,7 +528,7 @@ export class OpenAIChatModel extends BaseChatModel<OpenAIChatModelConfig> {
 			if (type === 'response.reasoning_summary_text.delta') {
 				const delta = event.delta;
 				if (delta) {
-					yield { type: 'text-delta', delta };
+					yield { type: 'reasoning-delta', delta };
 				}
 			}
 

@@ -132,10 +132,10 @@ async function main() {
 						Authorization: `Bearer ${apiKey}`,
 					},
 				});
+				if (!response.ok) {
+					throw new Error(`Failed to fetch: ${response.statusText}`);
+				}
 				return {
-					ok: response.ok,
-					status: response.status,
-					statusText: response.statusText,
 					body: await response.json(),
 				};
 			},
@@ -148,10 +148,10 @@ async function main() {
 						Authorization: `Bearer ${apiKey}`,
 					},
 				});
+				if (!response.ok) {
+					throw new Error(`Failed to fetch: ${response.statusText}`);
+				}
 				return {
-					ok: response.ok,
-					status: response.status,
-					statusText: response.statusText,
 					body: response.body as ReadableStream<Uint8Array<ArrayBufferLike>>,
 				};
 			},

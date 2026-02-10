@@ -4271,6 +4271,7 @@
 	"setupPanel.readyToDemo.description": "This workflow can be run before adding any credentials.",
 	"setupPanel.readyToDemo.skip": "Skip demo",
 	"setupPanel.readyToDemo.skipped": "Skipped demo",
+	"setupPanel.readyToDemo.ran": "Ran demo",
 	"setupPanel.readyToDemo.run": "Run demo",
 	"setupPanel.readyToDemo.clear": "Clear demo data",
 	"setupPanel.readyToDemo.skipTooltip": "Unpin provided test data",

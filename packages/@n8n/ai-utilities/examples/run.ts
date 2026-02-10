@@ -7,8 +7,9 @@ import dotenv from 'dotenv';
 import { createAgent, HumanMessage, tool } from 'langchain';
 import z from 'zod';
 
+import { LangchainAdapter } from 'src/adapters/langchain-chat-model';
+
 import { OpenAIChatModel } from './models/openai';
-import { LangchainAdapter } from '../adapters/langchain-chat-model';
 
 dotenv.config();
 

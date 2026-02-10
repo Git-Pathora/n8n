@@ -28,7 +28,7 @@ pnpm build:examples
 Update your env file with:
 
 ```bash
-N8N_CUSTOM_EXTENSIONS="<PATH_TO_N8N>/packages/@n8n/ai-utilities/dist/examples/nodes"
+N8N_CUSTOM_EXTENSIONS="<PATH_TO_N8N>/packages/@n8n/ai-utilities/dist_examples/examples/nodes"
 ```
 
 Start n8n and add "OpenAI Simple" or "OpenAI Custom" to workflows

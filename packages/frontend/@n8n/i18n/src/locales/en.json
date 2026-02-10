@@ -2951,6 +2951,8 @@
 	"settings.secretsProviderConnections.modal.saving": "Saving...",
 	"settings.secretsProviderConnections.modal.unsavedChanges.title": "Close without saving?",
 	"settings.secretsProviderConnections.modal.unsavedChanges.text": "You have unsaved changes. Are you sure you want to close?",
+	"settings.secretsProviderConnections.modal.testConnection.success.title": "Connection successful",
+	"settings.secretsProviderConnections.modal.testConnection.success.description": "Successfully connected to {providerName}",
 	"settings.secretsProviderConnections.modal.testConnection.success.serviceEnabled": "Service enabled, {count} secrets available on {providerName}.",
 	"settings.secretsProviderConnections.modal.testConnection.success.reference": "Reference secrets in credentials using expression:",
 	"settings.secretsProviderConnections.modal.testConnection.error": "Connection unsuccessful, please check your {providerName} settings",

@@ -56,6 +56,10 @@ function openConnectionModal(
 	});
 }
 
+function handleCardClick(providerKey: string) {
+	openConnectionModal(providerKey, 'connection');
+}
+
 function handleEdit(providerKey: string) {
 	openConnectionModal(providerKey, 'connection');
 }
@@ -160,6 +164,7 @@ function goToUpgrade() {
 					:provider="provider"
 					:provider-type-info="getProviderTypeInfo(provider.type)"
 					:can-update="secretsProviders.canUpdate.value"
+					@click="handleCardClick(provider.name)"
 					@edit="handleEdit"
 					@share="handleShare"
 					@delete="handleDelete"

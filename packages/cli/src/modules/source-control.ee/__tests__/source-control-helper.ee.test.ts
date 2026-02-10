@@ -3,6 +3,7 @@ import { Container } from '@n8n/di';
 import { accessSync, constants as fsConstants } from 'fs';
 import { mock } from 'jest-mock-extended';
 import { InstanceSettings } from 'n8n-core';
+import type { ICredentialDataDecryptedObject } from 'n8n-workflow';
 import path from 'path';
 
 import type { License } from '@/license';
@@ -928,26 +929,31 @@ describe('Source Control Helper', () => {
 
 			// Arrays should remain as arrays, not be converted to objects with string indexes
 			// This is the key fix: deepCopy preserves arrays, while object spread converts them to objects
-			expect(Array.isArray(result.headers?.values)).toBe(true);
+			const headers = result.headers as unknown as {
+				values: Array<{ name: string; value: string }>;
+			};
+			expect(Array.isArray(headers?.values)).toBe(true);
 			expect(Array.isArray(result.ports)).toBe(true);
 			expect(Array.isArray(result.tags)).toBe(true);
 
 			// Verify array structure is preserved
-			expect((result.headers?.values as any).length).toBe(3);
-			expect((result.ports as any).length).toBe(3);
-			expect((result.tags as any).length).toBe(3);
+			expect(headers.values.length).toBe(3);
+			const ports = result.ports as unknown as number[];
+			expect(ports.length).toBe(3);
+			const tags = result.tags as unknown as string[];
+			expect(tags.length).toBe(3);
 
 			// Verify nested object in array: plain strings become empty, expressions preserved, numbers preserved
-			expect((result.headers?.values as any)[0].name).toBe(''); // Plain string sanitized
-			expect((result.headers?.values as any)[0].value).toBe('={{ $json.val1 }}'); // Expression preserved
-			expect((result.ports as any)[0]).toBe(8080); // Numbers preserved
-			expect((result.ports as any)[1]).toBe(9090);
-			expect((result.ports as any)[2]).toBe(3000);
+			expect(headers.values[0].name).toBe(''); // Plain string sanitized
+			expect(headers.values[0].value).toBe('={{ $json.val1 }}'); // Expression preserved
+			expect(ports[0]).toBe(8080); // Numbers preserved
+			expect(ports[1]).toBe(9090);
+			expect(ports[2]).toBe(3000);
 
 			// String values in arrays should be converted to empty strings (secrets)
-			expect((result.tags as any)[0]).toBe('');
-			expect((result.tags as any)[1]).toBe('');
-			expect((result.tags as any)[2]).toBe('');
+			expect(tags[0]).toBe('');
+			expect(tags[1]).toBe('');
+			expect(tags[2]).toBe('');
 		});
 	});
 
@@ -959,13 +965,13 @@ describe('Source Control Helper', () => {
 			};
 			const remote = {
 				apiKey: '={{ $json.key }}',
-				// host is omitted from remote (plain strings become empty, then skipped as not synchable)
+				host: '', // Host is in remote but sanitized to empty string
 			};
 
 			const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
 
 			expect(result.apiKey).toBe('={{ $json.key }}'); // Expression from remote
-			expect(result.host).toBe('localhost'); // Local value preserved
+			expect(result.host).toBe('localhost'); // Local value preserved (empty string skipped)
 		});
 
 		it('should merge numbers from remote', () => {
@@ -984,17 +990,19 @@ describe('Source Control Helper', () => {
 			expect(result.timeout).toBe(30000);
 		});
 
-		it('should preserve local secrets when remote omits plain strings', () => {
+		it('should preserve local secrets when remote has sanitized strings', () => {
 			const local = {
 				apiKey: 'local-secret-123',
 				password: 'local-password',
 			};
 			const remote = {
-				// Plain strings not included in remote (become empty strings, then skipped as not synchable)
+				apiKey: '', // Plain string sanitized to empty
+				password: '', // Plain string sanitized to empty
 			};
 
 			const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
 
+			// Local secrets preserved when remote has empty strings (secrets not synced)
 			expect(result.apiKey).toBe('local-secret-123');
 			expect(result.password).toBe('local-password');
 		});
@@ -1012,7 +1020,7 @@ describe('Source Control Helper', () => {
 			const remote = {
 				auth: {
 					apiKey: '={{ $vars.key }}',
-					// username omitted (plain strings become empty, then skipped)
+					username: '', // Plain string sanitized to empty
 				},
 				config: {
 					port: 8080,
@@ -1021,29 +1029,31 @@ describe('Source Control Helper', () => {
 
 			const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
 
-			expect((result.auth as any).apiKey).toBe('={{ $vars.key }}'); // Expression from remote
-			expect((result.auth as any).username).toBe('user1'); // Local value preserved
-			expect((result.config as any).port).toBe(8080); // Number from remote
+			const auth = result.auth as ICredentialDataDecryptedObject;
+			const config = result.config as ICredentialDataDecryptedObject;
+			expect(auth.apiKey).toBe('={{ $vars.key }}'); // Expression from remote
+			expect(auth.username).toBe('user1'); // Local value preserved (empty skipped)
+			expect(config.port).toBe(8080); // Number from remote
 		});
 
-		it('should merge arrays as objects and booleans from remote', () => {
+		it('should merge arrays and booleans from remote', () => {
 			const local = {
 				apiKey: 'secret',
 				port: 3000,
 			};
 			const remote = {
-				// apiKey omitted (plain string becomes empty, then skipped)
+				apiKey: '', // Plain string sanitized to empty
 				port: 8080,
 				enabled: true, // Booleans are synchable and merged
-				tags: ['tag1', 'tag2'], // Arrays processed as objects
+				tags: ['tag1', 'tag2'], // Arrays are merged
 			};
 
 			const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
 
-			expect(result.apiKey).toBe('secret'); // Local preserved
+			expect(result.apiKey).toBe('secret'); // Local preserved (empty skipped)
 			expect(result.port).toBe(8080); // Number from remote
 			expect(result.enabled).toBe(true); // Booleans are merged (synchable)
-			expect(result.tags).toBeDefined(); // Arrays are merged as objects
+			expect(result.tags).toBeDefined(); // Arrays are merged
 		});
 
 		it('should handle mismatched types (local string, remote object)', () => {
@@ -1056,15 +1066,17 @@ describe('Source Control Helper', () => {
 					port: 8080,
 					timeout: 3000,
 				},
+				apiKey: '', // Plain string sanitized to empty
 			};
 
 			const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
 
 			// Remote object overwrites local string
 			expect(result.config).toBeDefined();
-			expect((result.config as any).port).toBe(8080);
-			expect((result.config as any).timeout).toBe(3000);
-			expect(result.apiKey).toBe('secret'); // Local preserved
+			const config = result.config as ICredentialDataDecryptedObject;
+			expect(config.port).toBe(8080);
+			expect(config.timeout).toBe(3000);
+			expect(result.apiKey).toBe('secret'); // Local preserved (empty skipped)
 		});
 
 		it('should handle null values in remote (sanitized away)', () => {
@@ -1073,18 +1085,19 @@ describe('Source Control Helper', () => {
 				port: 3000,
 			};
 			const remote = {
-				// apiKey omitted (plain strings become empty, then skipped)
+				apiKey: '', // Plain string sanitized to empty
+				port: 5000, // Different port
 				nullField: null, // Removed during sanitization
-			} as any;
+			} as unknown as ICredentialDataDecryptedObject;
 
 			const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
 
-			expect(result.apiKey).toBe('secret'); // Local preserved
-			expect(result.nullField).toBeUndefined(); // Null values removed
-			expect(result.port).toBe(3000); // Local preserved
+			expect(result.apiKey).toBe('secret'); // Local preserved (empty skipped)
+			expect(result.nullField).toBeUndefined(); // Null values removed during sanitization
+			expect(result.port).toBe(5000); // Number from remote
 		});
 
-		it('should preserve local fields not in remote', () => {
+		it('should only include fields present in remote', () => {
 			const local = {
 				apiKey: 'secret',
 				port: 3000,
@@ -1092,14 +1105,15 @@ describe('Source Control Helper', () => {
 			};
 			const remote = {
 				port: 8080,
-				// Other fields omitted from remote
+				apiKey: '', // Plain string sanitized to empty
+				// extraField is NOT in remote, so won't be in result
 			};
 
 			const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
 
-			expect(result.apiKey).toBe('secret'); // Local preserved
+			expect(result.apiKey).toBe('secret'); // Local preserved (empty skipped)
 			expect(result.port).toBe(8080); // Merged from remote
-			expect(result.extraField).toBe('local-only'); // Local preserved
+			expect(result.extraField).toBeUndefined(); // Not in remote, not in result
 		});
 
 		it('should handle empty local object', () => {
@@ -1124,9 +1138,8 @@ describe('Source Control Helper', () => {
 
 			const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
 
-			// All local values should be preserved
-			expect(result.apiKey).toBe('secret');
-			expect(result.port).toBe(3000);
+			// Remote is empty, so result is empty (remote is source of truth for which fields exist)
+			expect(result).toEqual({});
 		});
 
 		it('should handle both empty objects', () => {
@@ -1177,6 +1190,7 @@ describe('Source Control Helper', () => {
 				level1: {
 					level2: {
 						level3: {
+							secret: '', // Plain string sanitized to empty
 							port: 9000,
 							expression: '={{ $json.value }}',
 						},
@@ -1186,9 +1200,12 @@ describe('Source Control Helper', () => {
 
 			const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
 
-			expect((result.level1 as any).level2.level3.secret).toBe('local-deep-secret'); // Local preserved
-			expect((result.level1 as any).level2.level3.port).toBe(9000); // Remote merged
-			expect((result.level1 as any).level2.level3.expression).toBe('={{ $json.value }}'); // Remote merged
+			const level1 = result.level1 as ICredentialDataDecryptedObject;
+			const level2 = level1.level2 as ICredentialDataDecryptedObject;
+			const level3 = level2.level3 as ICredentialDataDecryptedObject;
+			expect(level3.secret).toBe('local-deep-secret'); // Local preserved (empty skipped)
+			expect(level3.port).toBe(9000); // Remote merged
+			expect(level3.expression).toBe('={{ $json.value }}'); // Remote merged
 		});
 
 		it('should handle zero, negative, and floating point numbers from remote', () => {
@@ -1213,15 +1230,16 @@ describe('Source Control Helper', () => {
 		it('should handle undefined local properties when remote has values', () => {
 			const local = {
 				apiKey: 'secret',
-			} as any;
+			};
 			const remote = {
+				apiKey: '', // Plain string sanitized to empty
 				port: 8080,
 				expression: '={{ $json.key }}',
 			};
 
 			const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
 
-			expect(result.apiKey).toBe('secret'); // Local preserved
+			expect(result.apiKey).toBe('secret'); // Local preserved (empty skipped)
 			expect(result.port).toBe(8080); // Remote added
 			expect(result.expression).toBe('={{ $json.key }}'); // Remote added
 		});
@@ -1233,6 +1251,8 @@ describe('Source Control Helper', () => {
 				port: 3000,
 			};
 			const remote = {
+				apiKey: '', // Plain string sanitized to empty
+				username: '', // Plain string sanitized to empty
 				port: 8080,
 				timeout: 5000,
 				expression: '={{ $vars.host }}',
@@ -1240,7 +1260,7 @@ describe('Source Control Helper', () => {
 
 			const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
 
-			// Local fields not in remote preserved
+			// Local secrets preserved when remote has empty strings
 			expect(result.apiKey).toBe('local-secret');
 			expect(result.username).toBe('user');
 			// Overlapping field merged from remote
@@ -1250,6 +1270,276 @@ describe('Source Control Helper', () => {
 			expect(result.expression).toBe('={{ $vars.host }}');
 		});
 
+		it('should merge arrays with matching lengths by index', () => {
+			const local = {
+				headers: [
+					{ name: 'Authorization', value: 'Bearer local-token' },
+					{ name: 'Content-Type', value: 'application/json' },
+				],
+			};
+			const remote = {
+				headers: [
+					{ name: '', value: '={{ $json.token }}' }, // Sanitized plain string + expression
+					{ name: '', value: '' }, // Both sanitized
+				],
+			};
+
+			const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
+
+			expect(Array.isArray(result.headers)).toBe(true);
+			const headers = result.headers as unknown as Array<{ name: string; value: string }>;
+			expect(headers.length).toBe(2);
+			// First item: local secret preserved for name (empty skipped), expression from remote for value
+			expect(headers[0].name).toBe('Authorization'); // Local preserved (remote empty skipped)
+			expect(headers[0].value).toBe('={{ $json.token }}'); // Expression from remote
+			// Second item: both local values preserved (remote empty strings skipped)
+			expect(headers[1].name).toBe('Content-Type'); // Local preserved
+			expect(headers[1].value).toBe('application/json'); // Local preserved
+		});
+
+		it('should use remote array when lengths differ', () => {
+			const local = {
+				items: [
+					{ id: 1, secret: 'secret1' },
+					{ id: 2, secret: 'secret2' },
+				],
+			};
+			const remote = {
+				items: [
+					{ id: 1, secret: '' }, // Only one item in remote (secret sanitized to empty)
+				],
+			};
+
+			const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
+
+			expect(Array.isArray(result.items)).toBe(true);
+			const items = result.items as unknown as Array<{ id: number; secret: string }>;
+			expect(items.length).toBe(1);
+			// Remote array used as-is when lengths don't match (secrets must be re-entered)
+			expect(items[0].id).toBe(1);
+			expect(items[0].secret).toBe(''); // Empty string from sanitized remote
+		});
+
+		it('should handle arrays with expressions and secrets at matching indices', () => {
+			const local = {
+				endpoints: [
+					{ url: 'https://api.example.com', key: 'local-key-1' },
+					{ url: 'https://api2.example.com', key: 'local-key-2' },
+					{ url: 'https://api3.example.com', key: 'local-key-3' },
+				],
+			};
+			const remote = {
+				endpoints: [
+					{ url: '', key: '={{ $json.apiKey1 }}' }, // Plain string + expression
+					{ url: '={{ $vars.API_URL }}', key: '' }, // Expression + plain string
+					{ url: '', key: '' }, // Both plain strings
+				],
+			};
+
+			const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
+
+			expect(Array.isArray(result.endpoints)).toBe(true);
+			const endpoints = result.endpoints as unknown as Array<{ url: string; key: string }>;
+			expect(endpoints.length).toBe(3);
+
+			// First endpoint
+			expect(endpoints[0].url).toBe('https://api.example.com'); // Local preserved
+			expect(endpoints[0].key).toBe('={{ $json.apiKey1 }}'); // Expression from remote
+
+			// Second endpoint
+			expect(endpoints[1].url).toBe('={{ $vars.API_URL }}'); // Expression from remote
+			expect(endpoints[1].key).toBe('local-key-2'); // Local preserved
+
+			// Third endpoint
+			expect(endpoints[2].url).toBe('https://api3.example.com'); // Local preserved
+			expect(endpoints[2].key).toBe('local-key-3'); // Local preserved
+		});
+
+		it('should handle nested arrays within objects', () => {
+			const local = {
+				config: {
+					servers: [
+						{ host: 'server1.com', port: 8080 },
+						{ host: 'server2.com', port: 9090 },
+					],
+				},
+			};
+			const remote = {
+				config: {
+					servers: [
+						{ host: '', port: 443 }, // Sanitized host, different port
+						{ host: '={{ $vars.SERVER_HOST }}', port: 9090 }, // Expression + same port
+					],
+				},
+			};
+
+			const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
+
+			const config = result.config as unknown as {
+				servers: Array<{ host: string; port: number }>;
+			};
+			expect(config.servers).toBeDefined();
+			expect(Array.isArray(config.servers)).toBe(true);
+			expect(config.servers.length).toBe(2);
+
+			// First server
+			expect(config.servers[0].host).toBe('server1.com'); // Local preserved
+			expect(config.servers[0].port).toBe(443); // Remote number
+
+			// Second server
+			expect(config.servers[1].host).toBe('={{ $vars.SERVER_HOST }}'); // Remote expression
+			expect(config.servers[1].port).toBe(9090); // Remote number
+		});
+
+		it('should handle arrays of primitives with matching lengths', () => {
+			const local = {
+				ports: [8080, 9090, 3000],
+				tags: ['tag1', 'tag2', 'tag3'],
+			} as unknown as ICredentialDataDecryptedObject;
+			const remote = {
+				ports: [443, 8443, 5000], // Different numbers
+				tags: ['', '', ''], // Sanitized strings
+			} as unknown as ICredentialDataDecryptedObject;
+
+			const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
+
+			// Numbers: remote values used
+			expect(Array.isArray(result.ports)).toBe(true);
+			const ports = result.ports as unknown as number[];
+			expect(ports[0]).toBe(443);
+			expect(ports[1]).toBe(8443);
+			expect(ports[2]).toBe(5000);
+
+			// Strings: local preserved (empty strings skipped)
+			expect(Array.isArray(result.tags)).toBe(true);
+			const tags = result.tags as unknown as string[];
+			expect(tags[0]).toBe('tag1');
+			expect(tags[1]).toBe('tag2');
+			expect(tags[2]).toBe('tag3');
+		});
+
+		it('should handle mixed array with expressions, numbers, and strings', () => {
+			const local = {
+				mixedArray: [
+					{ type: 'secret', value: 'local-secret' },
+					{ type: 'port', value: 3000 },
+					{ type: 'expression', value: '={{ $json.old }}' },
+				],
+			};
+			const remote = {
+				mixedArray: [
+					{ type: '', value: '' }, // Plain strings sanitized
+					{ type: '', value: 8080 }, // Plain string + number
+					{ type: '', value: '={{ $json.new }}' }, // Plain string + expression
+				],
+			};
+
+			const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
+
+			expect(Array.isArray(result.mixedArray)).toBe(true);
+			const mixedArray = result.mixedArray as unknown as Array<{
+				type: string;
+				value: string | number;
+			}>;
+
+			// First item: local secrets preserved
+			expect(mixedArray[0].type).toBe('secret'); // Local preserved
+			expect(mixedArray[0].value).toBe('local-secret'); // Local preserved
+
+			// Second item: number from remote, local string preserved
+			expect(mixedArray[1].type).toBe('port'); // Local preserved
+			expect(mixedArray[1].value).toBe(8080); // Number from remote
+
+			// Third item: expression from remote
+			expect(mixedArray[2].type).toBe('expression'); // Local preserved
+			expect(mixedArray[2].value).toBe('={{ $json.new }}'); // Expression from remote
+		});
+
+		it('should add array from remote when no local array exists', () => {
+			const local = {
+				apiKey: 'secret',
+			};
+			const remote = {
+				apiKey: '', // Plain string sanitized to empty
+				headers: [
+					{ name: '', value: '={{ $json.token }}' },
+					{ name: '', value: '={{ $json.key }}' },
+				],
+			};
+
+			const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
+
+			expect(result.apiKey).toBe('secret'); // Local preserved (empty skipped)
+			expect(Array.isArray(result.headers)).toBe(true);
+			const headers = result.headers as unknown as Array<{ name: string; value: string }>;
+			expect(headers.length).toBe(2);
+			expect(headers[0].value).toBe('={{ $json.token }}');
+			expect(headers[1].value).toBe('={{ $json.key }}');
+		});
+
+		it('should handle empty arrays', () => {
+			const local = {
+				items: [{ id: 1, value: 'local' }],
+				emptyArray: [],
+			};
+			const remote = {
+				items: [], // Empty remote array
+				emptyArray: [], // Both empty
+			};
+
+			const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
+
+			// Empty arrays have matching length (0), so merge by index (no items to merge)
+			expect(Array.isArray(result.items)).toBe(true);
+			const items = result.items as unknown as unknown[];
+			expect(items.length).toBe(0);
+			expect(Array.isArray(result.emptyArray)).toBe(true);
+			const emptyArray = result.emptyArray as unknown as unknown[];
+			expect(emptyArray.length).toBe(0);
+		});
+
+		it('should preserve deeply nested arrays with matching structure', () => {
+			const local = {
+				level1: {
+					level2: {
+						items: [
+							{ secret: 'secret1', port: 3000 },
+							{ secret: 'secret2', port: 4000 },
+						],
+					},
+				},
+			};
+			const remote = {
+				level1: {
+					level2: {
+						items: [
+							{ secret: '', port: 8080 },
+							{ secret: '={{ $json.key }}', port: 9090 },
+						],
+					},
+				},
+			};
+
+			const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
+
+			const level1 = result.level1 as unknown as {
+				level2: {
+					items: Array<{ secret: string; port: number }>;
+				};
+			};
+			const items = level1.level2.items;
+			expect(Array.isArray(items)).toBe(true);
+			expect(items.length).toBe(2);
+
+			// First item
+			expect(items[0].secret).toBe('secret1'); // Local preserved
+			expect(items[0].port).toBe(8080); // Remote number
+
+			// Second item
+			expect(items[1].secret).toBe('={{ $json.key }}'); // Remote expression
+			expect(items[1].port).toBe(9090); // Remote number
+		});
+
 		it('should add new nested objects from remote when local does not have them', () => {
 			const local = {
 				apiKey: 'local-secret',
@@ -1257,6 +1547,8 @@ describe('Source Control Helper', () => {
 				// No 'config' or 'auth' nested objects
 			};
 			const remote = {
+				apiKey: '', // Plain string sanitized to empty
+				port: 3000, // Same port
 				config: {
 					timeout: 5000,
 					retries: 3,
@@ -1270,17 +1562,19 @@ describe('Source Control Helper', () => {
 
 			const result = mergeRemoteCrendetialDataIntoLocalCredentialData({ local, remote });
 
-			// Local properties preserved
+			// Local secret preserved (empty skipped), number from remote
 			expect(result.apiKey).toBe('local-secret');
 			expect(result.port).toBe(3000);
 			// New nested objects from remote added
 			expect(result.config).toBeDefined();
-			expect((result.config as any).timeout).toBe(5000);
-			expect((result.config as any).retries).toBe(3);
-			expect((result.config as any).url).toBe('={{ $vars.baseUrl }}');
+			const config = result.config as ICredentialDataDecryptedObject;
+			expect(config.timeout).toBe(5000);
+			expect(config.retries).toBe(3);
+			expect(config.url).toBe('={{ $vars.baseUrl }}');
 			expect(result.auth).toBeDefined();
-			expect((result.auth as any).enabled).toBe(true);
-			expect((result.auth as any).port).toBe(443);
+			const auth = result.auth as ICredentialDataDecryptedObject;
+			expect(auth.enabled).toBe(true);
+			expect(auth.port).toBe(443);
 		});
 	});
 

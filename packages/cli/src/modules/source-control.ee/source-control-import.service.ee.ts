@@ -443,17 +443,23 @@ export class SourceControlImportService {
 		return localCredentials.map((local) => {
 			const remoteOwnerProject = local.shared?.find((s) => s.role === 'credential:owner')?.project;
 
-			const credentials = new Credentials(
-				{ id: local.id, name: local.name },
-				local.type,
-				local.data,
-			);
+			let data: Record<string, unknown> = {};
+			try {
+				const credentials = new Credentials(
+					{ id: local.id, name: local.name },
+					local.type,
+					local.data,
+				);
+				data = sanitizeCredentialData(credentials.getData());
+			} catch {
+				// Credential data may not be decryptable (e.g. empty or corrupted data)
+			}
 
 			return {
 				id: local.id,
 				name: local.name,
 				type: local.type,
-				data: sanitizeCredentialData(credentials.getData()),
+				data,
 				filename: getCredentialExportPath(local.id, this.credentialExportFolder),
 				ownedBy: remoteOwnerProject ? getOwnerFromProject(remoteOwnerProject) : undefined,
 				isGlobal: local.isGlobal,

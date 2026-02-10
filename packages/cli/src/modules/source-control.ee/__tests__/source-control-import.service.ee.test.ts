@@ -1282,7 +1282,7 @@ describe('SourceControlImportService', () => {
 			);
 
 			// Verify the credential data was sanitized properly
-			const upsertCall = credentialsRepository.upsert.mock.calls[0][0];
+			const upsertCall = credentialsRepository.upsert.mock.calls[0][0] as Record<string, unknown>;
 			expect(upsertCall.data).toBeDefined();
 		});
 

@@ -46,6 +46,7 @@ const flagsSchema = z.object({
 		'--id=5 --output=file.json',
 		'--id=5 --version=abc-123-def',
 		'--id=5 --published',
+		'--all --published --output=backups/latest/',
 		'--all --output=backups/latest/',
 		'--backup --output=backups/latest/',
 	],
@@ -100,16 +101,9 @@ export class ExportWorkflowsCommand extends BaseCommand<z.infer<typeof flagsSche
 					fs.mkdirSync(flags.output, { recursive: true });
 				}
 			} catch (e) {
-				this.logger.error(
-					'Aborting execution as a filesystem error has been encountered while creating the output directory. See log messages for details.',
+				throw new UserError(
+					`Filesystem error while creating the output directory: ${e instanceof Error ? e.message : String(e)}`,
 				);
-				this.logger.error('\nFILESYSTEM ERROR');
-				this.logger.info('====================================');
-				if (e instanceof Error) {
-					this.logger.error(e.message);
-					this.logger.error(e.stack!);
-				}
-				process.exit(1);
 			}
 		} else if (flags.output) {
 			if (fs.existsSync(flags.output)) {
@@ -174,8 +168,9 @@ export class ExportWorkflowsCommand extends BaseCommand<z.infer<typeof flagsSche
 		}
 	}
 
-	async catch(_error: Error) {
+	async catch(error: Error) {
 		this.logger.error('Error exporting workflows. See log messages for details.');
+		this.logger.debug(error.message);
 	}
 }
 
@@ -187,12 +182,16 @@ async function getWorkflowsToExport(
 	workflows: IWorkflowWithHistoryMetadata[],
 	flags: z.infer<typeof flagsSchema>,
 ) {
-	const workflowVersionPairs = workflows
-		.map((workflow) => {
-			const versionId = getTargetVersionId(workflow, flags);
-			return versionId ? { workflowId: workflow.id, versionId } : null;
-		})
-		.filter((pair) => pair !== null);
+	const versionIdByWorkflow = new Map<string, string>();
+	const workflowVersionPairs: Array<{ workflowId: string; versionId: string }> = [];
+
+	for (const workflow of workflows) {
+		const versionId = getTargetVersionId(workflow, flags);
+		if (versionId) {
+			versionIdByWorkflow.set(workflow.id, versionId);
+			workflowVersionPairs.push({ workflowId: workflow.id, versionId });
+		}
+	}
 
 	const workflowHistories: WorkflowHistory[] =
 		workflowVersionPairs.length > 0
@@ -205,7 +204,7 @@ async function getWorkflowsToExport(
 		workflowHistories.map((h) => [`${h.workflowId}:${h.versionId}`, h]),
 	);
 
-	return mergeHistoriesIntoWorkflows(workflows, historyMap, flags);
+	return mergeHistoriesIntoWorkflows(workflows, versionIdByWorkflow, historyMap, flags);
 }
 
 function getTargetVersionId(
@@ -219,12 +218,13 @@ function getTargetVersionId(
 
 function mergeHistoriesIntoWorkflows(
 	workflows: IWorkflowWithHistoryMetadata[],
+	versionIdByWorkflow: Map<string, string>,
 	historyMap: Map<string, WorkflowHistory>,
 	flags: z.infer<typeof flagsSchema>,
 ) {
 	return workflows
 		.map((workflow) => {
-			const versionId = getTargetVersionId(workflow, flags);
+			const versionId = versionIdByWorkflow.get(workflow.id);
 			if (!versionId) return null;
 
 			const history = historyMap.get(`${workflow.id}:${versionId}`);
@@ -246,7 +246,7 @@ function mergeHistoriesIntoWorkflows(
 
 			return {
 				...workflow,
-				workflowHistory: undefined,
+				workflowHistory: null,
 			};
 		})
 		.filter((w) => w !== null);

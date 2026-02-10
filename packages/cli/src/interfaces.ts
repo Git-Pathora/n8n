@@ -57,7 +57,7 @@ export interface IWorkflowHistoryMetadata {
 	workflowHistory?: {
 		name: string | null;
 		description: string | null;
-	};
+	} | null;
 }
 
 export interface IWorkflowToImport

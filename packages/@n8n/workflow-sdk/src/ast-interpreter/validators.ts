@@ -319,27 +319,15 @@ export function isAllowedMethod(name: string): boolean {
 
 /**
  * Safe subset of JSON methods available in SDK code.
- * Only stringify and parse are permitted.
+ * Only stringify is permitted.
  */
 const SAFE_JSON_METHODS: Record<string, (...args: unknown[]) => unknown> = {
 	stringify: (...args: unknown[]) =>
 		JSON.stringify(args[0], args[1] as undefined, args[2] as undefined),
-	parse: (...args: unknown[]) => {
-		const input = args[0];
-		if (typeof input !== 'string') {
-			throw new Error(`JSON.parse() expects a string argument, got ${typeof input}`);
-		}
-		try {
-			return JSON.parse(input) as unknown;
-		} catch (error) {
-			const message = error instanceof Error ? error.message : 'Unknown error';
-			throw new Error(`JSON.parse() failed: ${message}`);
-		}
-	},
 };
 
 /**
- * Check if a member expression is a safe JSON method call (JSON.stringify / JSON.parse).
+ * Check if a member expression is a safe JSON method call (e.g. JSON.stringify).
  * Returns the safe function if so, undefined otherwise.
  */
 export function getSafeJSONMethod(
@@ -348,4 +336,25 @@ export function getSafeJSONMethod(
 ): ((...args: unknown[]) => unknown) | undefined {
 	if (objectName !== 'JSON') return undefined;
 	return SAFE_JSON_METHODS[methodName];
+}
+
+/**
+ * Safe subset of string methods available in SDK code.
+ */
+const SAFE_STRING_METHODS: Record<string, (str: string, ...args: unknown[]) => unknown> = {
+	repeat: (str: string, count: unknown) => str.repeat(count as number),
+};
+
+/**
+ * Check if a method call on a string value is a safe string method (e.g. "abc".repeat(3)).
+ * Returns a bound function if so, undefined otherwise.
+ */
+export function getSafeStringMethod(
+	value: unknown,
+	methodName: string,
+): ((...args: unknown[]) => unknown) | undefined {
+	if (typeof value !== 'string') return undefined;
+	const factory = SAFE_STRING_METHODS[methodName];
+	if (!factory) return undefined;
+	return (...args: unknown[]) => factory(value, ...args);
 }

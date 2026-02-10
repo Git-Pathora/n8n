@@ -669,7 +669,7 @@ describe('AST Interpreter', () => {
 		});
 	});
 
-	describe('JSON.stringify and JSON.parse', () => {
+	describe('JSON.stringify', () => {
 		let sdkFunctions: SDKFunctions;
 
 		beforeEach(() => {
@@ -682,16 +682,15 @@ describe('AST Interpreter', () => {
 			expect(result).toBe('{"a":1,"b":"hello"}');
 		});
 
-		it('should allow JSON.parse with a string', () => {
-			const code = 'export default JSON.parse("{\\"x\\": 42}");';
-			const result = interpretSDKCode(code, sdkFunctions);
-			expect(result).toEqual({ x: 42 });
-		});
-
 		it('should allow JSON.stringify with indent argument', () => {
 			const code = 'export default JSON.stringify({ a: 1 }, null, 2);';
 			const result = interpretSDKCode(code, sdkFunctions);
 			expect(result).toBe('{\n  "a": 1\n}');
+		});
+
+		it('should reject JSON.parse', () => {
+			const code = 'export default JSON.parse("{\\"x\\": 42}");';
+			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
 		});
 
 		it('should reject unlisted JSON methods', () => {
@@ -701,6 +700,37 @@ describe('AST Interpreter', () => {
 
 		it('should still reject raw JSON identifier access', () => {
 			const code = 'export default JSON;';
+			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
+		});
+	});
+
+	describe('String.repeat', () => {
+		let sdkFunctions: SDKFunctions;
+
+		beforeEach(() => {
+			sdkFunctions = createMockSDKFunctions();
+		});
+
+		it('should allow "abc".repeat(3)', () => {
+			const code = 'export default "abc".repeat(3);';
+			const result = interpretSDKCode(code, sdkFunctions);
+			expect(result).toBe('abcabcabc');
+		});
+
+		it('should allow repeat with zero', () => {
+			const code = 'export default "hello".repeat(0);';
+			const result = interpretSDKCode(code, sdkFunctions);
+			expect(result).toBe('');
+		});
+
+		it('should allow repeat on a variable holding a string', () => {
+			const code = 'const sep = "-"; export default sep.repeat(5);';
+			const result = interpretSDKCode(code, sdkFunctions);
+			expect(result).toBe('-----');
+		});
+
+		it('should still reject other string methods', () => {
+			const code = 'export default "hello".toUpperCase();';
 			expect(() => interpretSDKCode(code, sdkFunctions)).toThrow(SecurityError);
 		});
 	});

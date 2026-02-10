@@ -19,6 +19,7 @@ import {
 	isAllowedSDKFunction,
 	isAllowedMethod,
 	getSafeJSONMethod,
+	getSafeStringMethod,
 } from './validators';
 
 /**
@@ -210,6 +211,13 @@ class SDKInterpreter {
 			}
 
 			thisArg = this.evaluate(memberExpr.object);
+
+			// Handle safe string methods (e.g. "abc".repeat(3))
+			const safeStringMethod = getSafeStringMethod(thisArg, methodName);
+			if (safeStringMethod) {
+				const args = node.arguments.map((arg) => this.evaluate(arg));
+				return safeStringMethod(...args);
+			}
 
 			// Validate method name against allowlist
 			if (!isAllowedMethod(methodName)) {

@@ -11,8 +11,9 @@ import type {
 	MessageWithCallback,
 } from '@/eventbus/message-event-bus/message-event-bus';
 
-import { MessageEventBusDestination } from './message-event-bus-destination.ee';
+import { AuditLog } from '../database/entities/audit-log.entity';
 import { AuditLogRepository } from '../database/repositories/audit-log.repository';
+import { MessageEventBusDestination } from './message-event-bus-destination.ee';
 
 export const isMessageEventBusDestinationDatabaseOptions = (
 	candidate: unknown,
@@ -43,15 +44,16 @@ export class MessageEventBusDestinationDatabase
 	async receiveFromEventBus(emitterPayload: MessageWithCallback): Promise<boolean> {
 		const { msg, confirmCallback } = emitterPayload;
 
-		const payload = this.anonymizeAuditMessages ? msg.anonymize() : msg.payload;
+		const payload = (this.anonymizeAuditMessages ? msg.anonymize() : msg.payload) ?? {};
 
-		await this.auditLogRepository.insert({
+		const auditLog = Object.assign(new AuditLog(), {
 			id: uuid(),
 			eventName: msg.eventName,
 			message: msg.message ?? msg.eventName,
 			timestamp: msg.ts.toJSDate(),
-			payload: payload ?? {},
+			payload,
 		});
+		await this.auditLogRepository.save(auditLog);
 
 		confirmCallback(msg, { id: this.id, name: this.label });
 		return true;

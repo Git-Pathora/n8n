@@ -584,3 +584,10 @@ export const sentryModalDescription = [
 	},
 	circuitBreakerOptions,
 ] as INodeProperties[];
+
+export const databaseModalDescription = [
+	{
+		type: 'notice',
+		displayName: 'Database integration requires no settings',
+	},
+] as INodeProperties[];

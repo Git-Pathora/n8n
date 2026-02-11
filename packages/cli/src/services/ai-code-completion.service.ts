@@ -13,8 +13,20 @@ interface CodestralFimResponse {
 }
 
 const BASE_CONTEXT = `/* n8n Code Node — JavaScript (ES6 only).
-RULES: Do NOT use require(), import, or external libraries. Only use the n8n globals below.
-Only console.log() works (no warn/error/info). Use async/await for promises.
+RULES:
+- Do NOT use require(), import, fetch(), or external libraries.
+- For HTTP calls use helpers.httpRequest() instead of fetch().
+- Only console.log() works (no warn/error/info). Use async/await for promises.
+- Prefer .map(), .filter(), .reduce() over imperative loops.
+- NEVER use optional chaining (?.) on the LEFT side of assignments.
+  CORRECT: item.json.prop = value   WRONG: item?.json?.prop = value
+- The final return of the Code node must be an object or array of objects, never a raw primitive.
+  Inner functions/closures can return any type.
+
+DATA MODEL:
+  Items are ALWAYS wrapped: { json: { ...data }, binary?: { propName: {...} } }
+  Access data via item.json.fieldName — NEVER item.fieldName directly.
+  Items from $("NodeName").all() are also wrapped the same way — use otherItem.json.field.
 
 GLOBALS:
   $input          - Current node's input data
@@ -40,7 +52,7 @@ GLOBALS:
   DateTime, Duration, Interval - Luxon classes (global)
   Buffer, setTimeout, setInterval, btoa, atob, FormData, TextEncoder, TextDecoder
 
-  $("NodeName")   - Access other node's data:
+  $("NodeName")   - Access other node's data (returns wrapped items with .json):
     .all(branch?, run?)    - All items from that node
     .first(branch?, run?)  - First item
     .last(branch?, run?)   - Last item
@@ -55,8 +67,6 @@ GLOBALS:
   helpers.prepareBinaryData(buffer, fileName?, mimeType?) -> Promise<BinaryData>
   helpers.setBinaryDataBuffer(metadata, buffer) -> Promise<BinaryData>
   helpers.binaryToString(buffer, encoding?) -> Promise<string>
-
-ITEM STRUCTURE: { json: { ...data }, binary?: { propName: { id, fileName, fileExtension, mimeType, fileSize } } }
 
 EXTENSION METHODS (call on values directly):
   String:  .toNumber(), .toBoolean(), .toDateTime(fmt?), .toInt(), .toFloat(),
@@ -90,13 +100,14 @@ const ALL_ITEMS_CONTEXT = `${BASE_CONTEXT}/* MODE: Run Once for All Items
     - Plain object: { name: "x", value: 1 } (auto-wrapped in json)
     - Explicit:     { json: { name: "x" }, binary?: { file: binaryData } }
     - Return null for empty output.
+  When reducing many items to fewer, add pairedItem for lineage:
+    { json: {...}, pairedItem: [0, 1, 2] }
 
   EXAMPLE:
-  const results = [];
-  for (const item of $input.all()) {
-    results.push({ name: item.json.name, processed: true });
-  }
-  return results;
+  return $input.all().map(item => ({
+    name: item.json.name,
+    email: item.json.email,
+  }));
 */
 `;
 
@@ -107,6 +118,8 @@ const EACH_ITEM_CONTEXT = `${BASE_CONTEXT}/* MODE: Run Once for Each Item
   $itemIndex        - Index of the current item (number)
 
   CANNOT use: $input.all(), $input.first(), $input.last(), $input.itemMatching()
+
+  When modifying the current item: $input.item.json.newField = value (no ?. on left side).
 
   RETURN: Single object (NOT an array). Either:
     - Plain object: { name: "x", value: 1 } (auto-wrapped in json)
@@ -137,7 +150,7 @@ export class AiCodeCompletionService {
 			);
 		}
 
-		const contextPrefix = this.getContextPrefix(payload.mode);
+		const contextPrefix = this.getContextPrefix(payload.mode, payload.inputSchema);
 
 		const response = await fetch('https://api.mistral.ai/v1/fim/completions', {
 			method: 'POST',
@@ -166,10 +179,13 @@ export class AiCodeCompletionService {
 		return { completion };
 	}
 
-	private getContextPrefix(mode?: string): string {
-		if (mode === 'runOnceForEachItem') {
-			return EACH_ITEM_CONTEXT;
+	private getContextPrefix(mode?: string, inputSchema?: string): string {
+		let prefix = mode === 'runOnceForEachItem' ? EACH_ITEM_CONTEXT : ALL_ITEMS_CONTEXT;
+
+		if (inputSchema) {
+			prefix += `/* INPUT SCHEMA (available on item.json):\n  ${inputSchema}\n*/\n`;
 		}
-		return ALL_ITEMS_CONTEXT;
+
+		return prefix;
 	}
 }

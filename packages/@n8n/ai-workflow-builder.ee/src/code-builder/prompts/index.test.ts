@@ -197,6 +197,67 @@ export default workflow('', 'Test').add(start);`;
 			expect(content).toContain('search_nodes');
 		});
 
+		it('includes node_search_results in user message when preSearchResults is provided', async () => {
+			const prompt = buildCodeBuilderPrompt(undefined, undefined, {
+				planOutput: mockPlan,
+				preSearchResults: 'httpRequest: version 4.3, slack: version 2.3',
+			});
+
+			const messages = await prompt.formatMessages({ userMessage: 'Build weather workflow' });
+			const humanMessage = messages.find((m) => m._getType() === 'human');
+			const content = humanMessage?.content as string;
+
+			expect(content).toContain('<node_search_results>');
+			expect(content).toContain('httpRequest: version 4.3');
+			expect(content).toContain('</node_search_results>');
+		});
+
+		it('does NOT include node_search_results when preSearchResults is absent', async () => {
+			const prompt = buildCodeBuilderPrompt(undefined, undefined, {
+				planOutput: mockPlan,
+			});
+
+			const messages = await prompt.formatMessages({ userMessage: 'Build weather workflow' });
+			const humanMessage = messages.find((m) => m._getType() === 'human');
+			const content = humanMessage?.content as string;
+
+			expect(content).not.toContain('<node_search_results>');
+		});
+
+		it('uses prefetched Step 2b variant in system prompt when preSearchResults is provided', async () => {
+			const prompt = buildCodeBuilderPrompt(undefined, undefined, {
+				planOutput: mockPlan,
+				preSearchResults: 'some search results',
+			});
+
+			const messages = await prompt.formatMessages({ userMessage: 'Build weather workflow' });
+			const systemMessage = messages.find((m) => m._getType() === 'system');
+			const content = Array.isArray(systemMessage?.content)
+				? systemMessage.content.map((b) => ('text' in b ? b.text : '')).join('')
+				: String(systemMessage?.content ?? '');
+
+			expect(content).toContain('pre-fetched in <node_search_results>');
+			// Should NOT contain the plan search variant's instruction to call search_nodes with queries
+			expect(content).not.toContain('search_nodes({ queries:');
+		});
+
+		it('uses plan Step 2b variant when planOutput but no preSearchResults', async () => {
+			const prompt = buildCodeBuilderPrompt(undefined, undefined, {
+				planOutput: mockPlan,
+			});
+
+			const messages = await prompt.formatMessages({ userMessage: 'Build weather workflow' });
+			const systemMessage = messages.find((m) => m._getType() === 'system');
+			const content = Array.isArray(systemMessage?.content)
+				? systemMessage.content.map((b) => ('text' in b ? b.text : '')).join('')
+				: String(systemMessage?.content ?? '');
+
+			// Should contain the plan search variant
+			expect(content).toContain('suggestedNodes to get discriminators');
+			// Should NOT contain the prefetched variant
+			expect(content).not.toContain('pre-fetched in <node_search_results>');
+		});
+
 		it('includes default steps 1 and 2a when planOutput is not provided', async () => {
 			const prompt = buildCodeBuilderPrompt();
 

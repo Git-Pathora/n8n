@@ -16,6 +16,7 @@ import { generateWorkflowCode } from '@n8n/workflow-sdk';
 import type { WorkflowJSON } from '@n8n/workflow-sdk';
 
 import type { ChatPayload } from '../../workflow-builder-agent';
+import type { PlanOutput } from '../../types/planning';
 import { TEXT_EDITOR_TOOL, VALIDATE_TOOL, BATCH_STR_REPLACE_TOOL } from '../constants';
 import { buildCodeBuilderPrompt, type HistoryContext } from '../prompts';
 import { TextEditorHandler } from './text-editor-handler';
@@ -118,6 +119,11 @@ export class ChatSetupHandler {
 		// Pre-generate workflow code for consistency between prompt and text editor
 		const preGeneratedWorkflowCode = this.preGenerateWorkflowCode(payload, workflowForCodeContext);
 
+		// Pre-fetch search results for plan's suggestedNodes to save an LLM round-trip
+		const preSearchResults = payload.planOutput
+			? await this.prefetchSearchResults(payload.planOutput)
+			: undefined;
+
 		// Check if text editor mode should be enabled
 		const textEditorEnabled = this.shouldEnableTextEditor();
 
@@ -131,6 +137,7 @@ export class ChatSetupHandler {
 			valuesExcluded: payload.workflowContext?.valuesExcluded,
 			pinnedNodes: payload.workflowContext?.pinnedNodes,
 			planOutput: payload.planOutput,
+			preSearchResults,
 		});
 
 		// Bind tools to LLM (exclude get_suggested_nodes when plan provides node suggestions)
@@ -264,4 +271,40 @@ export class ChatSetupHandler {
 
 		return { textEditorHandler, textEditorToolHandler };
 	}
+
+	/**
+	 * Pre-fetch search_nodes results for the plan's suggestedNodes.
+	 * Returns the search result string, or undefined if not applicable.
+	 */
+	private async prefetchSearchResults(plan: PlanOutput): Promise<string | undefined> {
+		const queries = extractSearchQueriesFromPlan(plan);
+		if (queries.length === 0) return undefined;
+
+		const searchTool = this.tools.find((t) => t.name === 'search_nodes');
+		if (!searchTool) return undefined;
+
+		try {
+			const result = await searchTool.invoke({ queries });
+			return typeof result === 'string' ? result : String(result);
+		} catch {
+			return undefined;
+		}
+	}
+}
+
+/**
+ * Extract short node names from a plan's suggestedNodes for search queries.
+ * Deduplicates and strips package prefixes (e.g. "n8n-nodes-base.httpRequest" → "httpRequest").
+ */
+export function extractSearchQueriesFromPlan(plan: PlanOutput): string[] {
+	const nodeSet = new Set<string>();
+	for (const step of plan.steps) {
+		if (step.suggestedNodes) {
+			for (const nodeName of step.suggestedNodes) {
+				const lastDotIndex = nodeName.lastIndexOf('.');
+				nodeSet.add(lastDotIndex >= 0 ? nodeName.substring(lastDotIndex + 1) : nodeName);
+			}
+		}
+	}
+	return [...nodeSet];
 }

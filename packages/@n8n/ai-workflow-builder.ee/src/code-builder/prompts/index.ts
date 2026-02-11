@@ -631,6 +631,14 @@ Search for:
 
 </step_2b_search_for_nodes>`;
 
+const STEP_2B_SEARCH_PREFETCHED = `<step_2b_search_for_nodes>
+
+The search results for the plan's suggestedNodes are pre-fetched in <node_search_results>.
+Read those results carefully. If you need additional nodes not covered (trigger, utility nodes),
+call \`search_nodes\`. Otherwise proceed to Step 2c.
+
+</step_2b_search_for_nodes>`;
+
 const STEP_2C_REVIEW_DEFAULT = `<step_2c_review_search_results>
 
 Use the \`think\` tool to review all results. Do NOT produce visible output in this step. Be EXTREMELY concise.
@@ -782,10 +790,14 @@ When validation passes, stop calling tools.
  * Build the mandatory workflow steps, swapping in plan-specific versions
  * of Steps 1, 2a, 2b, 2c, and 3 when an approved plan is provided.
  */
-function buildMandatoryWorkflow(hasPlanOutput: boolean): string {
+function buildMandatoryWorkflow(hasPlanOutput: boolean, hasPreSearchResults = false): string {
 	const step1 = hasPlanOutput ? STEP_1_READ_APPROVED_PLAN : STEP_1_ANALYZE_USER_REQUEST;
 	const step2a = hasPlanOutput ? '' : STEP_2A_GET_SUGGESTED_NODES;
-	const step2b = hasPlanOutput ? STEP_2B_SEARCH_PLAN : STEP_2B_SEARCH_DEFAULT;
+	const step2b = hasPreSearchResults
+		? STEP_2B_SEARCH_PREFETCHED
+		: hasPlanOutput
+			? STEP_2B_SEARCH_PLAN
+			: STEP_2B_SEARCH_DEFAULT;
 	const step2c = hasPlanOutput ? STEP_2C_REVIEW_PLAN : STEP_2C_REVIEW_DEFAULT;
 	const step3 = hasPlanOutput ? STEP_3_DESIGN_PLAN : STEP_3_DESIGN_DEFAULT;
 
@@ -830,6 +842,8 @@ export interface BuildCodeBuilderPromptOptions {
 	pinnedNodes?: string[];
 	/** Approved plan from planning phase */
 	planOutput?: PlanOutput;
+	/** Pre-fetched search_nodes results for the plan's suggestedNodes */
+	preSearchResults?: string;
 }
 
 /**
@@ -845,7 +859,8 @@ export function buildCodeBuilderPrompt(
 	options?: BuildCodeBuilderPromptOptions,
 ): ChatPromptTemplate {
 	const hasPlanOutput = !!options?.planOutput;
-	const mandatoryWorkflow = buildMandatoryWorkflow(hasPlanOutput);
+	const hasPreSearchResults = !!options?.preSearchResults;
+	const mandatoryWorkflow = buildMandatoryWorkflow(hasPlanOutput, hasPreSearchResults);
 
 	const promptSections = [
 		`<role>\n${ROLE}\n</role>`,
@@ -912,7 +927,14 @@ export function buildCodeBuilderPrompt(
 		);
 	}
 
-	// 5. Wrap user message in XML tag for easy extraction when loading sessions
+	// 5. Pre-fetched search results (saves an LLM round-trip when plan is provided)
+	if (options?.preSearchResults) {
+		userMessageParts.push(
+			`<node_search_results>\n${escapeCurlyBrackets(options.preSearchResults)}\n</node_search_results>`,
+		);
+	}
+
+	// 6. Wrap user message in XML tag for easy extraction when loading sessions
 	if (userMessageParts.length > 0) {
 		userMessageParts.push('<user_request>');
 		userMessageParts.push('{userMessage}');

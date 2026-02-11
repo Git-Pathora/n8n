@@ -2,7 +2,14 @@ import { defineConfig, globalIgnores } from 'eslint/config';
 import { nodeConfig } from '@n8n/eslint-config/node';
 
 export default defineConfig(
-	globalIgnores(['scripts/**/*.mjs', 'jest.config*.js', 'test/*-testcontainers.js', 'coverage/**']),
+	globalIgnores([
+		'scripts/**/*.mjs',
+		'jest.config*.js',
+		'test/*-testcontainers.js',
+		'coverage/**',
+		'src/modules/mcp/apps/*/src/**',
+		'src/modules/mcp/apps/vite.config.mts',
+	]),
 	nodeConfig,
 	{
 		rules: {

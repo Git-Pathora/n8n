@@ -2,6 +2,7 @@ import { type User, type WorkflowEntity } from '@n8n/db';
 import type { INode } from 'n8n-workflow';
 import z from 'zod';
 
+import { SEARCH_WORKFLOWS_RESOURCE_URI } from '../apps/register-apps';
 import { USER_CALLED_MCP_TOOL_EVENT } from '../mcp.constants';
 import type {
 	ToolDefinition,
@@ -83,6 +84,9 @@ export const createSearchWorkflowsTool = (
 				destructiveHint: false, // No destructive operations
 				idempotentHint: true, // Safe to retry multiple times
 				openWorldHint: false, // Works with internal n8n data only
+			},
+			_meta: {
+				ui: { resourceUri: SEARCH_WORKFLOWS_RESOURCE_URI },
 			},
 		},
 		handler: async ({

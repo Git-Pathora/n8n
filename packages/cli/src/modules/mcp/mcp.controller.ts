@@ -121,6 +121,7 @@ export class McpController {
 			});
 			await server.connect(transport);
 			await transport.handleRequest(req, res, req.body);
+			res.flush();
 			if (isInitializationRequest) {
 				this.trackConnectionEvent({
 					...telemetryPayload,

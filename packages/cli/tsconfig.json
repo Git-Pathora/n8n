@@ -19,6 +19,7 @@
 		"useUnknownInCatchVariables": false
 	},
 	"include": ["src/**/*.ts", "test/**/*.ts", "src/sso.ee/saml/saml-schema-metadata-2.0.xsd"],
+	"exclude": ["src/modules/mcp/apps/*/index.html", "src/modules/mcp/apps/*/src/**"],
 	"references": [
 		{ "path": "../core/tsconfig.build.json" },
 		{ "path": "../nodes-base/tsconfig.build.cjs.json" },

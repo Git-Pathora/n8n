@@ -110,6 +110,10 @@ export class McpService {
 			workflowDetailsTool.handler,
 		);
 
+		// Register MCP Apps (interactive UIs for tools)
+		const { registerMcpApps } = await import('./apps/register-apps');
+		await registerMcpApps(server);
+
 		return server;
 	}
 

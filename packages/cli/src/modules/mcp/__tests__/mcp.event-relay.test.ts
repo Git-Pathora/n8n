@@ -1,5 +1,5 @@
-import { Logger } from '@n8n/backend-common';
-import { WorkflowRepository, type IWorkflowDb } from '@n8n/db';
+import type { Logger } from '@n8n/backend-common';
+import type { WorkflowRepository, IWorkflowDb } from '@n8n/db';
 import { mock } from 'jest-mock-extended';
 
 import { EventService } from '@/events/event.service';

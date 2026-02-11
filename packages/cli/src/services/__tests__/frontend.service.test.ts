@@ -194,6 +194,7 @@ describe('FrontendService', () => {
 	beforeEach(() => {
 		originalEnv = process.env;
 		jest.clearAllMocks();
+		globalConfig.workflows.recoveryMode = false;
 	});
 
 	afterEach(() => {
@@ -210,6 +211,15 @@ describe('FrontendService', () => {
 					settingsMode: 'authenticated',
 				}),
 			);
+		});
+
+		it('should expose recovery mode from config', async () => {
+			globalConfig.workflows.recoveryMode = true;
+
+			const { service } = createMockService();
+			const settings = await service.getSettings();
+
+			expect(settings.recoveryMode).toBe(true);
 		});
 	});
 

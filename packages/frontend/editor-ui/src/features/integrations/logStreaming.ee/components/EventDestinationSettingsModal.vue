@@ -116,7 +116,10 @@ const testMessageResult = ref(false);
 const typeSelectOptions = computed(() => {
 	const options: Array<{ value: string; label: BaseTextKey }> = [];
 	for (const t of messageEventBusDestinationTypeNames) {
-		if (t === MessageEventBusDestinationTypeNames.abstract) {
+		if (
+			t === MessageEventBusDestinationTypeNames.abstract ||
+			t === MessageEventBusDestinationTypeNames.database
+		) {
 			continue;
 		}
 		options.push({

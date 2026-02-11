@@ -2,6 +2,7 @@ import { Logger } from '@n8n/backend-common';
 import { OnPubSubEvent } from '@n8n/decorators';
 import { Service } from '@n8n/di';
 import type { DeleteResult } from '@n8n/typeorm';
+import { MessageEventBusDestinationTypeNames } from 'n8n-workflow';
 import type { MessageEventBusDestinationOptions } from 'n8n-workflow';
 
 import type { EventMessageTypes } from '@/eventbus';
@@ -14,6 +15,7 @@ import { MessageEventBus } from '@/eventbus/message-event-bus/message-event-bus'
 import { Publisher } from '@/scaling/pubsub/publisher.service';
 
 import { EventDestinationsRepository } from './database/repositories/event-destination.repository';
+import { MessageEventBusDestinationDatabase } from './destinations/message-event-bus-destination-database.ee';
 import { messageEventBusDestinationFromDb } from './destinations/message-event-bus-destination-from-db';
 import { MessageEventBusDestination } from './destinations/message-event-bus-destination.ee';
 
@@ -44,7 +46,8 @@ export class LogStreamingDestinationService {
 	}
 
 	/**
-	 * Load all destinations from database and add them to the local destinations map
+	 * Load all destinations from database and add them to the local destinations map.
+	 * Also ensures the built-in database destination is always present.
 	 */
 	async loadDestinationsFromDb(): Promise<void> {
 		const savedEventDestinations = await this.eventDestinationsRepository.find({});
@@ -60,6 +63,28 @@ export class LogStreamingDestinationService {
 					this.logger.debug('Failed to load destination from database', { error });
 				}
 			}
+		}
+
+		this.ensureDatabaseDestination();
+	}
+
+	/**
+	 * Ensure the built-in database destination is always registered.
+	 */
+	private ensureDatabaseDestination(): void {
+		const hasDbDestination = Object.values(this.destinations).some(
+			(d) => d instanceof MessageEventBusDestinationDatabase,
+		);
+
+		if (!hasDbDestination) {
+			const dbDestination = new MessageEventBusDestinationDatabase(this.eventBus, {
+				__type: MessageEventBusDestinationTypeNames.database,
+				label: 'Local Database',
+				enabled: true,
+				subscribedEvents: ['n8n.audit'],
+			});
+			this.destinations[dbDestination.getId()] = dbDestination;
+			this.logger.debug('Auto-provisioned built-in database destination');
 		}
 	}
 
@@ -177,14 +202,16 @@ export class LogStreamingDestinationService {
 	}
 
 	/**
-	 * Find destination(s) by ID
+	 * Find destination(s) by ID, excluding built-in database destinations from API responses
 	 */
 	async findDestination(id?: string): Promise<MessageEventBusDestinationOptions[]> {
 		const result: MessageEventBusDestinationOptions[] = id
 			? this.destinations[id]
 				? [this.destinations[id].serialize()]
 				: []
-			: Object.values(this.destinations).map((dest) => dest.serialize());
+			: Object.values(this.destinations)
+					.filter((dest) => !(dest instanceof MessageEventBusDestinationDatabase))
+					.map((dest) => dest.serialize());
 		return result.sort((a, b) => (a.__type ?? '').localeCompare(b.__type ?? ''));
 	}
 

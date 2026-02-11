@@ -4,8 +4,13 @@ import path from 'path';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 export const SEARCH_WORKFLOWS_RESOURCE_URI = 'ui://n8n/search-workflows';
+export const EXECUTE_WORKFLOW_RESOURCE_URI = 'ui://n8n/execute-workflow';
 
 const RESOURCE_MIME_TYPE = 'text/html;profile=mcp-app';
+
+// At runtime __dirname is packages/cli/dist/modules/mcp/apps/
+// The built HTML files are at packages/cli/dist/mcp-apps/<app-name>/index.html
+const DIST_DIR = path.resolve(__dirname, '..', '..', '..', 'mcp-apps');
 
 /**
  * Registers all MCP App resources with the server.
@@ -13,14 +18,11 @@ const RESOURCE_MIME_TYPE = 'text/html;profile=mcp-app';
  */
 export async function registerMcpApps(server: McpServer): Promise<void> {
 	registerSearchWorkflowsApp(server);
+	registerExecuteWorkflowApp(server);
 }
 
 function registerSearchWorkflowsApp(server: McpServer): void {
-	// Resolve the built HTML file.
-	// At runtime __dirname is packages/cli/dist/modules/mcp/apps/
-	// The built HTML is at packages/cli/dist/mcp-apps/search-workflows/index.html
-	const distDir = path.resolve(__dirname, '..', '..', '..', 'mcp-apps');
-	const htmlPath = path.join(distDir, 'search-workflows', 'index.html');
+	const htmlPath = path.join(DIST_DIR, 'search-workflows', 'index.html');
 
 	server.registerResource(
 		'search-workflows-app',
@@ -35,6 +37,31 @@ function registerSearchWorkflowsApp(server: McpServer): void {
 				contents: [
 					{
 						uri: SEARCH_WORKFLOWS_RESOURCE_URI,
+						mimeType: RESOURCE_MIME_TYPE,
+						text: html,
+					},
+				],
+			};
+		},
+	);
+}
+
+function registerExecuteWorkflowApp(server: McpServer): void {
+	const htmlPath = path.join(DIST_DIR, 'execute-workflow', 'index.html');
+
+	server.registerResource(
+		'execute-workflow-app',
+		EXECUTE_WORKFLOW_RESOURCE_URI,
+		{
+			description: 'Interactive UI for providing inputs and executing n8n workflows',
+			mimeType: RESOURCE_MIME_TYPE,
+		},
+		async () => {
+			const html = await fs.readFile(htmlPath, 'utf-8');
+			return {
+				contents: [
+					{
+						uri: EXECUTE_WORKFLOW_RESOURCE_URI,
 						mimeType: RESOURCE_MIME_TYPE,
 						text: html,
 					},

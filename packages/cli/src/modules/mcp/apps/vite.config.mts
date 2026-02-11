@@ -14,6 +14,7 @@ export default defineConfig({
 		rollupOptions: {
 			input: {
 				'search-workflows': resolve(ROOT, 'search-workflows', 'index.html'),
+				'execute-workflow': resolve(ROOT, 'execute-workflow', 'index.html'),
 			},
 		},
 		emptyOutDir: true,

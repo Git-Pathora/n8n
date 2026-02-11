@@ -18,6 +18,7 @@ import {
 } from 'n8n-workflow';
 import z from 'zod';
 
+import { EXECUTE_WORKFLOW_RESOURCE_URI } from '../apps/register-apps';
 import { SUPPORTED_MCP_TRIGGERS, USER_CALLED_MCP_TOOL_EVENT } from '../mcp.constants';
 import { McpExecutionTimeoutError, WorkflowAccessError } from '../mcp.errors';
 import type {
@@ -77,6 +78,8 @@ const inputSchema = z.object({
 type ExecuteWorkflowOutput = {
 	success: boolean;
 	executionId: string | null;
+	workflowId: string;
+	workflowName: string | null;
 	result?: IRunExecutionData['resultData'];
 	error?: unknown;
 };
@@ -84,6 +87,8 @@ type ExecuteWorkflowOutput = {
 const outputSchema = {
 	success: z.boolean(),
 	executionId: z.string().nullable().optional(),
+	workflowId: z.string().describe('The ID of the executed workflow'),
+	workflowName: z.string().nullable().describe('The name of the executed workflow'),
 	result: z.unknown().optional().describe('Workflow execution result data'),
 	error: z.unknown().optional(),
 } satisfies z.ZodRawShape;
@@ -109,6 +114,9 @@ export const createExecuteWorkflowTool = (
 			destructiveHint: true, // Can cause changes in external systems via workflows
 			idempotentHint: true, // Safe to retry multiple times
 			openWorldHint: true, // Can access external systems via workflows
+		},
+		_meta: {
+			ui: { resourceUri: EXECUTE_WORKFLOW_RESOURCE_URI },
 		},
 	},
 	handler: async ({ workflowId, inputs }: z.infer<typeof inputSchema>) => {
@@ -168,6 +176,8 @@ export const createExecuteWorkflowTool = (
 			const output: ExecuteWorkflowOutput = {
 				success: false,
 				executionId: isTimeout ? error.executionId : null,
+				workflowId,
+				workflowName: null,
 				error: isTimeout
 					? `Workflow execution timed out after ${WORKFLOW_EXECUTION_TIMEOUT_MS / Time.milliseconds.toSeconds} seconds (Enforced MCP timeout)`
 					: (error.message ?? `${error.constructor.name}: (no message)`),
@@ -327,6 +337,8 @@ export const executeWorkflow = async (
 		return {
 			success,
 			executionId,
+			workflowId,
+			workflowName: workflow.name,
 			result: data.data.resultData,
 			error: data.data.resultData?.error,
 		};

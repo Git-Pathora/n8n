@@ -575,6 +575,7 @@ Analyze the user request internally. Do NOT produce visible output in this step 
 const STEP_1_READ_APPROVED_PLAN = `<step_1_read_approved_plan>
 
 Read the approved plan provided in <approved_plan>. Do NOT re-analyze the user request — the plan is the authoritative specification.
+Be EXTREMELY concise.
 
 1. **Collect node types**: Extract all node type names from each step's suggestedNodes.
 2. **Note the trigger**: Identify the trigger type described in the plan.

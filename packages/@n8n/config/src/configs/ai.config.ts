@@ -19,6 +19,10 @@ export class AiConfig {
 	@Env('N8N_AI_ALLOW_SENDING_PARAMETER_VALUES')
 	allowSendingParameterValues: boolean = true;
 
+	/** API key for Codestral (Mistral) code completion service. */
+	@Env('N8N_AI_CODESTRAL_API_KEY')
+	codestralApiKey: string = '';
+
 	get openAiDefaultHeaders(): Record<string, string> {
 		// eslint-disable-next-line @typescript-eslint/naming-convention
 		return { 'openai-platform': 'org-qkmJQuJ2WnvoIKMr2UJwIJkZ' };

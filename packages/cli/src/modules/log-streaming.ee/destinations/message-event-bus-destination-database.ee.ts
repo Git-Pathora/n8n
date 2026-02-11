@@ -46,10 +46,13 @@ export class MessageEventBusDestinationDatabase
 
 		const payload = (this.anonymizeAuditMessages ? msg.anonymize() : msg.payload) ?? {};
 
+		const userId = this.extractUserId(payload);
+
 		const auditLog = Object.assign(new AuditLog(), {
 			id: uuid(),
 			eventName: msg.eventName,
 			message: msg.message ?? msg.eventName,
+			userId,
 			timestamp: msg.ts.toJSDate(),
 			payload,
 		});
@@ -76,6 +79,19 @@ export class MessageEventBusDestinationDatabase
 		) {
 			return new MessageEventBusDestinationDatabase(eventBusInstance, data);
 		}
+		return null;
+	}
+
+	private extractUserId(payload: Record<string, unknown>): string | null {
+		if (typeof payload.userId === 'string') {
+			return payload.userId;
+		}
+
+		const user = payload.user;
+		if (user && typeof user === 'object' && 'id' in user && typeof user.id === 'string') {
+			return user.id;
+		}
+
 		return null;
 	}
 

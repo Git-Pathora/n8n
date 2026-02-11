@@ -12,6 +12,9 @@ export class AuditLog extends WithTimestampsAndStringId {
 	@Column('text')
 	message: string;
 
+	@Column('varchar', { length: 255, nullable: true })
+	userId: string | null;
+
 	@DateTimeColumn()
 	timestamp: Date;
 

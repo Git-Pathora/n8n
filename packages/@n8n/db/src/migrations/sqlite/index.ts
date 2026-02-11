@@ -135,7 +135,7 @@ import { CreateSecretsProviderConnectionTables1769433700000 } from '../common/17
 import { CreateWorkflowPublishedVersionTable1769698710000 } from '../common/1769698710000-CreateWorkflowPublishedVersionTable';
 import { ExpandSubjectIDColumnLength1769784356000 } from '../common/1769784356000-ExpandSubjectIDColumnLength';
 import { AddWorkflowUnpublishScopeToCustomRoles1769900001000 } from '../common/1769900001000-AddWorkflowUnpublishScopeToCustomRoles';
-import { CreateAuditLogTable1770000000000 } from '../common/1770000000000-CreateAuditLogTable';
+import { CreateAuditLogTable1770808328124 } from '../common/1770808328124-CreateAuditLogTable';
 import type { Migration } from '../migration-types';
 
 const sqliteMigrations: Migration[] = [
@@ -276,7 +276,7 @@ const sqliteMigrations: Migration[] = [
 	CreateWorkflowPublishedVersionTable1769698710000,
 	ExpandSubjectIDColumnLength1769784356000,
 	AddWorkflowUnpublishScopeToCustomRoles1769900001000,
-	CreateAuditLogTable1770000000000,
+	CreateAuditLogTable1770808328124,
 ];
 
 export { sqliteMigrations };

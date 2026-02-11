@@ -16,7 +16,11 @@ import { useIntersectionObserver } from '@vueuse/core';
 import type { ExecutionSummary } from 'n8n-workflow';
 import { computed, ref, useTemplateRef, watch, type ComponentPublicInstance } from 'vue';
 import { useExecutionsStore } from '../../executions.store';
-import type { ExecutionFilterType, ExecutionSummaryWithScopes } from '../../executions.types';
+import type {
+	ExecutionFilterType,
+	ExecutionSummaryWithCustomData,
+	ExecutionSummaryWithScopes,
+} from '../../executions.types';
 import { executionRetryMessage } from '../../executions.utils';
 import ConcurrentExecutionsHeader from '../ConcurrentExecutionsHeader.vue';
 import ExecutionsFilter from '../ExecutionsFilter.vue';
@@ -27,7 +31,7 @@ import { N8nButton, N8nCheckbox, N8nTableBase } from '@n8n/design-system';
 import { ElSkeletonItem } from 'element-plus';
 const props = withDefaults(
 	defineProps<{
-		executions: ExecutionSummaryWithScopes[];
+		executions: ExecutionSummaryWithCustomData[];
 		filters: ExecutionFilterType;
 		total?: number;
 		concurrentTotal?: number;

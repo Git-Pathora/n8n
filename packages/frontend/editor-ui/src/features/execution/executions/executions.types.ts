@@ -78,9 +78,13 @@ export interface IExecutionResponse extends IExecutionBase {
 
 export type ExecutionSummaryWithScopes = ExecutionSummary & { scopes: Scope[] };
 
+export type ExecutionSummaryWithCustomData = ExecutionSummaryWithScopes & {
+	customData?: Record<string, string>;
+};
+
 export interface IExecutionsListResponse {
 	count: number;
-	results: ExecutionSummaryWithScopes[];
+	results: ExecutionSummaryWithCustomData[];
 	estimated: boolean;
 	concurrentExecutionsCount: number;
 }

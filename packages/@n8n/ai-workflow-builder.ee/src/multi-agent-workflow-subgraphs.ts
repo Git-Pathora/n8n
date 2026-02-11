@@ -1,5 +1,6 @@
 import { HumanMessage } from '@langchain/core/messages';
 import type { RunnableConfig } from '@langchain/core/runnables';
+import type { LangChainTracer } from '@langchain/core/tracers/tracer_langchain';
 import { StateGraph, END, START, type MemorySaver, isGraphInterrupt } from '@langchain/langgraph';
 import type { Logger } from '@n8n/backend-common';
 import type { INodeTypeDescription } from 'n8n-workflow';
@@ -83,6 +84,8 @@ export interface MultiAgentSubgraphConfig {
 	onGenerationSuccess?: () => Promise<void>;
 	/** Callback for fetching resource locator options */
 	resourceLocatorCallback?: ResourceLocatorCallback;
+	/** Separate LangSmith tracer for the planning agent */
+	plannerTracer?: LangChainTracer;
 }
 
 /**
@@ -199,6 +202,7 @@ export function createMultiAgentWorkflowWithSubgraphs(config: MultiAgentSubgraph
 		featureFlags,
 		onGenerationSuccess,
 		resourceLocatorCallback,
+		plannerTracer,
 	} = config;
 
 	const supervisorAgent = new SupervisorAgent({ llm: stageLLMs.supervisor });
@@ -214,6 +218,7 @@ export function createMultiAgentWorkflowWithSubgraphs(config: MultiAgentSubgraph
 		plannerLLM: stageLLMs.planner,
 		logger,
 		featureFlags,
+		plannerTracer,
 	});
 
 	// Create Builder subgraph (still uses StateGraph pattern)

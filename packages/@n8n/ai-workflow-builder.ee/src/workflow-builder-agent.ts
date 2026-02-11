@@ -63,6 +63,8 @@ export interface WorkflowBuilderAgentConfig {
 	logger?: Logger;
 	checkpointer: MemorySaver;
 	tracer?: LangChainTracer;
+	/** Separate LangSmith tracer for the planning agent */
+	plannerTracer?: LangChainTracer;
 	instanceUrl?: string;
 	/** Metadata to include in LangSmith traces */
 	runMetadata?: Record<string, unknown>;
@@ -131,6 +133,7 @@ export class WorkflowBuilderAgent {
 	private stageLLMs: StageLLMs;
 	private logger?: Logger;
 	private tracer?: LangChainTracer;
+	private plannerTracer?: LangChainTracer;
 	private instanceUrl?: string;
 	private runMetadata?: Record<string, unknown>;
 	private onGenerationSuccess?: () => Promise<void>;
@@ -146,6 +149,7 @@ export class WorkflowBuilderAgent {
 		this.logger = config.logger;
 		this.checkpointer = config.checkpointer;
 		this.tracer = config.tracer;
+		this.plannerTracer = config.plannerTracer;
 		this.instanceUrl = config.instanceUrl;
 		this.runMetadata = config.runMetadata;
 		this.onGenerationSuccess = config.onGenerationSuccess;
@@ -168,6 +172,7 @@ export class WorkflowBuilderAgent {
 			featureFlags,
 			onGenerationSuccess: this.onGenerationSuccess,
 			resourceLocatorCallback: this.resourceLocatorCallback,
+			plannerTracer: this.plannerTracer,
 		});
 	}
 

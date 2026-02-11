@@ -22,4 +22,5 @@ export const EnterpriseEditionFeature: Record<
 	NamedVersions: 'namedVersions',
 	Provisioning: 'provisioning',
 	PersonalSpacePolicy: 'personalSpacePolicy',
+	CustomRoles: 'customRoles',
 };

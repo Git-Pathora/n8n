@@ -950,6 +950,7 @@ export type EnterpriseEditionFeatureKey =
 	| 'NamedVersions'
 	| 'Provisioning'
 	| 'PersonalSpacePolicy';
+	| 'CustomRoles';
 
 export type EnterpriseEditionFeatureValue = keyof Omit<FrontendSettings['enterprise'], 'projects'>;
 

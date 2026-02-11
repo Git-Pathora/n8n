@@ -22,9 +22,11 @@ import type {
 	ExecutionSummaryWithScopes,
 } from '../../executions.types';
 import { executionRetryMessage } from '../../executions.utils';
+import { useExecutionColumns } from '../../composables/useExecutionColumns';
 import ConcurrentExecutionsHeader from '../ConcurrentExecutionsHeader.vue';
 import ExecutionsFilter from '../ExecutionsFilter.vue';
 import ExecutionStopAllText from '../ExecutionStopAllText.vue';
+import ExecutionColumnPicker from './ExecutionColumnPicker.vue';
 import GlobalExecutionsListItem from './GlobalExecutionsListItem.vue';
 
 import { N8nButton, N8nCheckbox, N8nTableBase } from '@n8n/design-system';
@@ -56,6 +58,15 @@ const workflowsListStore = useWorkflowsListStore();
 const executionsStore = useExecutionsStore();
 const settingsStore = useSettingsStore();
 const pageRedirectionHelper = usePageRedirectionHelper();
+
+const {
+	visibleColumns,
+	visibleColumnCount,
+	toggleableColumns,
+	isColumnVisible,
+	toggleColumn,
+	getColumnLabel,
+} = useExecutionColumns(computed(() => props.executions));
 
 const allVisibleSelected = ref(false);
 const allExistingSelected = ref(false);
@@ -351,6 +362,12 @@ const goToUpgrade = () => {
 			/>
 			<div :class="$style.execHeaderRight">
 				<ExecutionStopAllText :executions="props.executions" />
+				<ExecutionColumnPicker
+					:columns="toggleableColumns"
+					:is-column-visible="isColumnVisible"
+					:get-column-label="getColumnLabel"
+					@toggle-column="toggleColumn"
+				/>
 				<ExecutionsFilter
 					:workflows="workflows"
 					class="execFilter"
@@ -371,7 +388,7 @@ const goToUpgrade = () => {
 									@update:model-value="handleCheckAllExistingChange"
 								/>
 							</th>
-							<th colspan="8">
+							<th :colspan="visibleColumnCount + 2">
 								{{
 									i18n.baseText('executionsList.selectAll', {
 										adjustToNumber: total,
@@ -390,20 +407,13 @@ const goToUpgrade = () => {
 									@update:model-value="handleCheckAllVisibleChange"
 								/>
 							</th>
-							<th>
-								{{ i18n.baseText('generic.workflow') }}
+							<th
+								v-for="col in visibleColumns"
+								:key="col.id"
+								:style="col.width ? { width: col.width } : {}"
+							>
+								{{ getColumnLabel(col) }}
 							</th>
-							<th>{{ i18n.baseText('executionsList.status') }}</th>
-							<th>
-								{{ i18n.baseText('executionsList.startedAt') }}
-							</th>
-							<th>
-								{{ i18n.baseText('executionsList.runTime') }}
-							</th>
-
-							<th>{{ i18n.baseText('executionsList.id') }}</th>
-
-							<th></th>
 							<th style="width: 69px"></th>
 							<th style="width: 50px"></th>
 						</tr>
@@ -413,6 +423,7 @@ const goToUpgrade = () => {
 							v-for="execution in executions"
 							:key="execution.id"
 							:execution="execution"
+							:visible-columns="visibleColumns"
 							:workflow-name="getExecutionWorkflowName(execution)"
 							:workflow-permissions="getExecutionWorkflowPermissions(execution)"
 							:selected="selectedItems[execution.id] || allExistingSelected"
@@ -428,13 +439,13 @@ const goToUpgrade = () => {
 						/>
 						<template v-if="executionsStore.loading && !executions.length">
 							<tr v-for="item in executionsStore.itemsPerPage" :key="item">
-								<td v-for="col in 9" :key="col">
+								<td v-for="col in visibleColumnCount + 3" :key="col">
 									<ElSkeletonItem />
 								</td>
 							</tr>
 						</template>
 						<tr>
-							<td colspan="9" style="text-align: center">
+							<td :colspan="visibleColumnCount + 3" style="text-align: center">
 								<template v-if="!executions.length">
 									<span data-test-id="execution-list-empty">
 										{{ i18n.baseText('executionsList.empty') }}

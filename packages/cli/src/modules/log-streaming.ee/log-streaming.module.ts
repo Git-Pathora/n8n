@@ -18,6 +18,7 @@ import { Container } from '@n8n/di';
 export class LogStreamingModule implements ModuleInterface {
 	async init() {
 		await import('./log-streaming.controller');
+		await import('./audit-log.controller');
 
 		const { LogStreamingDestinationService } = await import('./log-streaming-destination.service');
 		const destinationService = Container.get(LogStreamingDestinationService);

@@ -3184,6 +3184,7 @@ export interface ExecutionSummary {
 			name: string;
 		}>;
 	};
+	customData?: Record<string, string>;
 }
 
 export interface IExecutionSummaryNodeExecutionResult {

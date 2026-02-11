@@ -19,6 +19,8 @@ import type { ChatPayload } from '../../workflow-builder-agent';
 import type { PlanOutput } from '../../types/planning';
 import { TEXT_EDITOR_TOOL, VALIDATE_TOOL, BATCH_STR_REPLACE_TOOL } from '../constants';
 import { buildCodeBuilderPrompt, type HistoryContext } from '../prompts';
+import { formatNodeResult } from '../tools/code-builder-search.tool';
+import type { NodeTypeParser } from '../utils/node-type-parser';
 import { TextEditorHandler } from './text-editor-handler';
 import { TextEditorToolHandler } from './text-editor-tool-handler';
 import type { TextEditorCommand } from './text-editor.types';
@@ -47,6 +49,7 @@ export interface ChatSetupHandlerConfig {
 	enableTextEditorConfig?: boolean;
 	parseAndValidate: ParseAndValidateFn;
 	getErrorContext: GetErrorContextFn;
+	nodeTypeParser?: NodeTypeParser;
 }
 
 /**
@@ -92,6 +95,7 @@ export class ChatSetupHandler {
 	private enableTextEditorConfig?: boolean;
 	private parseAndValidate: ParseAndValidateFn;
 	private getErrorContext: GetErrorContextFn;
+	private nodeTypeParser?: NodeTypeParser;
 
 	constructor(config: ChatSetupHandlerConfig) {
 		this.llm = config.llm;
@@ -99,6 +103,7 @@ export class ChatSetupHandler {
 		this.enableTextEditorConfig = config.enableTextEditorConfig;
 		this.parseAndValidate = config.parseAndValidate;
 		this.getErrorContext = config.getErrorContext;
+		this.nodeTypeParser = config.nodeTypeParser;
 	}
 
 	/**
@@ -121,7 +126,7 @@ export class ChatSetupHandler {
 
 		// Pre-fetch search results for plan's suggestedNodes to save an LLM round-trip
 		const preSearchResults = payload.planOutput
-			? await this.prefetchSearchResults(payload.planOutput)
+			? this.prefetchSearchResults(payload.planOutput)
 			: undefined;
 
 		// Check if text editor mode should be enabled
@@ -273,36 +278,37 @@ export class ChatSetupHandler {
 	}
 
 	/**
-	 * Pre-fetch search_nodes results for the plan's suggestedNodes.
-	 * Returns the search result string, or undefined if not applicable.
+	 * Pre-fetch node info for the plan's suggestedNodes using direct NodeTypeParser lookup.
+	 * Returns the formatted result string, or undefined if not applicable.
 	 */
-	private async prefetchSearchResults(plan: PlanOutput): Promise<string | undefined> {
-		const queries = extractSearchQueriesFromPlan(plan);
-		if (queries.length === 0) return undefined;
+	private prefetchSearchResults(plan: PlanOutput): string | undefined {
+		const nodeNames = extractNodeNamesFromPlan(plan);
+		if (nodeNames.length === 0) return undefined;
+		if (!this.nodeTypeParser) return undefined;
 
-		const searchTool = this.tools.find((t) => t.name === 'search_nodes');
-		if (!searchTool) return undefined;
-
-		try {
-			const result = await searchTool.invoke({ queries });
-			return typeof result === 'string' ? result : String(result);
-		} catch {
-			return undefined;
+		const formattedResults: string[] = [];
+		for (const nodeName of nodeNames) {
+			const result = formatNodeResult(this.nodeTypeParser, nodeName);
+			if (result) {
+				formattedResults.push(result);
+			}
 		}
+
+		if (formattedResults.length === 0) return undefined;
+
+		return `Found ${formattedResults.length} nodes:\n\n${formattedResults.join('\n\n')}`;
 	}
 }
 
 /**
- * Extract short node names from a plan's suggestedNodes for search queries.
- * Deduplicates and strips package prefixes (e.g. "n8n-nodes-base.httpRequest" → "httpRequest").
+ * Extract deduplicated full node type names from a plan's suggestedNodes.
  */
-export function extractSearchQueriesFromPlan(plan: PlanOutput): string[] {
+export function extractNodeNamesFromPlan(plan: PlanOutput): string[] {
 	const nodeSet = new Set<string>();
 	for (const step of plan.steps) {
 		if (step.suggestedNodes) {
 			for (const nodeName of step.suggestedNodes) {
-				const lastDotIndex = nodeName.lastIndexOf('.');
-				nodeSet.add(lastDotIndex >= 0 ? nodeName.substring(lastDotIndex + 1) : nodeName);
+				nodeSet.add(nodeName);
 			}
 		}
 	}

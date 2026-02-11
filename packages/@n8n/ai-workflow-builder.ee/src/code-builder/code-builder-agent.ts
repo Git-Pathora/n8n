@@ -155,6 +155,7 @@ export class CodeBuilderAgent {
 				await this.parseValidateHandler.parseAndValidate(code, currentWorkflow),
 			getErrorContext: (code, errorMessage) =>
 				this.parseValidateHandler.getErrorContext(code, errorMessage),
+			nodeTypeParser: this.nodeTypeParser,
 		});
 
 		// Initialize tool dispatch handler

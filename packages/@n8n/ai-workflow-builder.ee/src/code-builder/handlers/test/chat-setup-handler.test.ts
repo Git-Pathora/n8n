@@ -1,20 +1,14 @@
 import type { BaseChatModel } from '@langchain/core/language_models/chat_models';
 import type { StructuredToolInterface } from '@langchain/core/tools';
+import type { INodeTypeDescription } from 'n8n-workflow';
 
 import type { PlanOutput } from '../../../types/planning';
 import type { ChatPayload } from '../../../workflow-builder-agent';
-import { ChatSetupHandler, extractSearchQueriesFromPlan } from '../chat-setup-handler';
+import { NodeTypeParser } from '../../utils/node-type-parser';
+import { ChatSetupHandler, extractNodeNamesFromPlan } from '../chat-setup-handler';
 
 function createMockTool(name: string): StructuredToolInterface {
 	return { name } as unknown as StructuredToolInterface;
-}
-
-function createMockSearchTool() {
-	const invoke = jest.fn().mockResolvedValue('mock search results for httpRequest, slack');
-	return {
-		tool: { name: 'search_nodes', invoke } as unknown as StructuredToolInterface,
-		invoke,
-	};
 }
 
 function createMockLlm() {
@@ -30,6 +24,42 @@ function createMockLlm() {
 
 	return { llm, boundTools, mockBoundLlm };
 }
+
+const mockHttpRequestNodeType: INodeTypeDescription = {
+	name: 'n8n-nodes-base.httpRequest',
+	displayName: 'HTTP Request',
+	description: 'Makes HTTP requests',
+	group: ['transform'],
+	version: 4,
+	defaults: { name: 'HTTP Request' },
+	inputs: ['main'],
+	outputs: ['main'],
+	properties: [],
+};
+
+const mockSlackNodeType: INodeTypeDescription = {
+	name: 'n8n-nodes-base.slack',
+	displayName: 'Slack',
+	description: 'Send messages to Slack',
+	group: ['output'],
+	version: 2,
+	defaults: { name: 'Slack' },
+	inputs: ['main'],
+	outputs: ['main'],
+	properties: [],
+};
+
+const mockSetNodeType: INodeTypeDescription = {
+	name: 'n8n-nodes-base.set',
+	displayName: 'Edit Fields',
+	description: 'Modify, add, or remove item fields',
+	group: ['transform'],
+	version: 3,
+	defaults: { name: 'Edit Fields' },
+	inputs: ['main'],
+	outputs: ['main'],
+	properties: [],
+};
 
 const mockPlan: PlanOutput = {
 	summary: 'Fetch weather and send Slack alert',
@@ -138,12 +168,17 @@ describe('ChatSetupHandler', () => {
 		});
 	});
 
-	describe('pre-fetch search results', () => {
-		it('invokes search_nodes tool with correct queries when planOutput has suggestedNodes', async () => {
+	describe('pre-fetch search results via direct lookup', () => {
+		it('uses nodeTypeParser to look up each suggestedNode', async () => {
 			const { llm } = createMockLlm();
-			const { tool: searchTool, invoke } = createMockSearchTool();
+			const nodeTypeParser = new NodeTypeParser([mockHttpRequestNodeType, mockSlackNodeType]);
+			const getNodeTypeSpy = jest.spyOn(nodeTypeParser, 'getNodeType');
 
-			const tools = [searchTool, createMockTool('get_node_types'), createMockTool('think')];
+			const tools = [
+				createMockTool('search_nodes'),
+				createMockTool('get_node_types'),
+				createMockTool('think'),
+			];
 
 			const handler = new ChatSetupHandler({
 				llm,
@@ -151,6 +186,7 @@ describe('ChatSetupHandler', () => {
 				enableTextEditorConfig: false,
 				parseAndValidate: jest.fn(),
 				getErrorContext: jest.fn(),
+				nodeTypeParser,
 			});
 
 			const payload: ChatPayload = {
@@ -161,16 +197,23 @@ describe('ChatSetupHandler', () => {
 
 			await handler.execute({ payload });
 
-			expect(invoke).toHaveBeenCalledWith({
-				queries: expect.arrayContaining(['httpRequest', 'slack']),
-			});
+			// formatNodeResult calls getNodeType multiple times per node (for hints, discriminators, etc.)
+			// Verify that both node types were looked up
+			const calledNodeIds = new Set(getNodeTypeSpy.mock.calls.map((call) => call[0]));
+			expect(calledNodeIds).toContain('n8n-nodes-base.httpRequest');
+			expect(calledNodeIds).toContain('n8n-nodes-base.slack');
 		});
 
-		it('does NOT invoke search_nodes when planOutput is absent', async () => {
+		it('does NOT look up nodes when planOutput is absent', async () => {
 			const { llm } = createMockLlm();
-			const { tool: searchTool, invoke } = createMockSearchTool();
+			const nodeTypeParser = new NodeTypeParser([mockHttpRequestNodeType, mockSlackNodeType]);
+			const getNodeTypeSpy = jest.spyOn(nodeTypeParser, 'getNodeType');
 
-			const tools = [searchTool, createMockTool('get_node_types'), createMockTool('think')];
+			const tools = [
+				createMockTool('search_nodes'),
+				createMockTool('get_node_types'),
+				createMockTool('think'),
+			];
 
 			const handler = new ChatSetupHandler({
 				llm,
@@ -178,6 +221,7 @@ describe('ChatSetupHandler', () => {
 				enableTextEditorConfig: false,
 				parseAndValidate: jest.fn(),
 				getErrorContext: jest.fn(),
+				nodeTypeParser,
 			});
 
 			const payload: ChatPayload = {
@@ -187,14 +231,19 @@ describe('ChatSetupHandler', () => {
 
 			await handler.execute({ payload });
 
-			expect(invoke).not.toHaveBeenCalled();
+			expect(getNodeTypeSpy).not.toHaveBeenCalled();
 		});
 
-		it('does NOT invoke search_nodes when plan has no suggestedNodes', async () => {
+		it('does NOT look up nodes when plan has no suggestedNodes', async () => {
 			const { llm } = createMockLlm();
-			const { tool: searchTool, invoke } = createMockSearchTool();
+			const nodeTypeParser = new NodeTypeParser([mockHttpRequestNodeType]);
+			const getNodeTypeSpy = jest.spyOn(nodeTypeParser, 'getNodeType');
 
-			const tools = [searchTool, createMockTool('get_node_types'), createMockTool('think')];
+			const tools = [
+				createMockTool('search_nodes'),
+				createMockTool('get_node_types'),
+				createMockTool('think'),
+			];
 
 			const handler = new ChatSetupHandler({
 				llm,
@@ -202,6 +251,7 @@ describe('ChatSetupHandler', () => {
 				enableTextEditorConfig: false,
 				parseAndValidate: jest.fn(),
 				getErrorContext: jest.fn(),
+				nodeTypeParser,
 			});
 
 			const planWithoutNodes: PlanOutput = {
@@ -218,14 +268,23 @@ describe('ChatSetupHandler', () => {
 
 			await handler.execute({ payload });
 
-			expect(invoke).not.toHaveBeenCalled();
+			expect(getNodeTypeSpy).not.toHaveBeenCalled();
 		});
 
 		it('deduplicates suggestedNodes across steps', async () => {
 			const { llm } = createMockLlm();
-			const { tool: searchTool, invoke } = createMockSearchTool();
+			const nodeTypeParser = new NodeTypeParser([
+				mockHttpRequestNodeType,
+				mockSlackNodeType,
+				mockSetNodeType,
+			]);
+			const getNodeTypeSpy = jest.spyOn(nodeTypeParser, 'getNodeType');
 
-			const tools = [searchTool, createMockTool('get_node_types'), createMockTool('think')];
+			const tools = [
+				createMockTool('search_nodes'),
+				createMockTool('get_node_types'),
+				createMockTool('think'),
+			];
 
 			const handler = new ChatSetupHandler({
 				llm,
@@ -233,6 +292,7 @@ describe('ChatSetupHandler', () => {
 				enableTextEditorConfig: false,
 				parseAndValidate: jest.fn(),
 				getErrorContext: jest.fn(),
+				nodeTypeParser,
 			});
 
 			const planWithDuplicates: PlanOutput = {
@@ -258,16 +318,49 @@ describe('ChatSetupHandler', () => {
 
 			await handler.execute({ payload });
 
-			const queries = invoke.mock.calls[0][0].queries as string[];
-			expect(queries).toHaveLength(3);
-			expect(queries).toContain('httpRequest');
-			expect(queries).toContain('set');
-			expect(queries).toContain('slack');
+			// Verify all three unique nodes were looked up (getNodeType is called
+			// multiple times per node internally by formatNodeResult helpers)
+			const calledNodeIds = new Set(getNodeTypeSpy.mock.calls.map((call) => call[0]));
+			expect(calledNodeIds).toContain('n8n-nodes-base.httpRequest');
+			expect(calledNodeIds).toContain('n8n-nodes-base.set');
+			expect(calledNodeIds).toContain('n8n-nodes-base.slack');
+			// httpRequest appears in both steps but extractNodeNamesFromPlan deduplicates
+			expect(calledNodeIds.size).toBe(3);
+		});
+
+		it('gracefully skips unknown nodes', async () => {
+			const { llm } = createMockLlm();
+			// Only httpRequest exists, slack does not
+			const nodeTypeParser = new NodeTypeParser([mockHttpRequestNodeType]);
+
+			const tools = [
+				createMockTool('search_nodes'),
+				createMockTool('get_node_types'),
+				createMockTool('think'),
+			];
+
+			const handler = new ChatSetupHandler({
+				llm,
+				tools,
+				enableTextEditorConfig: false,
+				parseAndValidate: jest.fn(),
+				getErrorContext: jest.fn(),
+				nodeTypeParser,
+			});
+
+			const payload: ChatPayload = {
+				id: 'test-prefetch-5',
+				message: 'Build the workflow',
+				planOutput: mockPlan,
+			};
+
+			// Should not throw
+			await expect(handler.execute({ payload })).resolves.toBeDefined();
 		});
 	});
 
-	describe('extractSearchQueriesFromPlan', () => {
-		it('strips package prefixes from node names', () => {
+	describe('extractNodeNamesFromPlan', () => {
+		it('returns full type names (no prefix stripping)', () => {
 			const plan: PlanOutput = {
 				summary: 'Test',
 				trigger: 'Manual',
@@ -283,9 +376,13 @@ describe('ChatSetupHandler', () => {
 				],
 			};
 
-			const queries = extractSearchQueriesFromPlan(plan);
+			const names = extractNodeNamesFromPlan(plan);
 
-			expect(queries).toEqual(['httpRequest', 'agent', 'slack']);
+			expect(names).toEqual([
+				'n8n-nodes-base.httpRequest',
+				'@n8n/n8n-nodes-langchain.agent',
+				'n8n-nodes-base.slack',
+			]);
 		});
 
 		it('returns empty array when no suggestedNodes exist', () => {
@@ -295,17 +392,20 @@ describe('ChatSetupHandler', () => {
 				steps: [{ description: 'Step 1' }],
 			};
 
-			expect(extractSearchQueriesFromPlan(plan)).toEqual([]);
+			expect(extractNodeNamesFromPlan(plan)).toEqual([]);
 		});
 
-		it('handles node names without a dot', () => {
+		it('deduplicates node names across steps', () => {
 			const plan: PlanOutput = {
 				summary: 'Test',
 				trigger: 'Manual',
-				steps: [{ description: 'Step 1', suggestedNodes: ['customNode'] }],
+				steps: [
+					{ description: 'Step 1', suggestedNodes: ['n8n-nodes-base.httpRequest'] },
+					{ description: 'Step 2', suggestedNodes: ['n8n-nodes-base.httpRequest'] },
+				],
 			};
 
-			expect(extractSearchQueriesFromPlan(plan)).toEqual(['customNode']);
+			expect(extractNodeNamesFromPlan(plan)).toEqual(['n8n-nodes-base.httpRequest']);
 		});
 	});
 });

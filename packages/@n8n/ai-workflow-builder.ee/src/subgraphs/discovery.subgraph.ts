@@ -10,7 +10,6 @@ import { HumanMessage, ToolMessage, isAIMessage } from '@langchain/core/messages
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 import type { Runnable, RunnableConfig } from '@langchain/core/runnables';
 import { tool, type StructuredTool } from '@langchain/core/tools';
-import type { LangChainTracer } from '@langchain/core/tracers/tracer_langchain';
 import { Annotation, END, START, StateGraph, type BaseCheckpointSaver } from '@langchain/langgraph';
 import type { Logger } from '@n8n/backend-common';
 import type { INodeTypeDescription } from 'n8n-workflow';
@@ -202,8 +201,6 @@ export interface DiscoverySubgraphConfig {
 	featureFlags?: BuilderFeatureFlags;
 	/** Optional checkpointer for interrupt/resume support (used in integration tests) */
 	checkpointer?: BaseCheckpointSaver;
-	/** Separate LangSmith tracer for the planning agent */
-	plannerTracer?: LangChainTracer;
 }
 
 export class DiscoverySubgraph extends BaseSubgraph<
@@ -220,13 +217,11 @@ export class DiscoverySubgraph extends BaseSubgraph<
 	private logger?: Logger;
 	private parsedNodeTypes!: INodeTypeDescription[];
 	private featureFlags?: BuilderFeatureFlags;
-	private plannerTracer?: LangChainTracer;
 
 	create(config: DiscoverySubgraphConfig) {
 		this.logger = config.logger;
 		this.parsedNodeTypes = config.parsedNodeTypes;
 		this.featureFlags = config.featureFlags;
-		this.plannerTracer = config.plannerTracer;
 
 		// Check feature flags
 		const includeExamples = config.featureFlags?.templateExamples === true;
@@ -347,11 +342,6 @@ export class DiscoverySubgraph extends BaseSubgraph<
 			return {};
 		}
 
-		// Use planner-specific tracer if available to route traces to a separate project
-		const plannerConfig = this.plannerTracer
-			? { ...runnableConfig, callbacks: [this.plannerTracer] }
-			: runnableConfig;
-
 		const result = await invokePlannerNode(
 			this.plannerAgent,
 			{
@@ -364,7 +354,7 @@ export class DiscoverySubgraph extends BaseSubgraph<
 				planPrevious: state.planPrevious,
 				planFeedback: state.planFeedback,
 			},
-			plannerConfig,
+			runnableConfig,
 		);
 
 		if (result.planDecision === 'modify') {

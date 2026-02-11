@@ -237,12 +237,6 @@ export class AiWorkflowBuilderService {
 							: 'n8n-workflow-builder',
 					})
 				: undefined,
-			plannerTracer: tracingClient
-				? new LangChainTracer({
-						client: tracingClient,
-						projectName: 'workflow-builder-planning-agent',
-					})
-				: undefined,
 			instanceUrl: this.instanceUrl,
 			runMetadata: {
 				n8nVersion: this.n8nVersion,

@@ -120,6 +120,7 @@ onMounted(async () => {
 			:class="$style.toolsButton"
 			:disabled="disabled"
 			icon="plus"
+			data-testid="chat-tools-button"
 			@click="openToolsManager"
 		>
 			{{ toolsLabel }}
@@ -145,6 +146,7 @@ onMounted(async () => {
 					:class="$style.toolsButton"
 					:disabled="disabled"
 					:icon="toolCount === 0 ? 'plus' : undefined"
+					data-testid="chat-tools-button"
 				>
 					<span v-if="toolCount > 0" :class="$style.iconStack">
 						<NodeIcon

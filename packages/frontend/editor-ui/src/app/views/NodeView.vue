@@ -2090,13 +2090,16 @@ onBeforeUnmount(() => {
 		}
 
 		@include mixins.breakpoint('xs-only') {
-			text-indent: -10000px;
 			width: 42px;
 			height: 42px;
 			padding: 0;
 
 			span {
 				margin: 0;
+			}
+
+			> span + span {
+				display: none;
 			}
 		}
 	}

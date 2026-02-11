@@ -6,8 +6,12 @@ import { N8nButton, N8nIcon, N8nText, N8nTooltip } from '@n8n/design-system';
 import { useWorkflowsStore } from '@/app/stores/workflows.store';
 import { type IPinData } from 'n8n-workflow';
 import cloneDeep from 'lodash/cloneDeep';
+import { useRunWorkflow } from '@/app/composables/useRunWorkflow';
+import { useRouter } from 'vue-router';
 
 type CardState = 'init' | 'skip' | 'ran' | 'clear';
+
+const router = useRouter();
 
 const state = ref<CardState>('init');
 
@@ -26,17 +30,15 @@ const workflowsStore = useWorkflowsStore();
 
 const workflow = computed(() => workflowsStore.workflow);
 
-const headerText = computed(() => {
-	switch (state.value) {
-		case 'init':
-			return i18n.baseText('setupPanel.readyToDemo.header');
-		case 'clear':
-		case 'ran':
-			return i18n.baseText('setupPanel.readyToDemo.ran');
-		case 'skip':
-			return i18n.baseText('setupPanel.readyToDemo.skipped');
-	}
-});
+const headerText = computed(
+	() =>
+		({
+			init: i18n.baseText('setupPanel.readyToDemo.header'),
+			clear: i18n.baseText('setupPanel.readyToDemo.ran'),
+			ran: i18n.baseText('setupPanel.readyToDemo.ran'),
+			skip: i18n.baseText('setupPanel.readyToDemo.skipped'),
+		})[state.value],
+);
 
 const onExitDemo = () => {
 	pinDataHoldover.value = cloneDeep(workflow.value.pinData ?? {});
@@ -45,17 +47,19 @@ const onExitDemo = () => {
 };
 
 const onReenterDemo = () => {
-	workflowsStore.setWorkflowPinData(pinDataHoldover.value);
+	workflowsStore.setWorkflowPinData(pinDataHoldover.value ?? {});
 	state.value = 'init';
 };
 
 const onClearDemoData = () => {
-	workflowsStore.setWorkflowPinData(pinDataHoldover.value);
+	workflowsStore.setWorkflowPinData(pinDataHoldover.value ?? {});
 	state.value = 'clear';
 };
+const { runEntireWorkflow } = useRunWorkflow({ router });
 
 const onTestClick = () => {
 	state.value = 'ran';
+	void runEntireWorkflow('main');
 	emit('testWorkflow');
 };
 </script>
@@ -68,19 +72,13 @@ const onTestClick = () => {
 		]"
 	>
 		<header :class="$style.header">
-			<!-- <N8nIcon
-				data-test-id="node-setup-card-complete-icon"
-				icon="pin"
-				:class="$style['complete-icon']"
-				size="medium"
-			/> -->
 			<N8nIcon
 				v-if="state === 'ran' || state === 'clear'"
 				icon="check"
 				:class="$style['complete-icon']"
 				size="medium"
 			/>
-			<span :class="$style['node-name']">{{ headerText }}</span>
+			<span :class="$style['title']">{{ headerText }}</span>
 			<N8nTooltip
 				v-if="state === 'ran'"
 				:content="i18n.baseText('setupPanel.readyToDemo.clearTooltip')"
@@ -109,14 +107,9 @@ const onTestClick = () => {
 
 		<template v-if="expanded">
 			<div :class="$style.content">
-				<div :class="$style['credential-label-row']">
-					<N8nText
-						data-test-id="node-setup-card-credential-label"
-						:class="$style['credential-label']"
-					>
-						{{ i18n.baseText('setupPanel.readyToDemo.description') }}
-					</N8nText>
-				</div>
+				<N8nText>
+					{{ i18n.baseText('setupPanel.readyToDemo.description') }}
+				</N8nText>
 			</div>
 
 			<footer :class="$style.footer">
@@ -162,12 +155,9 @@ const onTestClick = () => {
 	user-select: none;
 	padding: var(--spacing--sm) var(--spacing--sm) 0;
 	align-items: center;
-	// .card:not(.collapsed) & {
-	// 	margin-top: var(--spacing--sm);
-	// }
 }
 
-.node-name {
+.title {
 	flex: 1;
 	font-size: var(--font-size--sm);
 	font-weight: var(--font-weight--medium);
@@ -175,7 +165,6 @@ const onTestClick = () => {
 }
 
 .complete-icon {
-	// color: var(--callout--icon-color--secondary); // pinData
 	color: var(--color--success);
 }
 
@@ -184,23 +173,6 @@ const onTestClick = () => {
 	flex-direction: column;
 	gap: var(--spacing--xs);
 	padding: 0 var(--spacing--sm);
-}
-
-.credential-container {
-	display: flex;
-	flex-direction: column;
-	gap: var(--spacing--3xs);
-}
-
-.credential-label-row {
-	display: flex;
-	align-items: center;
-	gap: var(--spacing--2xs);
-}
-
-.credential-label {
-	font-size: var(--font-size--sm);
-	color: var(--color--text--shade-1);
 }
 
 .shared-nodes-hint {
@@ -220,18 +192,12 @@ const onTestClick = () => {
 	padding: 0 var(--spacing--sm) var(--spacing--sm);
 }
 
-.footer-complete-check {
-	display: flex;
-	align-items: center;
-	gap: var(--spacing--4xs);
-}
-
 .card.collapsed {
 	.header {
 		padding: var(--spacing--sm);
 	}
 
-	.node-name {
+	.title {
 		color: var(--color--text--tint-1);
 		overflow: hidden;
 		white-space: nowrap;

@@ -1,9 +1,56 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
+import { N8nButton, N8nHeading, N8nIcon, N8nText } from '@n8n/design-system';
 import { useAgentPanelStore } from '../agentPanel.store';
+import AgentAvatarComp from './AgentAvatar.vue';
 
 const panelStore = useAgentPanelStore();
 const taskPrompt = ref('');
+
+const isEditingName = ref(false);
+const editName = ref('');
+const isEditingAvatar = ref(false);
+const editAvatar = ref('');
+
+watch(
+	() => panelStore.panelAgentId,
+	() => {
+		isEditingName.value = false;
+		isEditingAvatar.value = false;
+	},
+);
+
+function startEditName() {
+	editName.value = panelStore.selectedAgent?.firstName ?? '';
+	isEditingName.value = true;
+}
+
+async function saveName() {
+	const name = editName.value.trim();
+	if (!name) return;
+	await panelStore.updateAgent({ firstName: name });
+	isEditingName.value = false;
+}
+
+function cancelEditName() {
+	isEditingName.value = false;
+}
+
+function startEditAvatar() {
+	const agent = panelStore.selectedAgent;
+	editAvatar.value = agent?.avatar.type === 'initials' ? '' : (agent?.avatar.value ?? '');
+	isEditingAvatar.value = true;
+}
+
+async function saveAvatar() {
+	const value = editAvatar.value.trim() || null;
+	await panelStore.updateAgent({ avatar: value });
+	isEditingAvatar.value = false;
+}
+
+function cancelEditAvatar() {
+	isEditingAvatar.value = false;
+}
 
 async function onRunTask() {
 	const prompt = taskPrompt.value.trim();
@@ -17,10 +64,52 @@ async function onRunTask() {
 		<!-- Header -->
 		<div :class="$style.header">
 			<div :class="$style.headerInfo">
-				<span :class="$style.emoji">{{ panelStore.selectedAgent?.emoji }}</span>
+				<!-- Avatar with edit overlay -->
+				<div v-if="panelStore.selectedAgent" :class="$style.avatarWrapper">
+					<AgentAvatarComp :avatar="panelStore.selectedAgent.avatar" size="large" />
+					<button
+						:class="$style.avatarEditBtn"
+						data-testid="agent-edit-avatar"
+						title="Edit avatar"
+						@click="startEditAvatar"
+					>
+						<N8nIcon icon="pen" size="xsmall" />
+					</button>
+				</div>
 				<div>
-					<div :class="$style.name">{{ panelStore.selectedAgent?.firstName }}</div>
-					<div :class="$style.role">{{ panelStore.selectedAgent?.role }}</div>
+					<!-- Editable name -->
+					<div v-if="isEditingName" :class="$style.editRow">
+						<input
+							v-model="editName"
+							:class="$style.editInput"
+							data-testid="agent-edit-name-input"
+							maxlength="32"
+							@keydown.enter="saveName"
+							@keydown.escape="cancelEditName"
+						/>
+						<button :class="$style.editAction" @click="saveName">
+							<N8nIcon icon="check" size="xsmall" />
+						</button>
+						<button :class="$style.editAction" @click="cancelEditName">
+							<N8nIcon icon="x" size="xsmall" />
+						</button>
+					</div>
+					<div v-else :class="$style.nameRow">
+						<N8nHeading bold tag="h3" size="medium">
+							{{ panelStore.selectedAgent?.firstName }}
+						</N8nHeading>
+						<button
+							:class="$style.inlineEditBtn"
+							data-testid="agent-edit-name"
+							title="Edit name"
+							@click="startEditName"
+						>
+							<N8nIcon icon="pen" size="xsmall" />
+						</button>
+					</div>
+					<N8nText color="text-light" size="small">
+						{{ panelStore.selectedAgent?.role }}
+					</N8nText>
 					<div v-if="panelStore.zoneName" :class="$style.zone">{{ panelStore.zoneName }}</div>
 				</div>
 			</div>
@@ -29,55 +118,75 @@ async function onRunTask() {
 				data-testid="agent-panel-close"
 				@click="panelStore.closePanel()"
 			>
-				&times;
+				<N8nIcon icon="x" size="medium" />
 			</button>
 		</div>
 
+		<!-- Avatar edit popover -->
+		<div v-if="isEditingAvatar" :class="$style.avatarEditRow" data-testid="agent-avatar-edit-row">
+			<input
+				v-model="editAvatar"
+				:class="$style.editInput"
+				placeholder="Emoji or image URL"
+				data-testid="agent-edit-avatar-input"
+				maxlength="255"
+				@keydown.enter="saveAvatar"
+				@keydown.escape="cancelEditAvatar"
+			/>
+			<N8nButton label="Save" size="mini" @click="saveAvatar" />
+			<N8nButton label="Cancel" type="tertiary" size="mini" @click="cancelEditAvatar" />
+		</div>
+
 		<!-- Loading -->
-		<div v-if="panelStore.isLoading" :class="$style.loading">Loading capabilities...</div>
+		<div v-if="panelStore.isLoading" :class="$style.loading">
+			<N8nIcon icon="spinner" spin size="medium" />
+			<N8nText color="text-light" size="small">Loading capabilities...</N8nText>
+		</div>
 
 		<!-- Content -->
 		<div v-else :class="$style.content">
 			<!-- Workflows -->
 			<section :class="$style.section">
-				<h3 :class="$style.sectionTitle">Workflows</h3>
+				<div :class="$style.sectionTitle">Workflows</div>
 				<div v-if="panelStore.capabilities?.workflows.length" :class="$style.list">
 					<div
 						v-for="wf in panelStore.capabilities.workflows"
 						:key="wf.id"
 						:class="$style.listItem"
 					>
+						<N8nIcon icon="workflow" :class="$style.itemIcon" size="small" />
 						<span :class="$style.itemName">{{ wf.name }}</span>
 						<span :class="[$style.badge, wf.active ? $style.badgeActive : $style.badgeInactive]">
 							{{ wf.active ? 'Active' : 'Inactive' }}
 						</span>
 					</div>
 				</div>
-				<div v-else :class="$style.empty">No workflows accessible</div>
+				<N8nText v-else color="text-light" size="small">No workflows accessible</N8nText>
 			</section>
 
 			<!-- Credentials -->
 			<section :class="$style.section">
-				<h3 :class="$style.sectionTitle">Credentials</h3>
+				<div :class="$style.sectionTitle">Credentials</div>
 				<div v-if="panelStore.capabilities?.credentials.length" :class="$style.list">
 					<div
 						v-for="cred in panelStore.capabilities.credentials"
 						:key="cred.id"
 						:class="$style.listItem"
 					>
+						<N8nIcon icon="key-round" :class="$style.itemIcon" size="small" />
 						<span :class="$style.itemName">{{ cred.name }}</span>
-						<span :class="$style.itemType">{{ cred.type }}</span>
+						<N8nText color="text-light" size="xsmall">{{ cred.type }}</N8nText>
 					</div>
 				</div>
-				<div v-else :class="$style.empty">No credentials accessible</div>
+				<N8nText v-else color="text-light" size="small">No credentials accessible</N8nText>
 			</section>
 
 			<!-- Connected Agents -->
 			<section v-if="panelStore.connectedAgents.length" :class="$style.section">
-				<h3 :class="$style.sectionTitle">Connected Agents</h3>
+				<div :class="$style.sectionTitle">Connected Agents</div>
 				<div :class="$style.list">
 					<div v-for="agent in panelStore.connectedAgents" :key="agent.id" :class="$style.listItem">
-						<span :class="$style.connectedEmoji">{{ agent.emoji }}</span>
+						<AgentAvatarComp :avatar="agent.avatar" size="small" />
 						<span :class="$style.itemName">{{ agent.firstName }}</span>
 					</div>
 				</div>
@@ -85,7 +194,7 @@ async function onRunTask() {
 
 			<!-- Task Input -->
 			<section :class="$style.section">
-				<h3 :class="$style.sectionTitle">Run a Task</h3>
+				<div :class="$style.sectionTitle">Run a Task</div>
 				<textarea
 					v-model="taskPrompt"
 					:class="$style.taskInput"
@@ -93,19 +202,20 @@ async function onRunTask() {
 					data-testid="agent-task-input"
 					:disabled="panelStore.isSubmitting"
 				/>
-				<button
-					:class="$style.runBtn"
-					data-testid="agent-run-task"
+				<N8nButton
+					:label="panelStore.isSubmitting ? 'Running...' : 'Run Task'"
 					:disabled="!taskPrompt.trim() || panelStore.isSubmitting"
+					:loading="panelStore.isSubmitting"
+					size="medium"
+					data-testid="agent-run-task"
+					:class="$style.runBtn"
 					@click="onRunTask"
-				>
-					{{ panelStore.isSubmitting ? 'Running...' : 'Run Task' }}
-				</button>
+				/>
 			</section>
 
 			<!-- Task Result -->
 			<section v-if="panelStore.taskResult" :class="$style.section">
-				<h3 :class="$style.sectionTitle">Result</h3>
+				<div :class="$style.sectionTitle">Result</div>
 				<div
 					:class="[
 						$style.resultBox,
@@ -160,20 +270,102 @@ async function onRunTask() {
 	align-items: flex-start;
 }
 
-.emoji {
-	font-size: var(--font-size--2xl);
-	line-height: 1;
+.avatarWrapper {
+	position: relative;
+	flex-shrink: 0;
 }
 
-.name {
-	font-size: var(--font-size--lg);
-	font-weight: var(--font-weight--bold);
-	color: var(--color--text);
-}
-
-.role {
-	font-size: var(--font-size--sm);
+.avatarEditBtn {
+	position: absolute;
+	bottom: -2px;
+	right: -2px;
+	width: 22px;
+	height: 22px;
+	border-radius: 50%;
+	background: var(--color--background);
+	border: var(--border);
 	color: var(--color--text--tint-2);
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+
+	&:hover {
+		color: var(--color--primary);
+		border-color: var(--color--primary);
+	}
+}
+
+.nameRow {
+	display: flex;
+	align-items: center;
+	gap: var(--spacing--4xs);
+}
+
+.inlineEditBtn {
+	background: none;
+	border: none;
+	color: var(--color--text--tint-2);
+	cursor: pointer;
+	padding: var(--spacing--5xs);
+	display: flex;
+	align-items: center;
+	opacity: 0;
+	transition: opacity 0.15s;
+
+	.nameRow:hover & {
+		opacity: 1;
+	}
+
+	&:hover {
+		color: var(--color--primary);
+	}
+}
+
+.editRow {
+	display: flex;
+	align-items: center;
+	gap: var(--spacing--4xs);
+}
+
+.editInput {
+	padding: var(--spacing--4xs) var(--spacing--2xs);
+	border: var(--border);
+	border-radius: var(--radius);
+	font-family: var(--font-family);
+	font-size: var(--font-size--sm);
+	color: var(--color--text);
+	background: var(--color--background);
+	min-width: 0;
+	flex: 1;
+
+	&:focus {
+		outline: none;
+		border-color: var(--color--primary);
+	}
+}
+
+.editAction {
+	background: none;
+	border: none;
+	color: var(--color--text--tint-2);
+	cursor: pointer;
+	padding: var(--spacing--4xs);
+	display: flex;
+	align-items: center;
+
+	&:hover {
+		color: var(--color--primary);
+	}
+}
+
+.avatarEditRow {
+	display: flex;
+	align-items: center;
+	gap: var(--spacing--2xs);
+	padding: var(--spacing--2xs) var(--spacing--lg);
+	border-bottom: var(--border);
+	background: var(--color--foreground--tint-2);
 }
 
 .zone {
@@ -185,22 +377,26 @@ async function onRunTask() {
 .closeBtn {
 	background: none;
 	border: none;
-	font-size: var(--font-size--xl);
 	color: var(--color--text--tint-2);
 	cursor: pointer;
-	padding: 0;
-	line-height: 1;
+	padding: var(--spacing--4xs);
+	border-radius: var(--radius);
+	display: flex;
+	align-items: center;
+	justify-content: center;
 
 	&:hover {
 		color: var(--color--text);
+		background: var(--color--foreground--tint-2);
 	}
 }
 
 .loading {
-	padding: var(--spacing--xl);
-	text-align: center;
-	color: var(--color--text--tint-2);
-	font-size: var(--font-size--sm);
+	padding: var(--spacing--2xl);
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	gap: var(--spacing--xs);
 }
 
 .content {
@@ -237,6 +433,11 @@ async function onRunTask() {
 	font-size: var(--font-size--sm);
 }
 
+.itemIcon {
+	color: var(--color--text--tint-2);
+	flex-shrink: 0;
+}
+
 .itemName {
 	color: var(--color--text);
 	flex: 1;
@@ -246,17 +447,12 @@ async function onRunTask() {
 	white-space: nowrap;
 }
 
-.itemType {
-	font-size: var(--font-size--2xs);
-	color: var(--color--text--tint-2);
-	flex-shrink: 0;
-}
-
 .badge {
 	font-size: var(--font-size--3xs);
 	padding: 1px var(--spacing--4xs);
 	border-radius: var(--radius);
 	flex-shrink: 0;
+	font-weight: var(--font-weight--bold);
 }
 
 .badgeActive {
@@ -267,16 +463,6 @@ async function onRunTask() {
 .badgeInactive {
 	background: var(--color--foreground--tint-2);
 	color: var(--color--text--tint-2);
-}
-
-.connectedEmoji {
-	font-size: var(--font-size--md);
-}
-
-.empty {
-	font-size: var(--font-size--sm);
-	color: var(--color--text--tint-2);
-	font-style: italic;
 }
 
 .taskInput {
@@ -309,23 +495,6 @@ async function onRunTask() {
 .runBtn {
 	margin-top: var(--spacing--2xs);
 	width: 100%;
-	padding: var(--spacing--2xs) var(--spacing--sm);
-	background: var(--color--primary);
-	color: #fff;
-	border: none;
-	border-radius: var(--radius);
-	font-size: var(--font-size--sm);
-	font-weight: var(--font-weight--bold);
-	cursor: pointer;
-
-	&:hover:not(:disabled) {
-		background: var(--color--primary--shade-1);
-	}
-
-	&:disabled {
-		opacity: 0.5;
-		cursor: not-allowed;
-	}
 }
 
 .resultBox {

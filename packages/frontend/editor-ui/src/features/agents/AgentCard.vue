@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { computed } from 'vue';
 import type { AgentNode } from './agents.types';
+import AgentAvatarComp from './components/AgentAvatar.vue';
 
 const props = defineProps<{
 	agent: AgentNode;
@@ -12,13 +13,20 @@ const emit = defineEmits<{
 	dragStart: [id: string, event: PointerEvent];
 }>();
 
-const isHovered = ref(false);
-
-const statusColor: Record<string, string> = {
-	idle: 'var(--color--foreground--tint-1)',
-	active: 'var(--color--success)',
-	busy: 'var(--color--warning)',
+const statusConfig: Record<string, { color: string; label: string }> = {
+	idle: { color: 'var(--color--foreground--tint-1)', label: 'Idle' },
+	active: { color: 'var(--color--success)', label: 'Active' },
+	busy: { color: 'var(--color--warning)', label: 'Busy' },
 };
+
+const status = computed(() => statusConfig[props.agent.status] ?? statusConfig.idle);
+
+const resourceBarColor = computed(() => {
+	const usage = props.agent.resourceUsage;
+	if (usage > 0.7) return 'var(--color--warning)';
+	if (usage > 0.4) return 'var(--color--success)';
+	return 'var(--color--foreground--tint-1)';
+});
 
 function onPointerDown(event: PointerEvent) {
 	emit('dragStart', props.agent.id, event);
@@ -36,17 +44,51 @@ function onPointerDown(event: PointerEvent) {
 		}"
 		data-testid="agent-card"
 		@pointerdown="onPointerDown"
-		@mouseenter="isHovered = true"
-		@mouseleave="isHovered = false"
 	>
-		<div :class="$style.avatar">
-			<span :class="$style.emoji">{{ agent.emoji }}</span>
+		<!-- Top row: avatar + name + status -->
+		<div :class="$style.topRow">
+			<AgentAvatarComp :avatar="agent.avatar" size="medium" />
+			<div :class="$style.info">
+				<div :class="$style.name">{{ agent.firstName }}</div>
+				<div :class="$style.role">{{ agent.role }}</div>
+			</div>
+			<div :class="$style.statusBadge" :style="{ '--status--color': status.color }">
+				<span :class="$style.statusDot" />
+				<span :class="$style.statusLabel">{{ status.label }}</span>
+			</div>
 		</div>
-		<div :class="$style.info">
-			<div :class="$style.name">{{ agent.firstName }}</div>
-			<div :class="$style.role">{{ agent.role }}</div>
+
+		<!-- Stats row -->
+		<div :class="$style.statsRow">
+			<div :class="$style.stat">
+				<span :class="$style.statValue">{{ agent.workflowCount }}</span>
+				<span :class="$style.statLabel">workflows</span>
+			</div>
+			<div :class="$style.statDivider" />
+			<div :class="$style.stat">
+				<span :class="$style.statValue">{{ agent.tasksCompleted }}</span>
+				<span :class="$style.statLabel">tasks</span>
+			</div>
+			<div :class="$style.statDivider" />
+			<div :class="$style.stat">
+				<span :class="$style.statValue">{{ agent.lastActive }}</span>
+				<span :class="$style.statLabel">last active</span>
+			</div>
 		</div>
-		<div :class="$style.statusDot" :style="{ backgroundColor: statusColor[agent.status] }" />
+
+		<!-- Resource bar -->
+		<div :class="$style.resourceRow">
+			<div :class="$style.resourceTrack">
+				<div
+					:class="$style.resourceFill"
+					:style="{
+						width: `${agent.resourceUsage * 100}%`,
+						backgroundColor: resourceBarColor,
+					}"
+				/>
+			</div>
+			<span :class="$style.resourceLabel">{{ Math.round(agent.resourceUsage * 100) }}%</span>
+		</div>
 	</div>
 </template>
 
@@ -54,29 +96,36 @@ function onPointerDown(event: PointerEvent) {
 .card {
 	position: absolute;
 	display: flex;
-	align-items: center;
-	gap: var(--spacing--xs);
+	flex-direction: column;
+	gap: var(--spacing--2xs);
 	padding: var(--spacing--xs) var(--spacing--sm);
 	background: var(--color--background);
 	border: var(--border);
-	border-radius: var(--radius--xl);
-	box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+	border-radius: var(--radius--lg);
+	box-shadow:
+		0 1px 3px color-mix(in srgb, var(--color--text) 6%, transparent),
+		0 1px 2px color-mix(in srgb, var(--color--text) 4%, transparent);
 	cursor: grab;
 	user-select: none;
 	z-index: 3;
 	transition:
 		box-shadow 0.15s ease,
 		transform 0.15s ease;
-	min-width: 180px;
+	min-width: 220px;
+	max-width: 260px;
 
 	&:hover {
-		box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+		box-shadow:
+			0 4px 12px color-mix(in srgb, var(--color--text) 10%, transparent),
+			0 2px 4px color-mix(in srgb, var(--color--text) 6%, transparent);
 		transform: translateY(-1px);
 	}
 
 	&:active {
 		cursor: grabbing;
-		box-shadow: 0 8px 24px rgba(0, 0, 0, 0.16);
+		box-shadow:
+			0 8px 20px color-mix(in srgb, var(--color--text) 14%, transparent),
+			0 4px 8px color-mix(in srgb, var(--color--text) 8%, transparent);
 		transform: translateY(-2px);
 	}
 }
@@ -97,27 +146,18 @@ function onPointerDown(event: PointerEvent) {
 	}
 }
 
-.avatar {
-	width: 40px;
-	height: 40px;
-	border-radius: 50%;
-	background: linear-gradient(135deg, var(--color--primary--tint-2), var(--color--primary--tint-3));
+.topRow {
 	display: flex;
 	align-items: center;
-	justify-content: center;
-	flex-shrink: 0;
-}
-
-.emoji {
-	font-size: var(--font-size--xl);
-	line-height: 1;
+	gap: var(--spacing--2xs);
 }
 
 .info {
 	display: flex;
 	flex-direction: column;
-	gap: 2px;
+	gap: 1px;
 	min-width: 0;
+	flex: 1;
 }
 
 .name {
@@ -130,16 +170,95 @@ function onPointerDown(event: PointerEvent) {
 }
 
 .role {
-	font-size: var(--font-size--2xs);
+	font-size: var(--font-size--3xs);
 	color: var(--color--text--tint-2);
 	white-space: nowrap;
 }
 
-.statusDot {
-	width: 8px;
-	height: 8px;
-	border-radius: 50%;
+.statusBadge {
+	display: flex;
+	align-items: center;
+	gap: var(--spacing--4xs);
+	padding: 2px var(--spacing--3xs);
+	border-radius: var(--radius);
+	background: color-mix(in srgb, var(--status--color) 12%, transparent);
 	flex-shrink: 0;
 	margin-left: auto;
+}
+
+.statusDot {
+	width: 6px;
+	height: 6px;
+	border-radius: 50%;
+	background: var(--status--color);
+}
+
+.statusLabel {
+	font-size: var(--font-size--3xs);
+	font-weight: var(--font-weight--bold);
+	color: var(--color--text--tint-1);
+	text-transform: uppercase;
+	letter-spacing: 0.3px;
+}
+
+.statsRow {
+	display: flex;
+	align-items: center;
+	gap: var(--spacing--2xs);
+	padding-top: var(--spacing--4xs);
+	border-top: 1px solid var(--color--foreground--tint-2);
+}
+
+.stat {
+	display: flex;
+	align-items: baseline;
+	gap: 3px;
+	min-width: 0;
+}
+
+.statValue {
+	font-size: var(--font-size--2xs);
+	font-weight: var(--font-weight--bold);
+	color: var(--color--text);
+}
+
+.statLabel {
+	font-size: var(--font-size--3xs);
+	color: var(--color--text--tint-2);
+	white-space: nowrap;
+}
+
+.statDivider {
+	width: 1px;
+	height: 12px;
+	background: var(--color--foreground--tint-2);
+	flex-shrink: 0;
+}
+
+.resourceRow {
+	display: flex;
+	align-items: center;
+	gap: var(--spacing--2xs);
+}
+
+.resourceTrack {
+	flex: 1;
+	height: 4px;
+	background: var(--color--foreground--tint-2);
+	border-radius: 2px;
+	overflow: hidden;
+}
+
+.resourceFill {
+	height: 100%;
+	border-radius: 2px;
+	transition: width 0.3s ease;
+}
+
+.resourceLabel {
+	font-size: var(--font-size--3xs);
+	color: var(--color--text--tint-2);
+	min-width: 28px;
+	text-align: right;
 }
 </style>

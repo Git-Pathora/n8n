@@ -79,6 +79,9 @@ export class User extends WithTimestamps implements IUser, AuthPrincipal {
 	@Column({ type: String, default: 'human' })
 	type: 'human' | 'agent';
 
+	@Column({ type: String, nullable: true, length: 255 })
+	avatar: string | null;
+
 	@Column({ type: Boolean, default: false })
 	disabled: boolean;
 

@@ -2,8 +2,8 @@
 import { computed } from 'vue';
 import type { AgentNode, ConnectionLine } from '../agents.types';
 
-const CARD_WIDTH = 180;
-const CARD_HEIGHT = 56;
+const CARD_WIDTH = 240;
+const CARD_HEIGHT = 110;
 
 const props = defineProps<{
 	connections: ConnectionLine[];

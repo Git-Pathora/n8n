@@ -69,6 +69,11 @@ export const useAgentPanelStore = defineStore('agentPanel', () => {
 		isSubmitting.value = false;
 	};
 
+	const updateAgent = async (updates: { firstName?: string; avatar?: string | null }) => {
+		if (!panelAgentId.value) return;
+		await agentsStore.updateAgent(panelAgentId.value, updates);
+	};
+
 	const dispatchTask = async (prompt: string) => {
 		if (!panelAgentId.value) return;
 
@@ -104,6 +109,7 @@ export const useAgentPanelStore = defineStore('agentPanel', () => {
 		connectedAgents,
 		openPanel,
 		closePanel,
+		updateAgent,
 		dispatchTask,
 	};
 });

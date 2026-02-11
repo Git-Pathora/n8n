@@ -1,13 +1,22 @@
+export type AgentAvatar =
+	| { type: 'emoji'; value: string }
+	| { type: 'image'; value: string }
+	| { type: 'initials'; value: string };
+
 export interface AgentNode {
 	id: string;
 	firstName: string;
 	lastName: string;
 	email: string;
 	role: string;
-	emoji: string;
+	avatar: AgentAvatar;
 	status: 'idle' | 'active' | 'busy';
 	position: { x: number; y: number };
 	zoneId: string | null;
+	workflowCount: number;
+	tasksCompleted: number;
+	lastActive: string;
+	resourceUsage: number;
 }
 
 export interface UserResponse {
@@ -16,6 +25,7 @@ export interface UserResponse {
 	lastName: string;
 	email: string;
 	type?: string;
+	avatar?: string | null;
 }
 
 export interface ZoneLayout {

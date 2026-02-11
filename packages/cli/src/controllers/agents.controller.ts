@@ -1,12 +1,15 @@
+import { CreateAgentDto, UpdateAgentDto } from '@n8n/api-types';
 import type { User } from '@n8n/db';
 import {
 	AuthenticatedRequest,
+	GLOBAL_MEMBER_ROLE,
 	UserRepository,
 	WorkflowRepository,
 	ProjectRelationRepository,
 	ProjectRepository,
 } from '@n8n/db';
-import { RestController, Get, Post, Param } from '@n8n/decorators';
+import { RestController, Body, Get, Post, Patch, Param } from '@n8n/decorators';
+import crypto from 'node:crypto';
 import type { Response } from 'express';
 import {
 	CHAT_TRIGGER_NODE_TYPE,
@@ -77,6 +80,60 @@ export class AgentsController {
 		private readonly activeExecutions: ActiveExecutions,
 	) {}
 
+	@Post('/')
+	async createAgent(_req: AuthenticatedRequest, _res: Response, @Body payload: CreateAgentDto) {
+		const email = `agent-${crypto.randomUUID().slice(0, 8)}@internal.n8n.local`;
+
+		const { user } = await this.userRepository.createUserWithProject({
+			email,
+			firstName: payload.firstName,
+			lastName: '',
+			password: null,
+			type: 'agent',
+			avatar: payload.avatar ?? null,
+			role: GLOBAL_MEMBER_ROLE,
+		});
+
+		return {
+			id: user.id,
+			firstName: user.firstName,
+			lastName: user.lastName,
+			email: user.email,
+			avatar: user.avatar,
+		};
+	}
+
+	@Patch('/:agentId')
+	async updateAgent(
+		_req: AuthenticatedRequest,
+		_res: Response,
+		@Param('agentId') agentId: string,
+		@Body payload: UpdateAgentDto,
+	) {
+		const agent = await this.userRepository.findOneBy({ id: agentId });
+
+		if (!agent || agent.type !== 'agent') {
+			throw new NotFoundError(`Agent ${agentId} not found`);
+		}
+
+		if (payload.firstName !== undefined) {
+			agent.firstName = payload.firstName;
+		}
+		if (payload.avatar !== undefined) {
+			agent.avatar = payload.avatar;
+		}
+
+		const saved = await this.userRepository.save(agent);
+
+		return {
+			id: saved.id,
+			firstName: saved.firstName,
+			lastName: saved.lastName,
+			email: saved.email,
+			avatar: saved.avatar,
+		};
+	}
+
 	@Get('/:agentId/capabilities')
 	async getCapabilities(
 		_req: AuthenticatedRequest,
@@ -132,7 +189,7 @@ export class AgentsController {
 	@Post('/:agentId/task')
 	async dispatchTask(req: AuthenticatedRequest, _res: Response, @Param('agentId') agentId: string) {
 		const { prompt } = req.body as { prompt: string };
-		return this.executeAgentTask(agentId, prompt, 0);
+		return await this.executeAgentTask(agentId, prompt, 0);
 	}
 
 	private async executeAgentTask(

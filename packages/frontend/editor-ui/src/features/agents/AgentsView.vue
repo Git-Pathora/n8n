@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, onBeforeUnmount, ref } from 'vue';
+import { N8nButton, N8nHeading, N8nText } from '@n8n/design-system';
 import { useAgentsStore, ZONE_COLORS } from './agents.store';
 import { useAgentPanelStore } from './agentPanel.store';
 import AgentCard from './AgentCard.vue';
@@ -8,12 +9,45 @@ import ConnectionLines from './components/ConnectionLines.vue';
 import AgentActionPanel from './components/AgentActionPanel.vue';
 
 const DRAG_THRESHOLD = 5;
-const CARD_WIDTH = 180;
-const CARD_HEIGHT = 56;
+const CARD_WIDTH = 240;
+const CARD_HEIGHT = 110;
 
 const agentsStore = useAgentsStore();
 const panelStore = useAgentPanelStore();
 const canvasRef = ref<HTMLElement>();
+
+const showAddDialog = ref(false);
+const newAgentName = ref('');
+const newAgentAvatar = ref('');
+const isCreating = ref(false);
+
+async function onCreateAgent() {
+	const name = newAgentName.value.trim();
+	if (!name) return;
+
+	isCreating.value = true;
+	try {
+		const avatar = newAgentAvatar.value.trim() || undefined;
+		await agentsStore.createAgent(name, avatar);
+
+		if (canvasRef.value) {
+			const { clientWidth, clientHeight } = canvasRef.value;
+			await agentsStore.fetchZones(clientWidth, clientHeight);
+		}
+
+		newAgentName.value = '';
+		newAgentAvatar.value = '';
+		showAddDialog.value = false;
+	} finally {
+		isCreating.value = false;
+	}
+}
+
+function onCancelAdd() {
+	showAddDialog.value = false;
+	newAgentName.value = '';
+	newAgentAvatar.value = '';
+}
 
 let dragState: {
 	agentId: string;
@@ -144,8 +178,57 @@ function onRemoveConnection(lineId: string) {
 <template>
 	<main :class="$style.container">
 		<div :class="$style.header">
-			<h1 :class="$style.title">Agent OS</h1>
-			<span :class="$style.subtitle">{{ agentsStore.agents.length }} agents</span>
+			<N8nHeading bold tag="h2" size="xlarge">Agent OS</N8nHeading>
+			<N8nText color="text-light" size="small"> {{ agentsStore.agents.length }} agents </N8nText>
+			<N8nButton
+				label="+ Add Agent"
+				size="small"
+				type="secondary"
+				data-testid="add-agent-button"
+				:class="$style.addBtn"
+				@click="showAddDialog = true"
+			/>
+		</div>
+
+		<!-- Add Agent Dialog -->
+		<div v-if="showAddDialog" :class="$style.dialogOverlay" @click.self="onCancelAdd">
+			<div :class="$style.dialog" data-testid="add-agent-dialog">
+				<N8nHeading bold tag="h3" size="medium">Add Agent</N8nHeading>
+				<div :class="$style.dialogField">
+					<label :class="$style.dialogLabel">Name</label>
+					<input
+						v-model="newAgentName"
+						:class="$style.dialogInput"
+						type="text"
+						placeholder="e.g. Docs Curator"
+						data-testid="add-agent-name"
+						maxlength="32"
+						@keydown.enter="onCreateAgent"
+					/>
+				</div>
+				<div :class="$style.dialogField">
+					<label :class="$style.dialogLabel">Avatar (emoji or URL, optional)</label>
+					<input
+						v-model="newAgentAvatar"
+						:class="$style.dialogInput"
+						type="text"
+						data-testid="add-agent-avatar"
+						maxlength="255"
+						@keydown.enter="onCreateAgent"
+					/>
+				</div>
+				<div :class="$style.dialogActions">
+					<N8nButton label="Cancel" type="tertiary" size="small" @click="onCancelAdd" />
+					<N8nButton
+						label="Create"
+						size="small"
+						:disabled="!newAgentName.trim() || isCreating"
+						:loading="isCreating"
+						data-testid="add-agent-submit"
+						@click="onCreateAgent"
+					/>
+				</div>
+			</div>
 		</div>
 		<div :class="$style.body">
 			<div ref="canvasRef" :class="$style.canvas" data-testid="agents-canvas">
@@ -173,7 +256,7 @@ function onRemoveConnection(lineId: string) {
 					v-if="agentsStore.agents.length === 0 && agentsStore.zones.length === 0"
 					:class="$style.empty"
 				>
-					No agents found. Start n8n to seed agent users.
+					No agents found. Click "+ Add Agent" to create one.
 				</div>
 				<div v-else-if="agentsStore.zones.length === 0" :class="$style.zonesEmpty">
 					No team projects found.
@@ -197,24 +280,13 @@ function onRemoveConnection(lineId: string) {
 .header {
 	display: flex;
 	align-items: baseline;
-	gap: var(--spacing--sm);
-	padding: var(--spacing--lg) var(--spacing--xl);
+	gap: var(--spacing--xs);
+	padding: var(--spacing--lg) var(--spacing--2xl);
 	border-bottom: var(--border);
 	background: var(--color--background);
 	flex-shrink: 0;
 	z-index: 1;
-}
-
-.title {
-	font-size: var(--font-size--2xl);
-	font-weight: var(--font-weight--bold);
-	color: var(--color--text);
-	margin: 0;
-}
-
-.subtitle {
-	font-size: var(--font-size--sm);
-	color: var(--color--text--tint-2);
+	min-height: var(--spacing--3xl);
 }
 
 .body {
@@ -248,5 +320,64 @@ function onRemoveConnection(lineId: string) {
 	transform: translateX(-50%);
 	color: var(--color--text--tint-2);
 	font-size: var(--font-size--sm);
+}
+
+.addBtn {
+	margin-left: auto;
+}
+
+.dialogOverlay {
+	position: fixed;
+	inset: 0;
+	background: rgba(0, 0, 0, 0.3);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	z-index: 100;
+}
+
+.dialog {
+	background: var(--color--background);
+	border-radius: var(--radius--lg);
+	padding: var(--spacing--lg);
+	width: 360px;
+	display: flex;
+	flex-direction: column;
+	gap: var(--spacing--sm);
+	box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+.dialogField {
+	display: flex;
+	flex-direction: column;
+	gap: var(--spacing--4xs);
+}
+
+.dialogLabel {
+	font-size: var(--font-size--2xs);
+	font-weight: var(--font-weight--bold);
+	color: var(--color--text--tint-1);
+}
+
+.dialogInput {
+	padding: var(--spacing--2xs) var(--spacing--xs);
+	border: var(--border);
+	border-radius: var(--radius);
+	font-family: var(--font-family);
+	font-size: var(--font-size--sm);
+	color: var(--color--text);
+	background: var(--color--background);
+
+	&:focus {
+		outline: none;
+		border-color: var(--color--primary);
+	}
+}
+
+.dialogActions {
+	display: flex;
+	justify-content: flex-end;
+	gap: var(--spacing--2xs);
+	margin-top: var(--spacing--2xs);
 }
 </style>

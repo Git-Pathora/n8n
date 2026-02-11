@@ -8,14 +8,67 @@ import {
 	addProjectMembers,
 	deleteProjectMember,
 } from '@/features/collaboration/projects/projects.api';
-import type { AgentNode, UserResponse, ZoneLayout, ConnectionLine } from './agents.types';
+import type {
+	AgentAvatar,
+	AgentNode,
+	UserResponse,
+	ZoneLayout,
+	ConnectionLine,
+} from './agents.types';
 
-const AGENT_METADATA: Record<string, { role: string; emoji: string }> = {
-	'agent-docs-curator@internal.n8n.local': { role: 'Knowledge Base', emoji: '\u{1F4DA}' },
-	'agent-issue-triager@internal.n8n.local': { role: 'Bug Analysis', emoji: '\u{1F50D}' },
-	'agent-qa@internal.n8n.local': { role: 'Test Strategy', emoji: '\u{1F916}' },
-	'agent-messenger@internal.n8n.local': { role: 'Comms & Alerts', emoji: '\u{1F4AC}' },
+interface AgentDemoStats {
+	role: string;
+	status: 'idle' | 'active' | 'busy';
+	tasksCompleted: number;
+	lastActive: string;
+	resourceUsage: number;
+	workflowCount: number;
+}
+
+const AGENT_DEMO_STATS: Record<string, AgentDemoStats> = {
+	'agent-docs-curator@internal.n8n.local': {
+		role: 'Knowledge Base',
+		status: 'idle',
+		tasksCompleted: 47,
+		lastActive: '12m ago',
+		resourceUsage: 0.15,
+		workflowCount: 2,
+	},
+	'agent-issue-triager@internal.n8n.local': {
+		role: 'Bug Analysis',
+		status: 'active',
+		tasksCompleted: 128,
+		lastActive: 'now',
+		resourceUsage: 0.62,
+		workflowCount: 3,
+	},
+	'agent-qa@internal.n8n.local': {
+		role: 'Test Strategy',
+		status: 'busy',
+		tasksCompleted: 89,
+		lastActive: '2m ago',
+		resourceUsage: 0.84,
+		workflowCount: 4,
+	},
+	'agent-messenger@internal.n8n.local': {
+		role: 'Comms & Alerts',
+		status: 'active',
+		tasksCompleted: 213,
+		lastActive: '1m ago',
+		resourceUsage: 0.31,
+		workflowCount: 1,
+	},
 };
+
+function parseAvatar(avatarString: string | null | undefined, initials: string): AgentAvatar {
+	if (!avatarString) {
+		return { type: 'initials', value: initials || '??' };
+	}
+	if (avatarString.startsWith('http')) {
+		return { type: 'image', value: avatarString };
+	}
+	return { type: 'emoji', value: avatarString };
+}
 
 const DEFAULT_POSITIONS: Array<{ x: number; y: number }> = [
 	{ x: 80, y: 60 },
@@ -58,17 +111,29 @@ export const useAgentsStore = defineStore('agents', () => {
 		);
 
 		agents.value = agentUsers.map((user, index) => {
-			const meta = AGENT_METADATA[user.email] ?? { role: 'Agent', emoji: '\u{1F916}' };
+			const initials = `${user.firstName?.[0] ?? ''}${user.lastName?.[0] ?? ''}`.toUpperCase();
+			const stats = AGENT_DEMO_STATS[user.email] ?? {
+				role: 'Agent',
+				status: 'idle' as const,
+				tasksCompleted: 0,
+				lastActive: 'never',
+				resourceUsage: 0,
+				workflowCount: 0,
+			};
 			return {
 				id: user.id,
 				firstName: user.firstName,
 				lastName: user.lastName,
 				email: user.email,
-				role: meta.role,
-				emoji: meta.emoji,
-				status: 'idle' as const,
+				role: stats.role,
+				avatar: parseAvatar(user.avatar, initials),
+				status: stats.status,
 				position: DEFAULT_POSITIONS[index % DEFAULT_POSITIONS.length],
 				zoneId: null,
+				workflowCount: stats.workflowCount,
+				tasksCompleted: stats.tasksCompleted,
+				lastActive: stats.lastActive,
+				resourceUsage: stats.resourceUsage,
 			};
 		});
 	};
@@ -170,8 +235,8 @@ export const useAgentsStore = defineStore('agents', () => {
 				const col = i % 2;
 				const row = Math.floor(i / 2);
 				zoneAgents[i].position = {
-					x: startX + col * 200,
-					y: startY + row * 80,
+					x: startX + col * 270,
+					y: startY + row * 130,
 				};
 			}
 		}
@@ -254,6 +319,58 @@ export const useAgentsStore = defineStore('agents', () => {
 		}
 	};
 
+	const createAgent = async (firstName: string, avatar?: string) => {
+		const response = await makeRestApiRequest<UserResponse>(
+			rootStore.restApiContext,
+			'POST',
+			'/agents',
+			{ firstName, avatar },
+		);
+
+		const initials =
+			`${response.firstName?.[0] ?? ''}${response.lastName?.[0] ?? ''}`.toUpperCase();
+		const newAgent: AgentNode = {
+			id: response.id,
+			firstName: response.firstName,
+			lastName: response.lastName,
+			email: response.email,
+			role: 'Agent',
+			avatar: parseAvatar(response.avatar, initials),
+			status: 'idle',
+			position: DEFAULT_POSITIONS[agents.value.length % DEFAULT_POSITIONS.length],
+			zoneId: null,
+			workflowCount: 0,
+			tasksCompleted: 0,
+			lastActive: 'never',
+			resourceUsage: 0,
+		};
+
+		agents.value.push(newAgent);
+		return newAgent;
+	};
+
+	const updateAgent = async (
+		agentId: string,
+		updates: { firstName?: string; avatar?: string | null },
+	) => {
+		const response = await makeRestApiRequest<UserResponse>(
+			rootStore.restApiContext,
+			'PATCH',
+			`/agents/${agentId}`,
+			updates,
+		);
+
+		const agent = agents.value.find((a) => a.id === agentId);
+		if (agent) {
+			if (response.firstName) {
+				agent.firstName = response.firstName;
+			}
+			const initials =
+				`${response.firstName?.[0] ?? ''}${response.lastName?.[0] ?? ''}`.toUpperCase();
+			agent.avatar = parseAvatar(response.avatar, initials);
+		}
+	};
+
 	const removeConnection = (lineId: string) => {
 		const index = connections.value.findIndex((c) => c.id === lineId);
 		if (index >= 0) {
@@ -276,5 +393,7 @@ export const useAgentsStore = defineStore('agents', () => {
 		selectAgent,
 		toggleConnection,
 		removeConnection,
+		createAgent,
+		updateAgent,
 	};
 });

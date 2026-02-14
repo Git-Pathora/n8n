@@ -343,7 +343,6 @@ export class Server extends AbstractServer {
 
 			const isTLSEnabled =
 				this.globalConfig.protocol === 'https' && !!(this.sslKey && this.sslCert);
-			const isPreviewMode = process.env.N8N_PREVIEW_MODE === 'true';
 			const cspDirectives = jsonParse<{ [key: string]: Iterable<string> }>(
 				Container.get(SecurityConfig).contentSecurityPolicy,
 				{
@@ -361,8 +360,7 @@ export class Server extends AbstractServer {
 								...cspDirectives,
 							},
 						},
-				xFrameOptions:
-					isPreviewMode || inE2ETests || inDevelopment ? false : { action: 'sameorigin' },
+				xFrameOptions: false,
 				dnsPrefetchControl: false,
 				// This is only relevant for Internet-explorer, which we do not support
 				ieNoOpen: false,

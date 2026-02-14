@@ -1,7 +1,12 @@
 <script setup lang="ts">
-import { onMounted, useTemplateRef } from 'vue';
+import { onMounted, useTemplateRef, computed } from 'vue';
 
 const layoutRef = useTemplateRef('layout');
+
+const isEmbedMode = computed(() => {
+	const params = new URLSearchParams(window.location.search);
+	return params.get('embed') === 'true';
+});
 
 const emit = defineEmits<{
 	mounted: [Element];
@@ -14,15 +19,12 @@ onMounted(() => {
 
 <template>
 	<div ref="layout" class="app-grid" :class="$style.appGrid">
-		<div v-if="!!$slots.banners" id="banners" :class="$style.banners">
+		<div v-if="!!$slots.banners && !isEmbedMode" id="banners" :class="$style.banners">
 			<slot name="banners" />
 		</div>
 		<header v-if="!!$slots.header" id="header" :class="$style.header">
 			<slot name="header" />
 		</header>
-		<aside v-if="!!$slots.sidebar" id="sidebar" :class="$style.sidebar">
-			<slot name="sidebar" />
-		</aside>
 		<main id="content" :class="$style.content">
 			<div :class="$style.contentWrapper">
 				<slot />

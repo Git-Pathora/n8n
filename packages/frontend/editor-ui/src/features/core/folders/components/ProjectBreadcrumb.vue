@@ -31,7 +31,7 @@ const projectIcon = computed((): IconOrEmoji => {
 	}
 
 	if (props.currentProject?.type === ProjectTypes.Personal) {
-		return { type: 'icon', value: 'user' };
+		return { type: 'icon', value: 'arrow-left' };
 	}
 
 	if (props.currentProject?.name) {
@@ -92,7 +92,7 @@ const onProjectMouseUp = () => {
 				:class="$style['project-label']"
 				:title="projectName"
 			>
-				{{ projectName }}
+				Back to {{ projectName }}
 			</N8nText>
 		</N8nLink>
 	</div>

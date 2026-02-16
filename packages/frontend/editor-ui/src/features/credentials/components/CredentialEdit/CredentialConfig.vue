@@ -429,17 +429,6 @@ watch(showOAuthSuccessBanner, (newValue, oldValue) => {
 			<N8nText v-if="isMissingCredentials" color="text-base" size="medium">
 				{{ i18n.baseText('credentialEdit.credentialConfig.missingCredentialType') }}
 			</N8nText>
-
-			<EnterpriseEdition :features="[EnterpriseEditionFeature.ExternalSecrets]">
-				<template #fallback>
-					<N8nInfoTip class="mt-s">
-						{{ i18n.baseText('credentialEdit.credentialConfig.externalSecrets') }}
-						<N8nLink bold :to="i18n.baseText('settings.externalSecrets.docs')" size="small">
-							{{ i18n.baseText('credentialEdit.credentialConfig.externalSecrets.moreInfo') }}
-						</N8nLink>
-					</N8nInfoTip>
-				</template>
-			</EnterpriseEdition>
 		</div>
 	</div>
 </template>

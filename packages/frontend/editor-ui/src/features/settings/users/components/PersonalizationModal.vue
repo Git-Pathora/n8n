@@ -499,52 +499,6 @@ const survey = computed<IFormInputs>(
 				},
 			},
 			{
-				name: REPORTED_SOURCE_KEY,
-				properties: {
-					type: 'select',
-					label: i18n.baseText('personalizationModal.howDidYouHearAboutN8n'),
-					placeholder: i18n.baseText('personalizationModal.select'),
-					options: [
-						{
-							label: 'Google',
-							value: REPORTED_SOURCE_GOOGLE,
-						},
-						{
-							label: 'Twitter',
-							value: REPORTED_SOURCE_TWITTER,
-						},
-						{
-							label: 'LinkedIn',
-							value: REPORTED_SOURCE_LINKEDIN,
-						},
-						{
-							label: 'YouTube',
-							value: REPORTED_SOURCE_YOUTUBE,
-						},
-						{
-							label: 'ChatGPT / LLM',
-							value: REPORTED_SOURCE_LLM,
-						},
-						{
-							label: i18n.baseText('personalizationModal.friendWordOfMouth'),
-							value: REPORTED_SOURCE_FRIEND,
-						},
-						{
-							label: i18n.baseText('personalizationModal.podcast'),
-							value: REPORTED_SOURCE_PODCAST,
-						},
-						{
-							label: i18n.baseText('personalizationModal.event'),
-							value: REPORTED_SOURCE_EVENT,
-						},
-						{
-							label: i18n.baseText('personalizationModal.otherPleaseSpecify'),
-							value: REPORTED_SOURCE_OTHER,
-						},
-					],
-				},
-			},
-			{
 				name: REPORTED_SOURCE_OTHER_KEY,
 				properties: {
 					placeholder: i18n.baseText('personalizationModal.specifyReportedSource'),

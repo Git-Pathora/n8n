@@ -20,6 +20,7 @@ interface FormBoxProps {
 	secondaryButtonText?: string;
 	redirectText?: string;
 	redirectLink?: string;
+	subtitle?: string;
 }
 
 defineOptions({ name: 'N8nFormBox' });
@@ -29,6 +30,7 @@ withDefaults(defineProps<FormBoxProps>(), {
 	buttonLoading: false,
 	redirectText: '',
 	redirectLink: '',
+	subtitle: '',
 });
 
 const formBus = createFormEventBus();
@@ -46,10 +48,11 @@ const onSecondaryButtonClick = (event: Event) => emit('secondaryClick', event);
 
 <template>
 	<div :class="['n8n-form-box', $style.container]">
-		<div v-if="title" :class="$style.heading">
-			<N8nHeading size="xlarge">
+		<div v-if="title || subtitle" :class="$style.heading">
+			<N8nHeading v-if="title" size="xlarge">
 				{{ title }}
 			</N8nHeading>
+			<p v-if="subtitle" :class="$style.subtitleText">{{ subtitle }}</p>
 		</div>
 		<div :class="$style.inputsContainer">
 			<N8nFormInputs
@@ -87,8 +90,16 @@ const onSecondaryButtonClick = (event: Event) => emit('secondaryClick', event);
 <style lang="scss" module>
 .heading {
 	display: flex;
+	flex-direction: column;
+	align-items: center;
 	justify-content: center;
 	margin-bottom: var(--spacing--xl);
+}
+
+.subtitleText {
+	color: var(--color--text--light);
+	margin-top: var(--spacing--xs);
+	text-align: center;
 }
 
 .container {

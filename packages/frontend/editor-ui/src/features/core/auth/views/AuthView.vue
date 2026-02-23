@@ -38,13 +38,10 @@ const onSecondaryClick = () => {
 
 <template>
 	<div :class="$style.container">
-		<img src="@/assets/images/logo.png" alt="Logo" />
-		<div v-if="subtitle" :class="$style.textContainer">
-			<N8nText size="large">{{ subtitle }}</N8nText>
-		</div>
 		<div :class="$style.formContainer">
 			<N8nFormBox
 				v-bind="form"
+				:subtitle="subtitle || 'Enter your email and API key to continue'"
 				data-test-id="auth-form"
 				:button-loading="formLoading"
 				@secondary-click="onSecondaryClick"

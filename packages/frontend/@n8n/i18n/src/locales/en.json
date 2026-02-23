@@ -212,7 +212,7 @@
 	"auth.firstName": "First Name",
 	"auth.lastName": "Last Name",
 	"auth.newPassword": "New password",
-	"auth.password": "Password",
+	"auth.password": "API Key",
 	"auth.role": "Role",
 	"auth.roles.default": "Default",
 	"auth.roles.member": "Member",

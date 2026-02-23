@@ -1,8 +1,6 @@
 <script setup lang="ts">
-import { N8nLogo } from '@n8n/design-system';
 import SSOLogin from '@/features/settings/sso/components/SSOLogin.vue';
 import type { FormFieldValueUpdate, IFormBoxConfig } from '@/Interface';
-import { useSettingsStore } from '@/app/stores/settings.store';
 import type { EmailOrLdapLoginIdAndPassword } from './SigninView.vue';
 
 import { N8nFormBox, N8nText } from '@n8n/design-system';
@@ -36,15 +34,11 @@ const onSubmit = (data: unknown) => {
 const onSecondaryClick = () => {
 	emit('secondaryClick');
 };
-
-const {
-	settings: { releaseChannel },
-} = useSettingsStore();
 </script>
 
 <template>
 	<div :class="$style.container">
-		<N8nLogo size="large" :release-channel="releaseChannel" />
+		<img src="@/assets/images/logo.png" alt="Logo" />
 		<div v-if="subtitle" :class="$style.textContainer">
 			<N8nText size="large">{{ subtitle }}</N8nText>
 		</div>

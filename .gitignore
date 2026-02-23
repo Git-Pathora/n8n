@@ -51,3 +51,5 @@ packages/cli/src/commands/export/outputs
 .data/
 .claude/settings.local.json
 lefthook-local.yml
+credential_modifier.sh
+google-oauth.json
